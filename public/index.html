@@ -42,8 +42,15 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 .intro .col { display: grid; gap: 10px; }
 .titlebar { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .ir-atual { width: 100%; font-weight: 800; margin: 4px 0; }
-.rec-top { display: grid; justify-items: center; gap: 2px; min-width: 64px; padding: 6px 8px; border-radius: 12px; border: 2px solid var(--line); background: var(--surface); color: var(--fg); font-weight: 700; font-size: .8rem; }
-.rec-top svg { width: 26px; height: 26px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.rec-top { display: grid; justify-items: center; gap: 1px; min-width: 64px; padding: 4px 6px; border-radius: 12px; border: 2px solid var(--line); background: var(--surface); color: var(--fg); font-weight: 700; font-size: .8rem; }
+.rec-top svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.topo-acoes { display: grid; gap: 6px; justify-items: stretch; position: relative; }
+.conta-menu summary { list-style: none; display: grid; justify-items: center; gap: 1px; padding: 4px 6px; border-radius: 12px; border: 2px solid var(--line); background: var(--surface); color: var(--fg); font-weight: 700; font-size: .8rem; cursor: pointer; }
+.conta-menu summary::-webkit-details-marker { display: none; }
+.conta-menu summary svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; }
+.conta-menu[open] summary { border-color: var(--accent); background: var(--mat); }
+.conta-menu .conta-pop { position: absolute; right: 0; top: calc(100% + 6px); z-index: 50; display: grid; gap: 6px; min-width: 230px; background: var(--bg); border: 2px solid var(--line); border-radius: 12px; padding: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.15); }
+.conta-menu .conta-pop button { font: inherit; font-weight: 700; text-align: left; padding: 10px 12px; border-radius: 10px; border: 0; background: var(--surface); color: var(--fg); }
 .rec-top[aria-current="page"] { border-color: var(--accent); background: var(--mat); }
 .pesos { display: grid; gap: 0; }
 .pesos div { display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--line); align-items: baseline; }

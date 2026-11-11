@@ -208,10 +208,20 @@
   }
   function menuConta(sb) {
     var d = document.createElement('details');
-    d.setAttribute('style', 'position:fixed;left:12px;bottom:12px;z-index:9000;font-size:.85rem');
-    d.innerHTML = '<summary style="cursor:pointer;opacity:.6">Conta</summary><div style="display:grid;gap:6px;margin-top:6px;background:var(--surface,#fff);padding:10px;border-radius:10px">' +
-      '<button type="button" id="pl-uso">Uso da IA</button><button type="button" id="pl-con">Conectar ou reconectar Strava</button><button type="button" id="pl-sair">Sair</button></div>';
-    document.body.appendChild(d);
+    d.className = 'conta-menu';
+    d.innerHTML = '<summary aria-label="Conta"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg><span>Conta</span></summary>' +
+      '<div class="conta-pop"><button type="button" id="pl-uso">Uso da IA</button><button type="button" id="pl-con">Conectar ou reconectar Strava</button><button type="button" id="pl-sair">Sair</button></div>';
+    var rec = document.getElementById('t-receitas');
+    if (rec && rec.parentNode) {
+      var col = document.createElement('div');
+      col.className = 'topo-acoes';
+      rec.parentNode.insertBefore(col, rec);
+      col.appendChild(rec); col.appendChild(d);
+    } else {
+      d.setAttribute('style', 'position:fixed;right:12px;top:12px;z-index:9000');
+      document.body.appendChild(d);
+    }
+    document.addEventListener('click', function (e) { if (d.open && !d.contains(e.target)) d.open = false; });
     d.querySelector('#pl-con').addEventListener('click', function () { api('/api/strava-conectar', {}).then(function (j) { location.href = j.url; }); });
     d.querySelector('#pl-uso').addEventListener('click', function () { d.open = false; painelUso(sb); });
     d.querySelector('#pl-sair').addEventListener('click', function () { sb.auth.signOut().then(function () { location.reload(); }); });
