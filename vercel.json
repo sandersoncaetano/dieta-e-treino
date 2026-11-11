@@ -26,10 +26,5 @@
         }
       ]
     }
-  ],
-  "functions": {
-    "api/importar.js": {
-      "includeFiles": "dados/**"
-    }
-  }
+  ]
 }
