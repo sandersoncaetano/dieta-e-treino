@@ -44,7 +44,7 @@ scripts/importar-backup.mjs  importa o backup do artefato
 1. Crie um repositório privado no GitHub e envie esta pasta.
 2. Em vercel.com, **Add New > Project**, escolha o repositório. Framework: **Other**. Não precisa de build.
 3. Em **Settings > Environment Variables**, cadastre tudo de `.env.example`:
-   `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `ANTHROPIC_API_KEY`, `EMAILS_PERMITIDOS` (seu e-mail), `STRAVA_CLIENT_ID`, `STRAVA_CLIENT_SECRET`, `APP_URL` (ex.: `https://dieta-e-treino.vercel.app`).
+   `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `ANTHROPIC_API_KEY`, `EMAILS_PERMITIDOS` (seu e-mail), `STRAVA_CLIENT_ID`, `STRAVA_CLIENT_SECRET`, `APP_URL` (`https://dieta-e-treino-lovat.vercel.app`).
 4. Faça o deploy de novo depois de cadastrar as variáveis.
 
 ### 4. Strava
