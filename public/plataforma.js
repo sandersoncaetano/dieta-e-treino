@@ -58,7 +58,10 @@
         '<h1 style="margin:0;font-size:1.6rem">Dieta e Treino</h1>' +
         '<label for="pl-email">Seu e-mail</label>' +
         '<input id="pl-email" type="email" required autocomplete="email" style="font:inherit;padding:12px;border-radius:10px;border:2px solid var(--line,#b7cac5)">' +
-        '<button type="submit" style="font:inherit;font-weight:700;padding:12px;border-radius:10px;border:0;background:var(--accent,#0f6b5f);color:#fff">Receber link de acesso</button>' +
+        '<label for="pl-senha">Senha (se tiver)</label>' +
+        '<input id="pl-senha" type="password" autocomplete="current-password" style="font:inherit;padding:12px;border-radius:10px;border:2px solid var(--line,#b7cac5)">' +
+        '<button type="button" id="pl-entrar" style="font:inherit;font-weight:700;padding:12px;border-radius:10px;border:0;background:var(--accent,#0f6b5f);color:#fff">Entrar com senha</button>' +
+        '<button type="submit" style="font:inherit;font-weight:700;padding:12px;border-radius:10px;border:2px solid var(--accent,#0f6b5f);background:transparent;color:inherit">Receber link de acesso por e-mail</button>' +
         '<p id="pl-msg" aria-live="polite" style="margin:0"></p></form>';
       document.body.appendChild(box);
       var form = box.querySelector('form'), msg = box.querySelector('#pl-msg');
@@ -68,6 +71,14 @@
         msg.textContent = 'Enviando...';
         sb.auth.signInWithOtp({ email: email, options: { emailRedirectTo: location.origin + location.pathname, shouldCreateUser: false } }).then(function (r) {
           msg.textContent = r.error ? 'Não consegui enviar: ' + r.error.message : 'Pronto. Abra o link que chegou no seu e-mail neste aparelho.';
+        });
+      });
+      box.querySelector('#pl-entrar').addEventListener('click', function () {
+        var email = box.querySelector('#pl-email').value.trim(), senha = box.querySelector('#pl-senha').value;
+        if (!email || !senha) { msg.textContent = 'Preencha e-mail e senha.'; return; }
+        msg.textContent = 'Entrando...';
+        sb.auth.signInWithPassword({ email: email, password: senha }).then(function (r) {
+          if (r.error) msg.textContent = 'Não consegui entrar: ' + (r.error.message === 'Invalid login credentials' ? 'e-mail ou senha incorretos.' : r.error.message);
         });
       });
       sb.auth.onAuthStateChange(function (_ev, s) { if (s) { box.remove(); resolve(s); } });
