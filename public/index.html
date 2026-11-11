@@ -265,7 +265,7 @@ td.neg { color: var(--stop); font-weight: 700; }
 .stage.low .phase { top: auto; bottom: 8px; max-width: 38%; line-height: 1.2; }
 .ex-body { padding: 16px; display: grid; gap: 12px; }
 .ex-head { display: grid; grid-template-columns: auto 1fr; gap: 2px 12px; align-items: center; }
-.num { grid-row: span 2; width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; background: var(--fig); color: var(--surface); font: 800 1.3rem var(--display); }
+.num { grid-row: span 2; width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; background: var(--accent); color: var(--on-accent); font: 800 1.3rem var(--display); }
 .dose { color: var(--accent); font-weight: 700; }
 .ex ul { margin: 0; padding-left: 1.1em; display: grid; gap: 4px; }
 .avoid { color: var(--muted); }
@@ -1492,8 +1492,15 @@ window.MOVES = (function () {
       var body = c.card.querySelector('.ex-body');
       body.insertBefore(wrap, body.firstChild.nextSibling);
       wrap.appendChild(stage);
+      var gestao = h('div', {});
+      var mais = h('details', { class: 'mais' }, h('summary', { text: 'Como fazer, dicas e imagem' }));
+      Array.prototype.slice.call(body.children).forEach(function (n) {
+        if (n.tagName === 'UL' || (n.classList && n.classList.contains('avoid'))) mais.appendChild(n);
+      });
+      mais.appendChild(gestao);
+      body.appendChild(mais);
       function sync() {
-        fillPhoto(x.id, x.name, box);
+        fillPhoto(x.id, x.name, box, gestao);
         if (!chosen) mode(Store.get('imagens', x.id) ? 'gif' : 'ani');
       }
       lombMedia.push(sync); sync();
