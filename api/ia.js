@@ -46,11 +46,15 @@ export default rota(async (req, res) => {
     })
   });
   const j = await r.json();
-  if (!r.ok) return responde(res, 502, { erro: (j.error && j.error.message) || 'Falha na IA', code: 'ia' });
+  if (!r.ok) {
+    console.error('Anthropic', r.status, JSON.stringify(j).slice(0, 500));
+    return responde(res, 502, { erro: (j.error && j.error.message) || 'Falha na IA', code: 'ia' });
+  }
   const modelo = j.model || process.env.ANTHROPIC_MODEL || 'claude-sonnet-5-5';
   try {
     await banco('uso_ia', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ user_id: u.id, tipo: tipoDe(String(prompt)), modelo, entrada: (j.usage && j.usage.input_tokens) || 0, saida: (j.usage && j.usage.output_tokens) || 0, imagens: imagens.length }) });
   } catch (e) { /* registro de uso não pode derrubar o cálculo */ }
   const texto = (j.content || []).filter((c) => c.type === 'text').map((c) => c.text).join('');
+  if (!texto) console.error('Anthropic sem texto', JSON.stringify(j).slice(0, 500));
   responde(res, 200, { resultado: extraiJson(texto), uso: j.usage });
 });

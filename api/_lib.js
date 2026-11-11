@@ -70,6 +70,7 @@ export function rota(fn) {
     try {
       await fn(req, res);
     } catch (e) {
+      console.error(req.url, e.status || 500, e.code || '', e.message);
       responde(res, e.status || 500, { erro: e.message || 'Erro', code: e.code || 'erro' });
     }
   };
