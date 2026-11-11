@@ -31,20 +31,20 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
 .gut { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
 .col { max-width: 600px; margin-inline: auto; }
 h1, h2, h3 { font-family: var(--display); margin: 0; text-wrap: balance; }
-h1 { font-size: clamp(2.1rem, 10vw, 3.2rem); line-height: 1; font-weight: 800; letter-spacing: -.02em; }
+h1 { font-size: clamp(1.7rem, 8vw, 2.6rem); line-height: 1; font-weight: 800; letter-spacing: -.02em; }
 h2 { font-size: 1.5rem; line-height: 1.15; font-weight: 800; }
 h3 { font-size: 1.45rem; line-height: 1.15; font-weight: 800; }
 p { margin: 0; }
 button { font: inherit; color: inherit; cursor: pointer; }
 button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 
-.intro { padding-block: 24px 14px; }
+.intro { padding-block: 12px 8px; }
 .intro .col { display: grid; gap: 10px; }
 .titlebar { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .ir-atual { width: 100%; font-weight: 800; margin: 4px 0; }
 .rec-top { display: grid; justify-items: center; gap: 1px; min-width: 64px; padding: 4px 6px; border-radius: 12px; border: 2px solid var(--line); background: var(--surface); color: var(--fg); font-weight: 700; font-size: .8rem; }
 .rec-top svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-.topo-acoes { display: grid; gap: 6px; justify-items: stretch; position: relative; }
+.topo-acoes { display: grid; grid-auto-flow: column; gap: 6px; position: relative; }
 .conta-menu summary { list-style: none; display: grid; justify-items: center; gap: 1px; padding: 4px 6px; border-radius: 12px; border: 2px solid var(--line); background: var(--surface); color: var(--fg); font-weight: 700; font-size: .8rem; cursor: pointer; }
 .conta-menu summary::-webkit-details-marker { display: none; }
 .conta-menu summary svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; }
@@ -85,20 +85,28 @@ main { padding-block: 20px 72px; }
 .gym-top { display: grid; gap: 12px; }
 .letters { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
 .letter { height: 52px; border: 2px solid var(--line); border-radius: 10px; background: transparent; font: 800 1.3rem var(--display); }
-.letter[aria-pressed="true"] { background: var(--fig); border-color: var(--fig); color: var(--surface); }
+.letter[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
 .gym-head { display: grid; gap: 2px; }
 #gym { display: grid; gap: 14px; }
 .lift { background: var(--surface); border-radius: 14px; padding: 14px 16px; display: grid; gap: 10px; }
 .lift h3 { font-size: 1.2rem; }
-.lift-head { display: grid; gap: 2px; }
+.lift-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; column-gap: 12px; row-gap: 2px; }
+.lift { gap: 8px; padding: 12px 14px; }
+.mais { border-top: 1px solid var(--line); padding-top: 6px; }
+.mais summary { cursor: pointer; font-weight: 700; color: var(--accent); padding: 6px 0; }
+.mais[open] > *:not(summary) { margin-top: 8px; }
+.ex-dados { display: grid; gap: 8px; }
+.howto .durs .dur { height: 34px; padding: 0 12px; font-size: .95rem; }
 .tip { color: var(--muted); font-size: .95rem; }
 .load-row { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 10px; align-items: end; }
-@media (max-width: 380px) { .load-row .stepper { grid-template-columns: 38px minmax(0, 1fr) 38px; } .load-row { gap: 8px; } }
+@media (max-width: 380px) { .load-row .stepper { grid-template-columns: 34px minmax(0, 1fr) 34px; gap: 3px; } .load-row { gap: 8px; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); } .load-row .stepper input { font-size: 1.05rem; } }
 .field { display: grid; gap: 4px; min-width: 0; }
 .field > span, .field > label { color: var(--muted); font-size: .92rem; }
 input, textarea { font: inherit; color: var(--fg); background: var(--bg); border: 2px solid var(--line); border-radius: 8px; padding: 8px 10px; width: 100%; min-width: 0; }
 input:focus-visible, textarea:focus-visible { outline: 3px solid var(--accent); outline-offset: 1px; }
 input[type="number"] { font-variant-numeric: tabular-nums; font-weight: 700; height: 46px; }
+input[type="number"]::-webkit-inner-spin-button, input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
 input[type="date"] { height: 46px; }
 .stepper { display: grid; grid-template-columns: 42px minmax(0, 1fr) 42px; gap: 4px; }
 .stepper input { padding-inline: 2px; min-width: 0; }
@@ -112,7 +120,7 @@ input[type="date"] { height: 46px; }
 .howto { display: grid; gap: 8px; }
 .howto .stage { border-radius: 10px; overflow: hidden; }
 .photo { display: grid; gap: 8px; }
-.photo img { display: block; width: 100%; max-height: 420px; object-fit: contain; background: var(--mat); border-radius: 10px; }
+.photo img { display: block; width: 100%; max-height: min(34vh, 300px); object-fit: contain; background: var(--mat); border-radius: 10px; }
 .photo-row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
 .photo .link { max-width: none; }
 .pick-wrap { position: relative; display: inline-grid; }
@@ -295,13 +303,13 @@ td.neg { color: var(--stop); font-weight: 700; }
 .wk-day { position: relative; display: grid; gap: 0; justify-items: center; padding: 6px 0 10px; border-radius: 8px; border: 2px solid var(--line); background: transparent; min-width: 0; }
 .wk-day span { font-size: .78rem; color: var(--muted); }
 .wk-day b { font-variant-numeric: tabular-nums; }
-.wk-day.sel { background: var(--fig); border-color: var(--fig); color: var(--surface); }
+.wk-day.sel { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
 .wk-day.sel span { color: var(--surface); }
 .wk-day.has::after { content: ""; position: absolute; bottom: 3px; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
 .lift.feito, .ex.feito { opacity: .5; }
 .lift.feito img, .ex.feito img { filter: grayscale(1); }
 .lift.now, .ex.now { background: color-mix(in srgb, var(--accent) 18%, var(--surface)); }
-.lift.now h3::before, .ex.now h3::before { content: "▶ Fazendo agora"; display: block; color: var(--accent); font-size: .85rem; font-weight: 800; letter-spacing: .02em; }
+.lift.now h3::before, .ex.now h3::before { content: "▶ Fazendo agora"; display: block; font-family: var(--body); color: var(--accent); font-size: .85rem; font-weight: 800; letter-spacing: .02em; }
 .go.done { background: var(--mat); color: var(--fg); }
 .go.saved, .go.saved:disabled { background: transparent; border: 3px solid var(--accent); color: var(--accent); opacity: 1; }
 .toast { position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); transform: translate(-50%, 16px); z-index: 30; max-width: calc(100vw - 32px); padding: 12px 18px; border-radius: 12px; background: var(--accent); color: var(--on-accent); font-weight: 800; box-shadow: 0 6px 20px rgba(0, 0, 0, .25); opacity: 0; pointer-events: none; transition: opacity .18s, transform .18s; }
@@ -345,9 +353,11 @@ footer .col { display: grid; gap: 10px; }
     <div class="gym-top">
       <div class="letters" id="gym-tabs" role="group" aria-label="Escolha o treino"></div>
     </div>
-    <p class="lede">Use GIF ou Animação para ver o movimento de cada exercício. Ajuste a carga se precisar. Ela fica salva quando você marca a primeira série. Em cada exercício, termine com 1 a 2 repetições sobrando.</p>
+    <details class="mais"><summary>Como usar, som e vibração</summary>
+    <p class="lede">Use GIF ou Animação para ver o movimento de cada exercício. Ajuste a carga se precisar. Ela fica salva quando você marca a primeira série. Em cada exercício, termine com 1 a 2 repetições sobrando. Se as repetições caírem, ajuste o campo Reps antes de marcar a série.</p>
     <div class="photo-row"><button type="button" class="howbtn" id="test-alert">Testar som e vibração</button><span class="tip" id="test-msg" aria-live="polite"></span></div>
     <div class="vol"><label for="alert-vol">Volume do alerta: <b id="alert-vol-n"></b></label><input type="range" id="alert-vol" min="0" max="100" step="10"></div>
+    </details>
     <div id="gym"></div>
   </section>
 
@@ -1579,8 +1589,10 @@ window.MOVES = (function () {
     if (!doc || !doc.asset_id) return;
     Store.assets().then(function (a) { if (a) a.delete(doc.asset_id).catch(function () {}); });
   }
-  function fillPhoto(id, name, box) {
+  function fillPhoto(id, name, box, gestao) {
     box.textContent = '';
+    var alvo = gestao || box;
+    if (gestao) gestao.textContent = '';
     var saved = Store.get('imagens', id);
     var msg = h('p', { class: 'tip', 'aria-live': 'polite' });
     var input = h('input', { type: 'file', accept: 'image/*', id: 'file-' + id, class: 'file', 'aria-label': 'Escolher imagem de ' + name });
@@ -1588,14 +1600,13 @@ window.MOVES = (function () {
       var f = input.files && input.files[0];
       if (!f) return;
       msg.textContent = 'Salvando imagem...';
-      saveImage(f, id, name).then(function () { fillPhoto(id, name, box); }).catch(function (e) {
+      saveImage(f, id, name).then(function () { fillPhoto(id, name, box, gestao); }).catch(function (e) {
         msg.textContent = e && e.message === 'gif'
           ? 'Esse GIF é grande demais para este modo. Abra o caderno pelo Claude e tente de novo.'
           : 'Não consegui usar essa imagem. Tente outra foto.';
       });
     });
     if (saved) box.appendChild(h('img', { src: saved.url, loading: 'lazy', alt: 'Imagem de ' + name }));
-    if (saved) box.appendChild(h('p', { class: 'tip', text: saved.animada ? 'Arquivo original mantido, com animação se ele tiver.' : 'Salva como imagem parada.' }));
     var pick = h('button', { type: 'button', class: 'howbtn', id: 'pick-' + id, tabindex: '-1', text: saved ? 'Trocar imagem' : 'Adicionar imagem' });
     var row = h('div', { class: 'photo-row' }, h('div', { class: 'pick-wrap' }, pick, input));
     if (saved) {
@@ -1605,11 +1616,11 @@ window.MOVES = (function () {
         var cur = Store.get('imagens', id);
         Store.del('imagens', id);
         dropAsset(cur);
-        fillPhoto(id, name, box);
+        fillPhoto(id, name, box, gestao);
       });
       row.appendChild(rm);
     }
-    box.appendChild(row); box.appendChild(msg);
+    alvo.appendChild(row); alvo.appendChild(msg);
   }
 
   function exCard(ex) {
@@ -1638,7 +1649,8 @@ window.MOVES = (function () {
       undoBtn.hidden = !sk;
       el.classList.toggle('feito', n + sk >= ex.sets);
       var rr = it ? repsDe(it) : [];
-      feitoTxt.textContent = rr.length ? 'Feito: ' + rr.map(function (x, j) { return 'S' + (j + 1) + ' ' + x; }).join(' · ') + ' reps' : 'Se as repetições caírem, ajuste o campo Reps antes de marcar a série.';
+      feitoTxt.textContent = rr.length ? 'Feito: ' + rr.map(function (x, j) { return 'S' + (j + 1) + ' ' + x; }).join(' · ') + ' reps' : '';
+      feitoTxt.hidden = !rr.length;
       pips.forEach(function (b, i) {
         var off = i >= n && i < n + sk;
         b.setAttribute('aria-pressed', i < n ? 'true' : 'false');
@@ -1728,10 +1740,12 @@ window.MOVES = (function () {
     var mv = window.MOVES[ex.id];
     mv.name = ex.name;
     var how = h('div', { class: 'howto' });
+    var gestaoImg = h('div', {});
+    var maisBox = h('details', { class: 'mais' }, h('summary', { text: 'Como fazer, dicas e imagem' }));
     (function () {
       var box = h('div', { class: 'photo' });
       var ani = h('div', {});
-      fillPhoto(mv.id, ex.name, box);
+      fillPhoto(mv.id, ex.name, box, gestaoImg);
       var gifBtn = h('button', { type: 'button', class: 'dur', id: 'gif-' + ex.id, text: 'GIF' });
       var aniBtn = h('button', { type: 'button', class: 'dur', id: 'ani-' + ex.id, text: 'Animação' });
       function mode(m) {
@@ -1745,15 +1759,16 @@ window.MOVES = (function () {
       how.appendChild(h('div', { class: 'durs', role: 'group', 'aria-label': 'Como ver o exercício' }, gifBtn, aniBtn));
       how.appendChild(box); how.appendChild(ani);
       mode(howMode[mv.id] || (Store.get('imagens', mv.id) ? 'gif' : 'ani'));
-      how.appendChild(h('p', { text: mv.how }));
-      how.appendChild(h('a', { class: 'yt', target: '_blank', rel: 'noopener', text: 'Ver vídeos no YouTube',
+      maisBox.appendChild(h('p', { text: mv.how }));
+      if (ex.tip) maisBox.appendChild(h('p', { class: 'tip', text: ex.tip }));
+      maisBox.appendChild(h('a', { class: 'yt', target: '_blank', rel: 'noopener', text: 'Ver vídeos no YouTube',
         href: 'https://www.youtube.com/results?search_query=' + encodeURIComponent(mv.q) }));
+      maisBox.appendChild(gestaoImg);
     })();
 
     var el = h('article', { class: 'lift' + (nowId === ex.id ? ' now' : ''), 'data-ex': ex.id },
       h('div', { class: 'lift-head' }, h('h3', { text: ex.name }), h('span', { class: 'dose', text: ex.sets + ' × ' + ex.reps })),
       how,
-      ex.tip ? h('p', { class: 'tip', text: ex.tip }) : null,
       h('div', { class: 'load-row' },
         h('div', { class: 'field' },
           h('span', { text: 'Carga' + (ex.unit ? ' ' + ex.unit : '') }),
@@ -1777,7 +1792,8 @@ window.MOVES = (function () {
       h('div', { class: 'skip-row' },
         h('button', { type: 'button', class: 'link', id: 'skip-set-' + ex.id, text: 'Pular série', on: { click: function () { skip(false); } } }),
         h('button', { type: 'button', class: 'link', id: 'skip-all-' + ex.id, text: 'Pular exercício', on: { click: function () { skip(true); } } }),
-        undoBtn));
+        undoBtn),
+      maisBox);
     el.sync = sync;
     return el;
   }
