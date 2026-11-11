@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#0f6b5f">
+<meta name="theme-color" content="#1a5fd0">
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" href="/icons/icon-192.png">
 <link rel="apple-touch-icon" href="/icons/icon-192.png">
@@ -15,27 +15,14 @@
 <style>
 /* Layout: uma coluna para seguir no chão, com o celular ao lado. Cada exercício é uma faixa de tatame com a figura em movimento. */
 :root {
-  --bg: #e9f0ee; --surface: #f7faf9; --mat: #d5e3df; --line: #b7cac5;
-  --fg: #12302e; --muted: #4c6764;
-  --fig: #1b4a55; --far: #86a5a8; --hi: #e2570f; --hi-far: #f19a6c;
-  --accent: #0d6c64; --on-accent: #ffffff;
+  --bg: #ffffff; --surface: #f5f8fd; --mat: #e4ecf8; --line: #c6d4e8;
+  --fg: #142338; --muted: #4f5f78;
+  --fig: #1d3f72; --far: #8ba3c6; --hi: #e2570f; --hi-far: #f19a6c;
+  --accent: #1a5fd0; --on-accent: #ffffff;
   --stop: #b3261e; --stop-bg: #f9e3e0;
   --display: "Bricolage Grotesque", "Trebuchet MS", system-ui, sans-serif;
   --body: "Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
-}
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
-  --bg: #0e1b1b; --surface: #152625; --mat: #1d3331; --line: #30504d;
-  --fg: #e4f0ed; --muted: #a2bab6;
-  --fig: #cfe6e4; --far: #5f8582; --hi: #ff8a4c; --hi-far: #b9663a;
-  --accent: #4fd0c0; --on-accent: #06211e;
-  --stop: #ff9d94; --stop-bg: #3a1c1a; color-scheme: dark;
-} }
-:root[data-theme="dark"] {
-  --bg: #0e1b1b; --surface: #152625; --mat: #1d3331; --line: #30504d;
-  --fg: #e4f0ed; --muted: #a2bab6;
-  --fig: #cfe6e4; --far: #5f8582; --hi: #ff8a4c; --hi-far: #b9663a;
-  --accent: #4fd0c0; --on-accent: #06211e;
-  --stop: #ff9d94; --stop-bg: #3a1c1a; color-scheme: dark;
+  color-scheme: light;
 }
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }

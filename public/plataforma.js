@@ -51,17 +51,17 @@
   /* Login por link no e-mail */
   function telaLogin(sb) {
     return new Promise(function (resolve) {
-      var css = 'position:fixed;inset:0;z-index:9999;display:grid;place-items:center;background:var(--bg,#e9f0ee);padding:16px;font-family:inherit';
+      var css = 'position:fixed;inset:0;z-index:9999;display:grid;place-items:center;background:var(--bg,#ffffff);padding:16px;font-family:inherit';
       var box = document.createElement('div');
       box.setAttribute('style', css);
       box.innerHTML = '<form style="max-width:360px;width:100%;display:grid;gap:12px;background:var(--surface,#fff);padding:20px;border-radius:16px">' +
         '<h1 style="margin:0;font-size:1.6rem">Dieta e Treino</h1>' +
         '<label for="pl-email">Seu e-mail</label>' +
-        '<input id="pl-email" type="email" required autocomplete="email" style="font:inherit;padding:12px;border-radius:10px;border:2px solid var(--line,#b7cac5)">' +
+        '<input id="pl-email" type="email" required autocomplete="email" style="font:inherit;padding:12px;border-radius:10px;border:2px solid var(--line,#c6d4e8)">' +
         '<label for="pl-senha">Senha (se tiver)</label>' +
-        '<input id="pl-senha" type="password" autocomplete="current-password" style="font:inherit;padding:12px;border-radius:10px;border:2px solid var(--line,#b7cac5)">' +
-        '<button type="button" id="pl-entrar" style="font:inherit;font-weight:700;padding:12px;border-radius:10px;border:0;background:var(--accent,#0f6b5f);color:#fff">Entrar com senha</button>' +
-        '<button type="submit" style="font:inherit;font-weight:700;padding:12px;border-radius:10px;border:2px solid var(--accent,#0f6b5f);background:transparent;color:inherit">Receber link de acesso por e-mail</button>' +
+        '<input id="pl-senha" type="password" autocomplete="current-password" style="font:inherit;padding:12px;border-radius:10px;border:2px solid var(--line,#c6d4e8)">' +
+        '<button type="button" id="pl-entrar" style="font:inherit;font-weight:700;padding:12px;border-radius:10px;border:0;background:var(--accent,#1a5fd0);color:#fff">Entrar com senha</button>' +
+        '<button type="submit" style="font:inherit;font-weight:700;padding:12px;border-radius:10px;border:2px solid var(--accent,#1a5fd0);background:transparent;color:inherit">Receber link de acesso por e-mail</button>' +
         '<p id="pl-msg" aria-live="polite" style="margin:0"></p></form>';
       document.body.appendChild(box);
       var form = box.querySelector('form'), msg = box.querySelector('#pl-msg');
