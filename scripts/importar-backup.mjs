@@ -23,7 +23,7 @@ for (let i = 0; i < linhas.length; i += 500) {
     method: 'POST',
     headers: {
       apikey: SUPABASE_SERVICE_ROLE_KEY,
-      Authorization: 'Bearer ' + SUPABASE_SERVICE_ROLE_KEY,
+      ...(SUPABASE_SERVICE_ROLE_KEY.startsWith('sb_') ? {} : { Authorization: 'Bearer ' + SUPABASE_SERVICE_ROLE_KEY }),
       'Content-Type': 'application/json',
       Prefer: 'resolution=merge-duplicates'
     },

@@ -34,7 +34,7 @@ scripts/importar-backup.mjs  importa o backup do artefato
 3. Em **Authentication > Users**, clique em **Add user** e crie o seu, com o seu e-mail.
 4. Em **Authentication > Sign In / Providers**, deixe o login por e-mail ligado e **desligue "Allow new users to sign up"**. Assim ninguém mais cria conta.
 5. Em **Authentication > URL Configuration**, coloque o endereço do app (passo 3) em **Site URL**.
-6. Anote em **Project Settings > API**: `URL`, `anon key` e `service_role key`.
+6. Em **Project Settings > API Keys**, a chave em **Secret keys** (começa com `sb_secret_`) é a `SUPABASE_SERVICE_ROLE_KEY`. A chave pública (`SUPABASE_ANON_KEY`) é a anon legada, em **View legacy API keys**.
 
 ### 2. Anthropic
 1. Em console.anthropic.com, crie uma chave de API.

@@ -41,7 +41,8 @@ export async function banco(caminho, opcoes = {}) {
     ...opcoes,
     headers: {
       apikey: env('SUPABASE_SERVICE_ROLE_KEY'),
-      Authorization: 'Bearer ' + env('SUPABASE_SERVICE_ROLE_KEY'),
+      // Chaves novas (sb_secret_...) vão só no apikey; as antigas (JWT) também no Authorization.
+      ...(env('SUPABASE_SERVICE_ROLE_KEY').startsWith('sb_') ? {} : { Authorization: 'Bearer ' + env('SUPABASE_SERVICE_ROLE_KEY') }),
       'Content-Type': 'application/json',
       Prefer: 'return=representation,resolution=merge-duplicates',
       ...(opcoes.headers || {})
