@@ -1,0 +1,11 @@
+{
+  "name": "dieta-e-treino",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "App pessoal de dieta e treino: página única + funções no Vercel + Supabase",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "importar": "node scripts/importar-backup.mjs"
+  }
+}
