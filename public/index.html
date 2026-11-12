@@ -273,6 +273,7 @@ td.neg { color: var(--stop); font-weight: 700; }
 
 .sets { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .pip { min-width: 52px; height: 46px; padding: 0 10px; border-radius: 8px; border: 2px solid var(--line); background: transparent; font-weight: 700; font-variant-numeric: tabular-nums; }
+.pip-add { border-style: dashed; font-size: 1.3rem; color: var(--accent); }
 .pip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
 .sets small { color: var(--muted); font-size: .9rem; }
 
@@ -1547,6 +1548,7 @@ window.MOVES = (function () {
     return out;
   }
   function repsTxt(it) { var r = repsDe(it); return r.length && r.some(function (x) { return x !== r[0]; }) ? r.join('/') : r.length + 'x' + (r[0] || 0); }
+  function plan(e, it) { return it && it.planejadas > 0 ? it.planejadas : e.sets; }
   function commit(s) { s.atualizado = new Date().toISOString(); Store.set('treinos', sid(), s); }
 
   function shrink(file, side, quality) {
@@ -1672,7 +1674,10 @@ window.MOVES = (function () {
       var it = session().itens[ex.id];
       var n = it ? it.series : 0, sk = it ? it.puladas || 0 : 0;
       undoBtn.hidden = !sk;
-      el.classList.toggle('feito', n + sk >= ex.sets);
+      el.classList.toggle('feito', n + sk >= plan(ex, it));
+      if (pips.length !== plan(ex, it)) montaPips();
+      dose.textContent = plan(ex, it) + ' × ' + ex.reps;
+      menosBtn.hidden = !(it && plan(ex, it) > Math.max(1, (it.series || 0) + (it.puladas || 0)));
       var rr = it ? repsDe(it) : [];
       feitoTxt.textContent = rr.length ? 'Feito: ' + rr.map(function (x, j) { return 'S' + (j + 1) + ' ' + x; }).join(' · ') + ' reps' : '';
       feitoTxt.hidden = !rr.length;
@@ -1711,17 +1716,17 @@ window.MOVES = (function () {
     reps.addEventListener('change', changed);
     confirmBtn.addEventListener('click', confirm);
     function skip(all) {
-      var s = current(), it = s.itens[ex.id], left = ex.sets - it.series - (it.puladas || 0);
+      var s = current(), it = s.itens[ex.id], left = plan(ex, it) - it.series - (it.puladas || 0);
       if (left <= 0) return;
       it.puladas = (it.puladas || 0) + (all ? left : 1);
       commit(s); sync();
-      if (it.series + it.puladas >= ex.sets) nextEx();
+      if (it.series + it.puladas >= plan(ex, it)) nextEx();
     }
     function nextEx() {
       window.goNext(document.querySelector('.lift[data-ex="' + ex.id + '"]'), function (card) {
         var e = TREINOS[sel].ex.filter(function (o) { return o.id === card.dataset.ex; })[0];
         var it = session().itens[card.dataset.ex];
-        return !!(e && it && it.series + (it.puladas || 0) >= e.sets);
+        return !!(e && it && it.series + (it.puladas || 0) >= plan(e, it));
       });
     }
     function repStep(dir) {
@@ -1731,16 +1736,33 @@ window.MOVES = (function () {
       var v = (num(kg.value) || 0) + dir * (ex.step || 2.5);
       kg.value = Math.max(0, v); changed();
     }
-    for (var i = 0; i < ex.sets; i++) (function (i) {
+    var maisBtn = h('button', { type: 'button', class: 'pip pip-add', id: 'set-add-' + ex.id, text: '+', 'aria-label': 'Adicionar uma série em ' + ex.name, on: { click: function () {
+      var s = current(), it = s.itens[ex.id];
+      it.planejadas = plan(ex, it) + 1; commit(s); sync(); setNow(ex.id);
+    } } });
+    var menosBtn = h('button', { type: 'button', class: 'link', id: 'set-rm-' + ex.id, text: 'Remover série', hidden: '', on: { click: function () {
+      var s = current(), it = s.itens[ex.id];
+      var min = Math.max(1, (it.series || 0) + (it.puladas || 0));
+      if (plan(ex, it) <= min) return;
+      it.planejadas = plan(ex, it) - 1; commit(s); sync();
+    } } });
+    function montaPips() {
+      pipRow.textContent = ''; pips.length = 0;
+      var tot = plan(ex, session().itens[ex.id]);
+      for (var i = 0; i < tot; i++) criaPip(i);
+      pipRow.appendChild(maisBtn);
+    }
+    function criaPip(i) {
       var b = h('button', { type: 'button', class: 'pip', id: 'set-' + ex.id + '-' + i, text: i + 1, 'aria-label': ex.name + ', série ' + (i + 1),
         on: { click: function () {
           var s = current(), it = s.itens[ex.id];
           var prev = it.series, sk = it.puladas || 0;
           if (i >= prev && i < prev + sk) { it.puladas = i - prev; commit(s); sync(); return; }
           it.series = it.series === i + 1 ? i : i + 1;
-          it.puladas = Math.min(sk, ex.sets - it.series);
-          if (it.series + (it.puladas || 0) < ex.sets) setNow(ex.id);
-          if (it.series > prev) Rest.start(restOf(), it.series + (it.puladas || 0) >= ex.sets ? nextEx : null);
+          var tp = plan(ex, it);
+          it.puladas = Math.min(sk, tp - it.series);
+          if (it.series + (it.puladas || 0) < tp) setNow(ex.id);
+          if (it.series > prev) Rest.start(restOf(), it.series + (it.puladas || 0) >= tp ? nextEx : null);
           it.kg = num(kg.value); it.reps = num(reps.value);
           var rs = (it.repsSerie || []).slice(0, Math.min(prev, it.series));
           while (rs.length < it.series) rs.push(it.reps || 0);
@@ -1750,7 +1772,8 @@ window.MOVES = (function () {
           sync();
         } } });
       pips.push(b); pipRow.appendChild(b);
-    })(i);
+    }
+    montaPips();
 
     function restOf() { var r = Store.get('descansos', ex.id); return r ? r.segundos : 60; }
     var restVal = h('b', { class: 'rest-val', id: 'descanso-' + ex.id, text: clock(restOf()) });
@@ -1791,8 +1814,9 @@ window.MOVES = (function () {
       maisBox.appendChild(gestaoImg);
     })();
 
+    var dose = h('span', { class: 'dose', text: plan(ex, it0) + ' × ' + ex.reps });
     var el = h('article', { class: 'lift' + (nowId === ex.id ? ' now' : ''), 'data-ex': ex.id },
-      h('div', { class: 'lift-head' }, h('h3', { text: ex.name }), h('span', { class: 'dose', text: ex.sets + ' × ' + ex.reps })),
+      h('div', { class: 'lift-head' }, h('h3', { text: ex.name }), dose),
       how,
       h('div', { class: 'load-row' },
         h('div', { class: 'field' },
@@ -1817,6 +1841,7 @@ window.MOVES = (function () {
       h('div', { class: 'skip-row' },
         h('button', { type: 'button', class: 'link', id: 'skip-set-' + ex.id, text: 'Pular série', on: { click: function () { skip(false); } } }),
         h('button', { type: 'button', class: 'link', id: 'skip-all-' + ex.id, text: 'Pular exercício', on: { click: function () { skip(true); } } }),
+        menosBtn,
         undoBtn),
       maisBox);
     el.sync = sync;
@@ -1861,7 +1886,7 @@ window.MOVES = (function () {
     var itens = session().itens || {};
     var part = TREINOS[sel].ex.filter(function (e) {
       var it = itens[e.id], d = it ? it.series + (it.puladas || 0) : 0;
-      return d > 0 && d < e.sets;
+      return d > 0 && d < plan(e, it);
     })[0];
     var first = part ? { dataset: { ex: part.id } } : document.querySelector('#gym .lift:not(.feito)');
     setNow(first ? first.dataset.ex : null);
@@ -1878,7 +1903,7 @@ window.MOVES = (function () {
   });
   function updateCount() {
     var total = 0, done = 0, pul = 0, s = session();
-    TREINOS[sel].ex.forEach(function (e) { total += e.sets; var it = s.itens[e.id]; if (it) { done += it.series; pul += it.puladas || 0; } });
+    TREINOS[sel].ex.forEach(function (e) { var it = s.itens[e.id]; total += plan(e, it); if (it) { done += it.series; pul += it.puladas || 0; } });
     var c = $('gym-count'); if (c) c.textContent = done + ' de ' + total + ' séries' + (pul ? ' · ' + pul + ' puladas' : '');
     var dl = $('gym-del'); if (dl) dl.hidden = !Store.get('treinos', sid());
   }
@@ -1920,7 +1945,7 @@ window.MOVES = (function () {
       var c = session();
       return tr.ex.filter(function (e) {
         var it = c.itens[e.id];
-        return !it || it.series + (it.puladas || 0) < e.sets;
+        return !it || it.series + (it.puladas || 0) < plan(e, it);
       });
     }
     function tryFinish() {
@@ -1939,7 +1964,7 @@ window.MOVES = (function () {
         var c = meta();
         pend.forEach(function (e) {
           var it = c.itens[e.id] || (c.itens[e.id] = { nome: e.name, kg: null, reps: null, series: 0, planejadas: e.sets, confirmada: false });
-          it.puladas = e.sets - it.series;
+          it.puladas = Math.max(0, plan(e, it) - it.series);
         });
         commit(c); finishGym();
       } } }));
