@@ -282,6 +282,54 @@
     });
   }
 
+  /* Aviso de descanso por notificação (funciona com o app em segundo plano) */
+  function b64(u) { var p = '='.repeat((4 - u.length % 4) % 4), s = atob((u + p).replace(/-/g, '+').replace(/_/g, '/')), a = new Uint8Array(s.length); for (var i = 0; i < s.length; i++) a[i] = s.charCodeAt(i); return a; }
+  var alertaAtual = null, inscritoP = null;
+  function inscrever() {
+    if (inscritoP) return inscritoP;
+    inscritoP = Promise.all([cliente(), config(), navigator.serviceWorker.ready]).then(function (r) {
+      var sb = r[0], cfg = r[1], reg = r[2];
+      if (!cfg.vapidPublic || !reg.pushManager) throw new Error('sem push');
+      return reg.pushManager.getSubscription().then(function (sub) {
+        return sub || reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64(cfg.vapidPublic) });
+      }).then(function (sub) {
+        var j = sub.toJSON();
+        return sb.from('push_inscricoes').upsert({ endpoint: j.endpoint, p256dh: j.keys.p256dh, auth: j.keys.auth }).then(function (x) { if (x.error) throw x.error; return true; });
+      });
+    });
+    inscritoP.catch(function () { inscritoP = null; });
+    return inscritoP;
+  }
+  window.AlertaPush = {
+    disponivel: function () { return 'Notification' in window && 'serviceWorker' in navigator && 'PushManager' in window; },
+    permissao: function () { return 'Notification' in window ? Notification.permission : 'denied'; },
+    ativar: function () {
+      if (!window.AlertaPush.disponivel()) return Promise.resolve('indisponivel');
+      return Notification.requestPermission().then(function (p) { return p === 'granted' ? inscrever().then(function () { return 'ok'; }) : p; });
+    },
+    agendar: function (quando, titulo, corpo) {
+      if (!window.AlertaPush.disponivel()) return;
+      var pedir = Notification.permission === 'default' ? Notification.requestPermission() : Promise.resolve(Notification.permission);
+      var meu = {};
+      window.AlertaPush.cancelar();
+      alertaAtual = meu;
+      pedir.then(function (p) {
+        if (p !== 'granted' || alertaAtual !== meu) return;
+        return inscrever().then(function () { return cliente(); }).then(function (sb) {
+          return sb.from('alertas').insert({ dispara_em: new Date(quando).toISOString(), titulo: titulo, corpo: corpo || null }).select('id').single();
+        }).then(function (r) {
+          if (r && r.data) meu.id = r.data.id;
+          if (alertaAtual !== meu && meu.id) cancelaId(meu.id);
+        });
+      }).catch(function () {});
+    },
+    cancelar: function () {
+      var a = alertaAtual; alertaAtual = null;
+      if (a && a.id) cancelaId(a.id);
+    }
+  };
+  function cancelaId(id) { cliente().then(function (sb) { return sb.from('alertas').delete().eq('id', id); }).catch(function () {}); }
+
   var servicos = null;
   function prontos() {
     if (!servicos) servicos = Promise.all([cliente(), sessao()]).then(function (r) {

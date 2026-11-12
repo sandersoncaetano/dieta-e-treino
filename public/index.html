@@ -357,6 +357,8 @@ footer .col { display: grid; gap: 10px; }
     <p class="lede">Use GIF ou Animação para ver o movimento de cada exercício. Ajuste a carga se precisar. Ela fica salva quando você marca a primeira série. Em cada exercício, termine com 1 a 2 repetições sobrando. Se as repetições caírem, ajuste o campo Reps antes de marcar a série.</p>
     <div class="photo-row"><button type="button" class="howbtn" id="test-alert">Testar som e vibração</button><span class="tip" id="test-msg" aria-live="polite"></span></div>
     <div class="vol"><label for="alert-vol">Volume do alerta: <b id="alert-vol-n"></b></label><input type="range" id="alert-vol" min="0" max="100" step="10"></div>
+    <div class="photo-row"><button type="button" class="howbtn" id="push-on">Ativar aviso com o app em segundo plano</button><span class="tip" id="push-msg" aria-live="polite"></span></div>
+    <p class="tip">O aviso chega como notificação, com vibração, mesmo vendo vídeo ou com a tela bloqueada. Pode atrasar 1 a 3 segundos.</p>
     </details>
     <div id="gym"></div>
   </section>
@@ -1276,27 +1278,43 @@ window.MOVES = (function () {
   /* Cronômetro do treino e descanso */
   var Rest = (function () {
     var end = 0, t = null, then = null;
+    function agenda() { if (window.AlertaPush) window.AlertaPush.agendar(end, 'Descanso acabou', 'Hora da próxima série.'); }
     function hide() {
       clearInterval(t); t = null; $('rest').hidden = true;
+      if (window.AlertaPush && Date.now() < end - 1500) window.AlertaPush.cancelar();
       var f = then; then = null; if (f) f();
     }
     function tick() {
       var left = Math.ceil((end - Date.now()) / 1000);
+      // Com o app na tela, o alerta toca aqui mesmo; cancela a notificação para não duplicar.
+      if (left <= 4 && document.visibilityState === 'visible' && window.AlertaPush) window.AlertaPush.cancelar();
       if (left <= 0) { window.Fig.alert(); hide(); return; }
       $('rest-time').textContent = clock(left);
     }
-    $('rest-add').addEventListener('click', function () { end += 15000; tick(); });
+    $('rest-add').addEventListener('click', function () { end += 15000; tick(); agenda(); });
     $('rest-skip').addEventListener('click', hide);
     return { start: function (sec, after) {
       window.Fig.prep();
       then = after || null;
       end = Date.now() + sec * 1000;
+      agenda();
       $('rest').hidden = false;
       if (!t) t = setInterval(tick, 250);
       tick();
     } };
   })();
   window.Rest = Rest;
+  (function () {
+    var b = $('push-on'), m = $('push-msg');
+    if (!b) return;
+    function estado() {
+      if (!window.AlertaPush || !window.AlertaPush.disponivel()) { m.textContent = 'Este navegador não permite avisos em segundo plano.'; b.hidden = true; return; }
+      var p = window.AlertaPush.permissao();
+      m.textContent = p === 'granted' ? 'Ativado.' : p === 'denied' ? 'Bloqueado nas configurações do navegador. Libere as notificações do site para ativar.' : '';
+    }
+    b.addEventListener('click', function () { m.textContent = 'Ativando...'; window.AlertaPush.ativar().then(function () { estado(); }, function () { m.textContent = 'Não consegui ativar agora.'; }); });
+    setTimeout(estado, 1500);
+  })();
 
   var nowId = null;
   window.goNext = function (el, isDone) {
