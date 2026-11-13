@@ -3993,38 +3993,48 @@ window.MOVES = (function () {
       });
       return Object.keys(g).map(function (k) { g[k].key = k; return g[k]; });
     }
-    function trecho(v) {
-      var m = v.match(/^([\s\S]*(?:[,;+\n]|\se\s|\scom\s))?([^,;+\n]*)$/i);
-      var antes = m && m[1] || '', frag = m ? m[2] : v;
-      var q = frag.match(/^\s*\d+(?:[.,]\d+)?\s*(?:g|kg|ml|l|un|unidades?|fatias?|colher(?:es)?(?: de sopa| de ch[aá])?|x[ií]caras?|scoops?|conchas?|pedaços?|copos?)?\s*(?:de\s+)?/i);
-      if (q && q[0].trim()) { antes += (antes ? ' ' : '') + q[0].trim() + ' '; frag = frag.slice(q[0].length); }
-      return { antes: antes, frag: frag };
-    }
+    var PARADA = { de: 1, e: 1, com: 1, g: 1, kg: 1, ml: 1, gr: 1, gramas: 1, um: 1, uma: 1, mais: 1 };
     var relEl = $('food-relato'), sugEl = $('food-sug');
     function sugere() {
       sugEl.textContent = '';
-      var t = trecho(relEl.value), f = normTxt(t.frag);
-      if (f.length < 2 || /\d/.test(f)) { sugEl.hidden = true; return; }
-      var toks = f.split(' ');
-      var achados = alimentos().filter(function (a) {
-        if (a.key === f) return false;
-        var ws = a.key.split(' ');
-        return toks.every(function (tk) { return ws.some(function (w) { return w.indexOf(tk) === 0; }); });
-      }).sort(function (a, b) { return b.n - a.n || (b.t > a.t ? 1 : -1); }).slice(0, 5);
-      if (!achados.length) { sugEl.hidden = true; return; }
+      var v = relEl.value, cur = typeof relEl.selectionStart === 'number' ? relEl.selectionStart : v.length;
+      var antes = v.slice(0, cur), depois = v.slice(cur);
+      // Só o trecho de palavras logo antes do cursor (para em número, vírgula, ponto, quebra de linha...).
+      var m = antes.match(/[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ \-]*$/);
+      if (!m || /^[A-Za-zÀ-ÿ]/.test(depois)) { sugEl.hidden = true; return; }
+      var base = antes.length - m[0].length, pos = [], rx = /[^ ]+/g, w;
+      while ((w = rx.exec(m[0]))) pos.push(w.index);
+      var palavras = m[0].trim().split(/\s+/), lista = alimentos(), achou = null;
+      // Tenta do trecho mais longo (até 4 palavras) para o mais curto: "feijão cozido" ou só "arroz".
+      for (var n = Math.min(4, palavras.length); n >= 1 && !achou; n--) {
+        var ws = palavras.slice(-n);
+        if (PARADA[normTxt(ws[0])]) continue;
+        var f = normTxt(ws.join(' ')); if (f.length < 2) continue;
+        var toks = f.split(' ');
+        var r = lista.filter(function (a) {
+          if (a.key === f) return false;
+          var aw = a.key.split(' ');
+          return toks.every(function (tk) { return aw.some(function (w) { return w.indexOf(tk) === 0; }); });
+        });
+        if (r.length) achou = { itens: r, ini: base + pos[pos.length - n] };
+      }
+      if (!achou) { sugEl.hidden = true; return; }
+      var r2 = achou.itens.sort(function (a, b) { return b.n - a.n || (b.t > a.t ? 1 : -1); }).slice(0, 5);
       sugEl.hidden = false;
-      achados.forEach(function (a, i) {
+      r2.forEach(function (a, i) {
         sugEl.appendChild(h('button', { type: 'button', class: 'freq', id: 'sug-' + i,
           text: a.nome + (a.q ? ' · última vez: ' + String(a.q).replace(/\s*\([^)]*\)/g, '') : ''),
           on: { mousedown: function (e) { e.preventDefault(); }, click: function () {
-            var antes = t.antes ? t.antes.replace(/\s+$/, '') + ' ' : '';
-            relEl.value = antes + a.nome + ' ';
+            var pre = antes.slice(0, achou.ini) + a.nome + ' ';
+            relEl.value = pre + depois.replace(/^\s+/, '');
             sugEl.hidden = true; sugEl.textContent = '';
-            relEl.focus(); try { relEl.setSelectionRange(relEl.value.length, relEl.value.length); } catch (e) {}
+            relEl.focus(); try { relEl.setSelectionRange(pre.length, pre.length); } catch (e) {}
           } } }));
       });
     }
     relEl.addEventListener('input', sugere);
+    relEl.addEventListener('keyup', sugere);
+    relEl.addEventListener('compositionend', sugere);
     relEl.addEventListener('blur', function () { setTimeout(function () { if (document.activeElement !== relEl) sugEl.hidden = true; }, 200); });
     var file = $('food-file'), name = $('food-name'), prev = $('food-prev');
     var foodUrl = '', foodLendo = false, foodErro = '', foodVez = 0;
