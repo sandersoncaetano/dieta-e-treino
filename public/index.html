@@ -279,6 +279,11 @@ td.neg { color: var(--stop); font-weight: 700; }
 
 .timer { display: grid; gap: 8px; }
 .durs { display: flex; flex-wrap: wrap; gap: 6px; }
+#food-freq { margin: 10px 0 4px; }
+#food-freq .tip { margin: 0 0 6px; }
+.freq-list { display: flex; flex-direction: column; gap: 6px; }
+.freq { text-align: left; min-height: 40px; padding: 8px 12px; border-radius: 8px; border: 2px solid var(--line); background: transparent; color: inherit; font: inherit; }
+.freq:active { border-color: var(--accent); }
 .dur { height: 40px; padding: 0 14px; border-radius: 8px; border: 2px solid var(--line); background: transparent; font-variant-numeric: tabular-nums; }
 .dur[aria-pressed="true"] { border-color: var(--fg); font-weight: 700; }
 .go { height: 62px; border: 0; border-radius: 10px; background: var(--accent); color: var(--on-accent); font: 800 1.3rem var(--display); font-variant-numeric: tabular-nums; }
@@ -413,6 +418,7 @@ footer .col { display: grid; gap: 10px; }
     <form class="finish" id="food-form">
       <h2>Nova refeição</h2>
       <div id="food-tipo"></div>
+      <div id="food-freq" hidden></div>
       <div class="field"><label for="food-relato">O que você comeu</label><textarea id="food-relato" rows="3" placeholder="Ex.: 85 g de arroz, 78 g de feijão e 95 g de lombo"></textarea></div>
       <p class="tip">Para ditar, toque no campo e use o microfone do teclado.</p>
       <div id="food-rec"></div>
@@ -2975,10 +2981,47 @@ window.MOVES = (function () {
     if (!doc.foto) return Promise.resolve(null);
     return fetch(doc.foto).then(function (r) { return r.ok ? r.blob() : null; }).catch(function () { return null; });
   }
-  function calcMeal(id) {
+  /* Reaproveitar refeições já calculadas (economiza IA) */
+  function normTxt(s) {
+    return String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
+  }
+  function mealReuso(m) {
+    return m && m.relato && !m.foto && !m.receita && !(m.ajustes || []).length && typeof m.kcal === 'number' && m.origem !== 'receita';
+  }
+  function mealIgual(relato, exceto) {
+    var n = normTxt(relato); if (!n) return null;
+    var all = Store.all('refeicoes'), best = null;
+    Object.keys(all).forEach(function (k) {
+      var m = all[k]; if (k === exceto || !mealReuso(m) || normTxt(m.relato) !== n) return;
+      if (!best || (m.criado || '') > (best.v.criado || '')) best = { id: k, v: m };
+    });
+    return best;
+  }
+  function copiaValores(c, src) {
+    ['kcal', 'proteina_g', 'gordura_g', 'carbo_g'].forEach(function (f) { c[f] = src[f] === undefined ? null : src[f]; });
+    c.itens = JSON.parse(JSON.stringify(src.itens || []));
+    c.avaliacao = src.avaliacao ? JSON.parse(JSON.stringify(src.avaliacao)) : null;
+    c.origem = 'historico';
+    c.observacao = 'Mesmos valores de ' + ddmm(src.data || '') + ', sem novo cálculo. Use Recalcular se mudou algo.';
+  }
+  function mealFrequentes(tipo) {
+    var all = Store.all('refeicoes'), g = {};
+    Object.keys(all).forEach(function (k) {
+      var m = all[k]; if (!mealReuso(m) || (tipo && m.tipo !== tipo)) return;
+      var n = normTxt(m.relato), x = g[n] || (g[n] = { n: 0, v: m });
+      x.n++; if ((m.criado || '') > (x.v.criado || '')) x.v = m;
+    });
+    return Object.keys(g).map(function (k) { return g[k]; }).filter(function (x) { return x.n >= 2; })
+      .sort(function (a, b) { return b.n - a.n || ((b.v.criado || '') > (a.v.criado || '') ? 1 : -1); }).slice(0, 4);
+  }
+  function calcMeal(id, forca) {
     var doc = Store.get('refeicoes', id);
     if (!doc) return;
     if (doc.receita && !doc.relato && !doc.foto && !(doc.ajustes || []).length) { aplicaReceitaSo(id); renderFood(); return; }
+    if (!forca && doc.relato && !doc.foto && !doc.receita && !(doc.ajustes || []).length) {
+      var igual = mealIgual(doc.relato, id);
+      if (igual) { copiaValores(doc, igual.v); Store.set('refeicoes', id, doc); renderFood(); return; }
+    }
     foodBusy[id] = true; foodMsg[id] = ''; renderFood();
     Store.sample().then(function (sample) {
       if (!sample) throw new Error('indisponivel');
@@ -3177,7 +3220,7 @@ window.MOVES = (function () {
     if (foodMsg[id]) card.appendChild(h('p', { class: 'tip', text: foodMsg[id] }));
     var again = h('button', { type: 'button', class: 'howbtn', id: 'recalc-' + id, text: foodBusy[id] ? 'Calculando...' : 'Recalcular' });
     if (foodBusy[id]) again.disabled = true;
-    again.addEventListener('click', function () { calcMeal(id); });
+    again.addEventListener('click', function () { calcMeal(id, true); });
     var del = h('button', { type: 'button', class: 'link', id: 'fdel-' + id, text: 'Apagar' });
     del.addEventListener('click', function () {
       if (!del.dataset.sure) { del.dataset.sure = '1'; del.textContent = 'Confirmar exclusão'; return; }
@@ -3195,7 +3238,23 @@ window.MOVES = (function () {
     }
     var ajb = h('button', { type: 'button', class: 'howbtn', id: 'fadj-' + id, text: 'Ajustar' });
     ajb.addEventListener('click', function () { foodAdj[id] = !foodAdj[id]; renderFood(); });
-    card.appendChild(h('div', { class: 'photo-row' }, edt, ajb, again, del));
+    var rep = null;
+    if (m.data !== today && typeof m.kcal === 'number') {
+      rep = h('button', { type: 'button', class: 'howbtn', id: 'frep-' + id, text: 'Repetir hoje' });
+      rep.addEventListener('click', function () {
+        var c = Store.get('refeicoes', id); if (!c) return;
+        var nid = today + '_' + Date.now();
+        var novo = { data: today, tipo: c.tipo, relato: c.relato || '', criado: new Date().toISOString() };
+        if (c.receita) novo.receita = JSON.parse(JSON.stringify(c.receita));
+        copiaValores(novo, c);
+        if (c.origem === 'receita') { novo.origem = 'receita'; novo.observacao = 'Repetida de ' + ddmm(c.data) + ', valores da receita.'; }
+        else novo.observacao = 'Repetida de ' + ddmm(c.data) + ', mesmos valores, sem novo cálculo.';
+        Store.set('refeicoes', nid, novo);
+        rep.disabled = true; rep.textContent = 'Adicionada em hoje';
+        renderFoodSummary();
+      });
+    }
+    card.appendChild(h('div', { class: 'photo-row' }, edt, ajb, again, rep, del));
     if (foodAdj[id]) card.appendChild(adjBox(id));
     return card;
   }
@@ -3840,7 +3899,23 @@ window.MOVES = (function () {
       box.appendChild(chips('food-t', FOOD_TIPOS, null, function (v) {
         if (!v) { $('food-t-' + foodTipo).setAttribute('aria-pressed', 'true'); return; }
         foodTipo = v; $('food-msg').textContent = '';
+        freqChips();
       }));
+      freqChips();
+    }
+    function freqChips() {
+      var box = $('food-freq'); box.textContent = '';
+      var fs = foodTipo ? mealFrequentes(foodTipo) : [];
+      if (!fs.length) { box.hidden = true; return; }
+      box.hidden = false;
+      box.appendChild(h('p', { class: 'tip', text: 'Frequentes: toque para preencher. Salvar usa os mesmos valores, sem gastar IA.' }));
+      var w = h('div', { class: 'freq-list' });
+      fs.forEach(function (x, i) {
+        var t = x.v.relato.length > 60 ? x.v.relato.slice(0, 57) + '...' : x.v.relato;
+        w.appendChild(h('button', { type: 'button', class: 'freq', id: 'freq-' + i, text: t + ' · ' + nInt(x.v.kcal) + ' kcal',
+          on: { click: function () { $('food-relato').value = x.v.relato; $('food-msg').textContent = ''; $('food-relato').focus(); } } }));
+      });
+      box.appendChild(w);
     }
     tipoChips();
     var file = $('food-file'), name = $('food-name'), prev = $('food-prev');
