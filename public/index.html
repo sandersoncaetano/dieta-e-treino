@@ -280,6 +280,8 @@ td.neg { color: var(--stop); font-weight: 700; }
 .timer { display: grid; gap: 8px; }
 .durs { display: flex; flex-wrap: wrap; gap: 6px; }
 #food-freq { margin: 10px 0 4px; }
+#food-sug { margin: -6px 0 10px; }
+#food-sug .freq { min-height: 44px; }
 #food-freq .tip { margin: 0 0 6px; }
 .freq-list { display: flex; flex-direction: column; gap: 6px; }
 .freq { text-align: left; min-height: 40px; padding: 8px 12px; border-radius: 8px; border: 2px solid var(--line); background: transparent; color: inherit; font: inherit; }
@@ -420,6 +422,7 @@ footer .col { display: grid; gap: 10px; }
       <div id="food-tipo"></div>
       <div id="food-freq" hidden></div>
       <div class="field"><label for="food-relato">O que você comeu</label><textarea id="food-relato" rows="3" placeholder="Ex.: 85 g de arroz, 78 g de feijão e 95 g de lombo"></textarea></div>
+      <div id="food-sug" class="freq-list sug" hidden></div>
       <p class="tip">Para ditar, toque no campo e use o microfone do teclado.</p>
       <div id="food-rec"></div>
       <div class="photo-row">
@@ -3975,6 +3978,54 @@ window.MOVES = (function () {
       box.appendChild(w);
     }
     tipoChips();
+    /* Sugere alimentos já registrados enquanto você digita (ex.: "arroz" → "Arroz branco cozido") */
+    function alimentos() {
+      var all = Store.all('refeicoes'), g = {};
+      Object.keys(all).forEach(function (k) {
+        var m = all[k];
+        (m.itens || []).forEach(function (i) {
+          var nome = String(i.nome || '').replace(/\s*\([^)]*\)/g, '').trim();
+          if (!nome || nome.indexOf(':') >= 0 || nome.length > 50) return;
+          var n = normTxt(nome), x = g[n] || (g[n] = { nome: nome, n: 0, q: '', t: '' });
+          x.n++;
+          if ((m.criado || '') >= x.t) { x.t = m.criado || ''; x.q = i.quantidade || ''; x.nome = nome; }
+        });
+      });
+      return Object.keys(g).map(function (k) { g[k].key = k; return g[k]; });
+    }
+    function trecho(v) {
+      var m = v.match(/^([\s\S]*(?:[,;+\n]|\se\s|\scom\s))?([^,;+\n]*)$/i);
+      var antes = m && m[1] || '', frag = m ? m[2] : v;
+      var q = frag.match(/^\s*\d+(?:[.,]\d+)?\s*(?:g|kg|ml|l|un|unidades?|fatias?|colher(?:es)?(?: de sopa| de ch[aá])?|x[ií]caras?|scoops?|conchas?|pedaços?|copos?)?\s*(?:de\s+)?/i);
+      if (q && q[0].trim()) { antes += (antes ? ' ' : '') + q[0].trim() + ' '; frag = frag.slice(q[0].length); }
+      return { antes: antes, frag: frag };
+    }
+    var relEl = $('food-relato'), sugEl = $('food-sug');
+    function sugere() {
+      sugEl.textContent = '';
+      var t = trecho(relEl.value), f = normTxt(t.frag);
+      if (f.length < 2 || /\d/.test(f)) { sugEl.hidden = true; return; }
+      var toks = f.split(' ');
+      var achados = alimentos().filter(function (a) {
+        if (a.key === f) return false;
+        var ws = a.key.split(' ');
+        return toks.every(function (tk) { return ws.some(function (w) { return w.indexOf(tk) === 0; }); });
+      }).sort(function (a, b) { return b.n - a.n || (b.t > a.t ? 1 : -1); }).slice(0, 5);
+      if (!achados.length) { sugEl.hidden = true; return; }
+      sugEl.hidden = false;
+      achados.forEach(function (a, i) {
+        sugEl.appendChild(h('button', { type: 'button', class: 'freq', id: 'sug-' + i,
+          text: a.nome + (a.q ? ' · última vez: ' + String(a.q).replace(/\s*\([^)]*\)/g, '') : ''),
+          on: { mousedown: function (e) { e.preventDefault(); }, click: function () {
+            var antes = t.antes ? t.antes.replace(/\s+$/, '') + ' ' : '';
+            relEl.value = antes + a.nome + ' ';
+            sugEl.hidden = true; sugEl.textContent = '';
+            relEl.focus(); try { relEl.setSelectionRange(relEl.value.length, relEl.value.length); } catch (e) {}
+          } } }));
+      });
+    }
+    relEl.addEventListener('input', sugere);
+    relEl.addEventListener('blur', function () { setTimeout(function () { if (document.activeElement !== relEl) sugEl.hidden = true; }, 200); });
     var file = $('food-file'), name = $('food-name'), prev = $('food-prev');
     var foodUrl = '', foodLendo = false, foodErro = '', foodVez = 0;
     file.addEventListener('change', function () {
