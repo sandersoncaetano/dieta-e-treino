@@ -527,6 +527,10 @@ var Store = (function () {
       var m = JSON.parse(localStorage.getItem(MIRROR) || 'null');
       if (!m || fresh) return;
       COLLS.forEach(function (c) { cache[c] = m[c] || {}; });
+      Object.keys(pend).forEach(function (k) {
+        var i = k.indexOf('/'), c = k.slice(0, i), id = k.slice(i + 1);
+        if (cache[c]) { if (pend[k].v) cache[c][id] = pend[k].v; else delete cache[c][id]; }
+      });
       emit();
     } catch (e) {}
   }
@@ -541,19 +545,61 @@ var Store = (function () {
     notice('Os registros estão sendo guardados só neste aparelho, porque o armazenamento do app não respondeu.');
     emit();
   }
+  /* Diário de gravações pendentes: cada mudança fica no aparelho até o servidor confirmar.
+     Se o app for fechado ou faltar sinal, ela é reenviada na próxima abertura. */
+  var PEND = 'dieta-treino-pendentes', pend = {}, retryT = null, seq = Date.now();
+  try { pend = JSON.parse(localStorage.getItem(PEND) || '{}') || {}; } catch (e) { pend = {}; }
+  function savePend() { try { localStorage.setItem(PEND, JSON.stringify(pend)); } catch (e) {} }
+  function marca(c, id) {
+    var data = cache[c][id];
+    pend[c + '/' + id] = { v: data ? data : null, t: ++seq };
+    savePend();
+  }
+  function retry() {
+    clearTimeout(retryT);
+    retryT = setTimeout(function () { if (mode === 'db') flush(true); }, 15000);
+  }
   function write(c, id) {
-    var k = c + '/' + id, data = cache[c][id];
+    var k = c + '/' + id, data = cache[c][id], token = pend[k] && pend[k].t;
+    clearTimeout(timers[k]);
     var run = function () { return data ? db.collection(c).doc(id).set(data) : db.collection(c).doc(id).delete(); };
-    inflight[k] = (inflight[k] || Promise.resolve()).then(run).catch(function () {
-      notice('Não consegui salvar o último registro. Confira sua conexão e toque de novo.');
+    inflight[k] = (inflight[k] || Promise.resolve()).then(run).then(function () {
+      if (pend[k] && pend[k].t === token) { delete pend[k]; savePend(); }
+      if (!Object.keys(pend).length) notice('');
+    }, function () {
+      notice('Sem conexão: o registro ficou guardado neste aparelho e será enviado assim que der.');
+      retry();
     }).then(function () { delete timers[k]; });
   }
   function schedule(c, id) {
     if (mode !== 'db') { saveLocal(); return; }
+    marca(c, id); saveMirror();
     var k = c + '/' + id;
     clearTimeout(timers[k]);
     timers[k] = setTimeout(function () { write(c, id); }, 500);
   }
+  // Envia já o que está esperando (ao sair do app) ou tudo que ficou pendente (ao reconectar).
+  function flush(todos) {
+    if (mode !== 'db') return;
+    Object.keys(todos ? pend : timers).forEach(function (k) {
+      var i = k.indexOf('/'), c = k.slice(0, i), id = k.slice(i + 1);
+      if (!cache[c]) return;
+      if (todos && !timers[k]) timers[k] = -1;
+      write(c, id);
+    });
+  }
+  function reaplica() {
+    Object.keys(pend).forEach(function (k) {
+      var i = k.indexOf('/'), c = k.slice(0, i), id = k.slice(i + 1);
+      if (!cache[c]) { delete pend[k]; return; }
+      if (pend[k].v) cache[c][id] = pend[k].v; else delete cache[c][id];
+      timers[k] = -1;
+    });
+    savePend();
+  }
+  document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'hidden') { flush(false); try { localStorage.setItem(MIRROR, JSON.stringify(cache)); } catch (e) {} } });
+  window.addEventListener('pagehide', function () { flush(false); });
+  window.addEventListener('online', function () { flush(true); });
   function start() {
     var wait = setTimeout(useLocal, window.PLATAFORMA_PROPRIA ? 6e5 : 10000);
     if (!window.claude || !window.claude.use) { clearTimeout(wait); useLocal(); return; }
@@ -563,6 +609,7 @@ var Store = (function () {
       clearTimeout(wait);
       if (!d) { useLocal(); return; }
       db = d; mode = 'db'; notice('');
+      if (Object.keys(pend).length) { reaplica(); emit(); setTimeout(function () { flush(true); }, 300); }
       COLLS.forEach(function (c) {
         db.collection(c).onSnapshot(function (snap) {
           var next = {};
@@ -609,9 +656,11 @@ var Store = (function () {
       delete cache[c][id];
       clearTimeout(timers[k]); delete timers[k];
       if (mode !== 'db') { saveLocal(); return Promise.resolve(); }
-      gone[k] = 1;
+      gone[k] = 1; marca(c, id); saveMirror();
+      var token = pend[k].t;
       return (inflight[k] || Promise.resolve()).then(function () { return db.collection(c).doc(id).delete(); })
-        .then(function () { delete gone[k]; }, function (e) { delete gone[k]; throw e; });
+        .then(function () { delete gone[k]; if (pend[k] && pend[k].t === token) { delete pend[k]; savePend(); } },
+          function (e) { delete gone[k]; retry(); throw e; });
     },
     busy: function () { return Object.keys(timers).length > 0; },
     watch: function (f) { subs.push(f); }
@@ -1286,8 +1335,10 @@ window.MOVES = (function () {
   var Rest = (function () {
     var end = 0, t = null, then = null;
     function agenda() { if (window.AlertaPush) window.AlertaPush.agendar(end, 'Descanso acabou', 'Hora da próxima série.'); }
+    function guarda() { try { if (end) localStorage.setItem('dt-descanso', String(end)); else localStorage.removeItem('dt-descanso'); } catch (e) {} }
     function hide() {
       clearInterval(t); t = null; $('rest').hidden = true;
+      try { localStorage.removeItem('dt-descanso'); } catch (e) {}
       if (window.AlertaPush && Date.now() < end - 1500) window.AlertaPush.cancelar();
       var f = then; then = null; if (f) f();
     }
@@ -1298,13 +1349,19 @@ window.MOVES = (function () {
       if (left <= 0) { window.Fig.alert(); hide(); return; }
       $('rest-time').textContent = clock(left);
     }
-    $('rest-add').addEventListener('click', function () { end += 15000; tick(); agenda(); });
+    $('rest-add').addEventListener('click', function () { end += 15000; guarda(); tick(); agenda(); });
+    // Se o app foi fechado no meio do descanso, retoma a contagem de onde parou.
+    try {
+      var salvo = Number(localStorage.getItem('dt-descanso') || 0);
+      if (salvo > Date.now() + 1000) { end = salvo; $('rest').hidden = false; t = setInterval(tick, 250); tick(); }
+      else localStorage.removeItem('dt-descanso');
+    } catch (e) {}
     $('rest-skip').addEventListener('click', hide);
     return { start: function (sec, after) {
       window.Fig.prep();
       then = after || null;
       end = Date.now() + sec * 1000;
-      agenda();
+      guarda(); agenda();
       $('rest').hidden = false;
       if (!t) t = setInterval(tick, 250);
       tick();
@@ -4019,7 +4076,7 @@ window.MOVES = (function () {
       window.Fig.prep(); window.Fig.alert(true);
     });
   })();
-  var firstData = true, lastImgs = '';
+  var firstData = true, lastImgs = '', retomou = false;
   var stravaAuto = false;
   Store.watch(function () {
     if (!stravaAuto && Object.keys(Store.all('strava')).length) { stravaAuto = true; syncStrava(true); }
@@ -4027,6 +4084,11 @@ window.MOVES = (function () {
     var a = document.activeElement;
     var typing = a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA') && $('gym').contains(a);
     if (!typing && !Store.busy()) renderGym();
+    // Reabriu o app com treino de hoje em andamento: volta direto ao exercício onde parou.
+    if (!retomou && gymDate === today && ((location.hash || '#academia') === '#academia')) {
+      var ss = session(), feitos = Object.keys(ss.itens || {}).some(function (k) { var it = ss.itens[k]; return it && (it.series || it.puladas); });
+      if ((feitos || (ss.inicio && !ss.fim)) && ss.status !== 'concluido') { retomou = true; setTimeout(irAtual, 150); }
+    }
     renderCardio(); renderHist(); renderWeek();
     if (!$('food-list').contains(document.activeElement)) renderFood();
     if (window.renderLombar) window.renderLombar();
