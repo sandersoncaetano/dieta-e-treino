@@ -318,7 +318,7 @@
       var h = '<table style="width:100%;border-collapse:collapse;font-size:.95rem"><thead><tr><th ' + th + '>Período</th><th ' + td + '>Chamadas</th><th ' + td + '>Custo estimado</th></tr></thead><tbody>';
       per.forEach(function (p) { var t = soma(p[1]); h += '<tr><td ' + th + '>' + p[0] + '</td><td ' + td + '>' + t.n + '</td><td ' + td + '>' + dinheiro(t.usd) + '</td></tr>'; });
       h += '</tbody></table>';
-      var nomes = { refeicao: 'Refeições', dia: 'Fechar o dia', receita: 'Receitas', atividade: 'Análise de atividades', outro: 'Outros' };
+      var nomes = { refeicao: 'Refeições', dia: 'Fechar o dia', receita: 'Receitas', atividade: 'Análise de atividades', semana: 'Análise da semana', outro: 'Outros' };
       var mes = per[2][1], tipos = {};
       mes.forEach(function (x) { (tipos[x.tipo] = tipos[x.tipo] || []).push(x); });
       h += '<h3 style="margin:6px 0 0;font-size:1.05rem">Este mês, por tipo</h3><table style="width:100%;border-collapse:collapse;font-size:.95rem"><thead><tr><th ' + th + '>Tipo</th><th ' + td + '>Chamadas</th><th ' + td + '>Tokens</th><th ' + td + '>Custo</th></tr></thead><tbody>';

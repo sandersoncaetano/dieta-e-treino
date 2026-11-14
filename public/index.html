@@ -493,6 +493,7 @@ footer .col { display: grid; gap: 10px; }
     <section class="panel" id="h-ativ"></section>
     <section class="panel" id="balanco"></section>
     <section class="panel" id="h-peso"></section>
+    <section class="panel" id="h-comp"></section>
     <section class="panel" id="h-evo"></section>
     <section class="panel">
       <h2>Painel de força</h2>
@@ -518,14 +519,14 @@ footer .col { display: grid; gap: 10px; }
 
 <script>
 var Store = (function () {
-  var COLLS = ['treinos', 'cardio', 'lombar', 'cargas', 'imagens', 'refeicoes', 'descansos', 'dias', 'peso', 'strava', 'receitas', 'analises', 'medidas', 'composicao', 'saude_dia'];
+  var COLLS = ['treinos', 'cardio', 'lombar', 'cargas', 'imagens', 'refeicoes', 'descansos', 'dias', 'peso', 'strava', 'receitas', 'analises', 'medidas', 'composicao', 'saude_dia', 'semanas'];
   var KEY = 'caderno-treino';
   var cache = {}; COLLS.forEach(function (c) { cache[c] = {}; });
   var subs = [], db = null, mode = 'loading';
   var timers = {}, inflight = {}, gone = {};
   function notice(t) { var n = document.getElementById('notice'); if (n) { n.textContent = t; n.hidden = !t; } }
   function emit() { subs.forEach(function (f) { f(); }); }
-  var emitT = null, mirrorT = null, fresh = false, MIRROR = 'dieta-treino-espelho';
+  var emitT = null, mirrorT = null, fresh = false, carregadas = {}, MIRROR = 'dieta-treino-espelho';
   function emitSoon() { clearTimeout(emitT); emitT = setTimeout(emit, 80); }
   function saveMirror() {
     clearTimeout(mirrorT);
@@ -622,7 +623,7 @@ var Store = (function () {
       COLLS.forEach(function (c) {
         db.collection(c).onSnapshot(function (snap) {
           var next = {};
-          fresh = true;
+          fresh = true; carregadas[c] = 1;
           snap.docs.forEach(function (doc) { next[doc.id] = doc.data(); });
           Object.keys(timers).forEach(function (k) {
             var p = k.split('/');
@@ -672,6 +673,7 @@ var Store = (function () {
           function (e) { delete gone[k]; retry(); throw e; });
     },
     busy: function () { return Object.keys(timers).length > 0; },
+    loaded: function (c) { return mode === 'local' || !!carregadas[c]; },
     watch: function (f) { subs.push(f); }
   };
 })();
@@ -2176,9 +2178,43 @@ window.MOVES = (function () {
     var k = at.length ? at[at.length - 1] : ks[0];
     return k ? Store.get('peso', k).kg : BAL.pesoBase;
   }
-  function tmbDe(d) {
+  function tmbFormula(d) {
     var a = parseInt(d.slice(0, 4), 10) - 1980 - (d.slice(5) < BAL.nasc.slice(5) ? 1 : 0);
     return 10 * pesoAte(d) + 6.25 * BAL.altura - 5 * a + 5;
+  }
+  // Pesagem da balança (Health Connect) mais recente até o dia, de no máximo 60 dias antes.
+  function compAte(d, campo) {
+    var c = Store.all('composicao') || {}, ks = Object.keys(c).sort();
+    for (var i = ks.length - 1; i >= 0; i--) {
+      if (ks[i] > d) continue;
+      if (ks[i] < addDias(d, -60)) break;
+      if (!campo || typeof c[ks[i]][campo] === 'number') return c[ks[i]];
+    }
+    return null;
+  }
+  function tmbDe(d) { var c = compAte(d, 'tmb_kcal'); return c ? c.tmb_kcal : tmbFormula(d); }
+  // Passos das caminhadas e corridas do Strava, para não contar o mesmo esforço duas vezes.
+  function passosEmAtividades(d) {
+    var st = Store.all('strava'), n = 0;
+    Object.keys(st).forEach(function (k) {
+      var a = st[k]; if (a.data !== d || !a.km) return;
+      if (/run|corr/i.test(a.tipo)) n += a.km * 1000 / 1.1;
+      else if (/walk|hike|camin/i.test(a.tipo)) n += a.km * 1000 / 0.75;
+    });
+    return Math.round(n);
+  }
+  /* Gasto fora do exercício: com passos do relógio/celular, 10% da TMB (digestão e rotina)
+     mais o custo dos passos fora dos treinos (0,5 kcal por kg por km, passo de 0,75 m).
+     Sem passos, 25% da TMB, como antes. */
+  function baseDia(d) {
+    var tmb = tmbDe(d), sd = Store.get('saude_dia', d), r = { tmb: tmb, tmbBalanca: !!compAte(d, 'tmb_kcal') };
+    if (sd && typeof sd.passos === 'number' && sd.passos > 0) {
+      r.passos = sd.passos; r.passosEx = Math.min(sd.passos, passosEmAtividades(d));
+      r.kcalPassos = (r.passos - r.passosEx) * pesoAte(d) * 0.000375;
+      r.rotina = tmb * 0.10 + r.kcalPassos;
+    } else r.rotina = tmb * (BAL.atividade - 1);
+    r.total = tmb + r.rotina;
+    return r;
   }
   function balDados() {
     var ing = {}, ex = {}, br = {}, semKcal = {};
@@ -2208,7 +2244,7 @@ window.MOVES = (function () {
     var r = { seg: seg, fim: w.dias[6], n: 0, comeu: 0, base: 0, ex: 0, bruto: 0, semKcal: 0, real: null };
     w.dias.forEach(function (d) {
       if (d >= hoje || !b.ing[d]) return;
-      r.n++; r.comeu += b.ing[d]; r.base += tmbDe(d) * BAL.atividade;
+      r.n++; r.comeu += b.ing[d]; r.base += baseDia(d).total;
       r.ex += (b.ex[d] || 0) * BAL.fator; r.bruto += b.ex[d] || 0;
       r.semKcal += b.semKcal[d] || 0;
     });
@@ -2439,7 +2475,7 @@ window.MOVES = (function () {
         box.appendChild(h('p', { text: 'Acumulado: previsto ' + sinal(sp, kg2) + ' kg, real ' + sinal(sr, kg2) + ' kg.' }));
       }
     }
-    box.appendChild(h('p', { class: 'tip', text: 'Manutenção: ' + nInt(tmb * BAL.atividade) + ' kcal/dia (TMB ' + nInt(tmb) + ' × 1,25). Exercício: calorias do Strava ou do relógio, sem a TMB do período, × 0,7.' }));
+    box.appendChild(h('p', { class: 'tip', text: 'Gasto fora do exercício: TMB ' + nInt(tmb) + ' kcal' + (compAte(hoje, 'tmb_kcal') ? ' (da balança)' : ' (por fórmula)') + ', mais 10% de rotina e os passos do dia; sem passos, TMB × 1,25. Exercício: calorias do Strava ou do relógio, sem a TMB do período, × 0,7.' }));
     box.appendChild(h('p', { class: 'tip', text: aj.n >= 2
       ? 'Ajuste pelos seus resultados: ' + sinal(Math.round(aj.kcal), nInt) + ' kcal/dia, com base em ' + aj.n + ' semanas.'
       : 'O ajuste pelos seus resultados começa com 2 semanas de pelo menos 5 dias registrados e uma pesagem por semana, incluindo a semana anterior. Pesagens semanais oscilam com água e sal, por isso o ajuste é gradual.' }));
@@ -2482,8 +2518,8 @@ window.MOVES = (function () {
   function diaInfo(d, b, aj) {
     var t = { n: 0, k: 0, p: 0, g: 0, c: 0 };
     mealsOf(d).forEach(function (r) { var m = r.v; t.n++; t.k += m.kcal || 0; t.p += m.proteina_g || 0; t.g += m.gordura_g || 0; t.c += m.carbo_g || 0; });
-    var base = tmbDe(d) * BAL.atividade, exb = b.ex[d] || 0;
-    t.tmb = tmbDe(d); t.rel = (b.br || {})[d] || 0;
+    var bd = baseDia(d), base = bd.total, exb = b.ex[d] || 0;
+    t.tmb = bd.tmb; t.bd = bd; t.rel = (b.br || {})[d] || 0;
     t.base = base; t.exb = exb; t.ex = exb * BAL.fator;
     t.gasto = base + t.ex + (aj || 0);
     t.saldo = t.k - t.gasto;
@@ -2572,8 +2608,11 @@ window.MOVES = (function () {
     }
     var gt = h('div', { class: 'gasto-tab' }, h('h3', { text: 'De onde vem o gasto' }));
     function gl(rot, det, v, cls) { gt.appendChild(h('div', { class: 'gl' + (cls ? ' ' + cls : '') }, h('div', {}, h('span', { text: rot }), det ? h('small', { text: det }) : null), h('b', { text: v }))); }
-    gl('Metabolismo basal (TMB)', 'Gasto em repouso, pela fórmula de Mifflin-St Jeor com seu peso.', nInt(t.tmb) + ' kcal');
-    gl('Dia a dia', 'Andar, trabalhar e comer, sem contar exercício (25% da TMB).', '+ ' + nInt(t.base - t.tmb) + ' kcal');
+    gl('Metabolismo basal (TMB)', t.bd.tmbBalanca ? 'Gasto em repouso, medido pela sua balança.' : 'Gasto em repouso, pela fórmula de Mifflin-St Jeor com seu peso.', nInt(t.tmb) + ' kcal');
+    if (t.bd.passos) {
+      gl('Rotina', 'Digestão e atividades leves (10% da TMB).', '+ ' + nInt(t.tmb * 0.10) + ' kcal');
+      gl('Passos', nInt(t.bd.passos) + ' passos' + (t.bd.passosEx ? ', menos ' + nInt(t.bd.passosEx) + ' já contados nos treinos' : '') + (d === hoje ? ' (até agora)' : '') + '.', '+ ' + nInt(t.bd.kcalPassos) + ' kcal');
+    } else gl('Dia a dia', 'Andar, trabalhar e comer, sem contar exercício (25% da TMB). Sem passos registrados neste dia.', '+ ' + nInt(t.base - t.tmb) + ' kcal');
     if (t.rel) {
       gl('Exercício pelo relógio', 'O que o relógio marcou nas atividades.', nInt(t.rel) + ' kcal', 'sub');
       gl('Exercício considerado', 'Tira o repouso que já está na TMB e 30% de margem, porque relógios costumam superestimar.', '+ ' + nInt(t.ex) + ' kcal');
@@ -2659,6 +2698,58 @@ window.MOVES = (function () {
     box.appendChild(legenda([['Pesagem', 'var(--far)'], ['Média de 4 semanas', 'var(--accent)'], ['Meta de ' + PESO_META + ' kg', 'var(--fg)']]));
     var dif = tr[tr.length - 1] - tr[0];
     box.appendChild(h('p', { class: 'tip', text: 'Média atual: ' + kg1(tr[tr.length - 1]) + ' kg. Variação da média no período: ' + (dif > 0 ? '+' : dif < 0 ? '−' : '') + kg1(Math.abs(dif)) + ' kg. Uma pesagem isolada varia com água e sal; olhe a linha, que junta as últimas 4 semanas.' }));
+  }
+  /* Gordura × massa magra: de onde vem a perda de peso */
+  function compPontos() {
+    var c = Store.all('composicao') || {};
+    return Object.keys(c).sort().map(function (k) { return c[k]; })
+      .filter(function (x) { return x.peso_kg && x.gordura_pct && x.massa_magra_kg; })
+      .map(function (x) { return { d: x.data, g: x.peso_kg * x.gordura_pct / 100, m: x.massa_magra_kg, p: x.peso_kg }; });
+  }
+  // Tendência: média das 3 últimas pesagens contra a média das até 3 anteriores.
+  function compTendencia() {
+    var pts = compPontos();
+    if (pts.length < 4) return { n: pts.length };
+    var rec = pts.slice(-3), ant = pts.slice(Math.max(0, pts.length - 6), pts.length - 3);
+    var med = function (a, k) { return a.reduce(function (s, x) { return s + x[k]; }, 0) / a.length; };
+    var t = { n: pts.length, de: ant[0].d, ate: rec[rec.length - 1].d, dg: med(rec, 'g') - med(ant, 'g'), dm: med(rec, 'm') - med(ant, 'm'), dp: med(rec, 'p') - med(ant, 'p') };
+    if (t.dm <= -1 && t.dp < 0 && -t.dm >= -t.dp * 0.4) { t.nivel = 'atencao'; t.msg = 'Boa parte do peso perdido está saindo da massa magra. Garanta 160 a 180 g de proteína por dia, mantenha a musculação e evite dias muito abaixo da meta de calorias.'; }
+    else if (t.dg <= -0.5 && t.dm > -1) { t.nivel = 'bom'; t.msg = 'A perda está vindo da gordura e a massa magra se mantém. É exatamente o que se quer.'; }
+    else if (t.dg > 0.5) { t.nivel = 'ok'; t.msg = 'A gordura subiu nas últimas pesagens. Confira o saldo de calorias das últimas semanas.'; }
+    else { t.nivel = 'ok'; t.msg = 'Sem mudança clara ainda. Bioimpedância oscila com água; continue pesando sempre no mesmo horário.'; }
+    return t;
+  }
+  function renderCompH() {
+    var box = $('h-comp'); if (!box) return; box.textContent = '';
+    box.appendChild(h('h2', { text: 'Gordura e massa magra' }));
+    var pts = compPontos().filter(function (p) { return p.d >= addDias(Store.day(), -182); });
+    if (pts.length < 2) { box.appendChild(h('p', { class: 'tip', text: 'Aparece a partir da segunda pesagem com a balança (ela chega sozinha pelo Health Connect). Mostra se o peso que sai é gordura ou músculo.' })); return; }
+    var p0 = pts[0];
+    var dg = pts.map(function (p) { return p.g - p0.g; }), dm = pts.map(function (p) { return p.m - p0.m; });
+    var vals = dg.concat(dm, [0]);
+    var mn = Math.floor(Math.min.apply(null, vals) - 0.5), mx = Math.ceil(Math.max.apply(null, vals) + 0.5);
+    var W = 320, H = 160, x0 = 30, x1 = W - 6, y0 = 10, y1 = 130;
+    var t0 = new Date(p0.d + 'T12:00:00').getTime(), t1 = Math.max(new Date(pts[pts.length - 1].d + 'T12:00:00').getTime(), t0 + 864e5);
+    function X(d) { return x0 + (new Date(d + 'T12:00:00').getTime() - t0) / (t1 - t0) * (x1 - x0); }
+    function Y(v) { return y1 - (v - mn) / (mx - mn) * (y1 - y0); }
+    var svg = sv('svg', { viewBox: '0 0 ' + W + ' ' + H, class: 'chart', role: 'img', 'aria-label': 'Variação de gordura e de massa magra desde a primeira pesagem' });
+    [mn, 0, mx].forEach(function (v) { sv('line', { x1: x0, x2: x1, y1: Y(v), y2: Y(v), stroke: v === 0 ? 'var(--fg)' : 'var(--line)', 'stroke-dasharray': v === 0 ? '3 3' : '' }, svg); sv('text', { x: 0, y: Y(v) + 4, text: (v > 0 ? '+' : '') + v }, svg); });
+    [[dg, 'var(--far)'], [dm, 'var(--accent)']].forEach(function (s2) {
+      sv('polyline', { points: pts.map(function (p, i) { return X(p.d) + ',' + Y(s2[0][i]); }).join(' '), fill: 'none', stroke: s2[1], 'stroke-width': 2.5, 'stroke-linejoin': 'round' }, svg);
+      pts.forEach(function (p, i) { sv('circle', { cx: X(p.d), cy: Y(s2[0][i]), r: 3, fill: s2[1] }, svg); });
+    });
+    sv('text', { x: x0, y: H - 10, text: br(p0.d) }, svg);
+    sv('text', { x: x1 - 30, y: H - 10, text: br(pts[pts.length - 1].d) }, svg);
+    box.appendChild(svg);
+    box.appendChild(legenda([['Gordura (kg)', 'var(--far)'], ['Massa magra (kg)', 'var(--accent)']]));
+    var u = pts[pts.length - 1], fx = function (v) { return (v > 0 ? '+' : v < 0 ? '−' : '') + kg1(Math.abs(v)); };
+    box.appendChild(h('p', { text: 'Desde ' + br(p0.d) + ': gordura ' + fx(u.g - p0.g) + ' kg, massa magra ' + fx(u.m - p0.m) + ' kg, peso ' + fx(u.p - p0.p) + ' kg.' }));
+    var t = compTendencia();
+    if (t.nivel) {
+      var NV = { bom: 'No caminho certo', ok: 'Acompanhe', atencao: 'Atenção' };
+      box.appendChild(h('div', { class: 'verdict ' + t.nivel }, h('b', { text: NV[t.nivel] }),
+        h('p', { text: 'Média das 3 últimas pesagens contra as anteriores: gordura ' + fx(t.dg) + ' kg, massa magra ' + fx(t.dm) + ' kg. ' + t.msg })));
+    } else box.appendChild(h('p', { class: 'tip', text: 'A tendência aparece a partir da 4ª pesagem. Uma pesagem isolada varia até 1 kg só com água.' }));
   }
   function sessoesEx(id) {
     return treinosOk().map(function (r) { var it = (r.v.itens || {})[id]; if (!(it && it.series > 0 && it.kg)) return null; var rr = repsDe(it); return { d: r.v.data, kg: it.kg, reps: Math.max.apply(null, rr), soma: rr.reduce(function (a, b) { return a + b; }, 0), series: it.series, nome: it.nome }; })
@@ -2951,7 +3042,7 @@ window.MOVES = (function () {
   }
   function renderHist() {
     var b = balDados(), segs = balSemanas(b), aj = balAjuste(b, segs).kcal;
-    renderCal(); renderDia(b, aj); renderSemanaH(b, aj); renderAtiv(); renderBalanco(); renderPesoH(); renderEvo();
+    renderCal(); renderDia(b, aj); renderSemanaH(b, aj); renderAtiv(); renderBalanco(); renderPesoH(); renderCompH(); renderEvo();
     var mon = segDe(histSel), fim = addDias(mon, 6);
     function naSemana(d) { return d >= mon && d <= fim; }
     var tr = treinosOk(), ca = cardioTudo(), lo = lombarOk();
@@ -3482,6 +3573,77 @@ window.MOVES = (function () {
   function medNum(v) { var n = num(v); return n && n > 10 && n < 250 ? Math.round(n * 10) / 10 : null; }
   function cm1(v) { return fmtN(v, 1) + ' cm'; }
   function sinalCm(x) { x = Math.round(x * 10) / 10; return (x > 0 ? '+' : x < 0 ? '−' : '') + fmtN(Math.abs(x), 1) + ' cm'; }
+  /* Análise da semana: quando chega a pesagem, a IA junta tudo e sugere um ajuste */
+  var semBusy = false, semMsg = '', semTentou = {};
+  function semPrompt(dPes) {
+    var b = balDados(), aj = balAjuste(b, balSemanas(b)).kcal;
+    var pts = compPontos().filter(function (p) { return p.d <= dPes; }).slice(-6);
+    var comp = Store.all('composicao') || {};
+    var pes = pts.map(function (p) {
+      var c = comp[p.d] || {};
+      return '- ' + br(p.d) + ': ' + kg1(p.p) + ' kg, gordura ' + kg1(c.gordura_pct) + '% (' + kg1(p.g) + ' kg), massa magra ' + kg1(p.m) + ' kg' + (c.agua_kg ? ', água ' + kg1(c.agua_kg) + ' kg' : '');
+    }).join('\n');
+    var t = compTendencia();
+    var med = Object.keys(Store.all('medidas')).sort().filter(function (k) { return k <= dPes; }).slice(-3).map(function (k) {
+      var m = Store.get('medidas', k); return '- ' + br(k) + ': ' + MED.filter(function (x) { return m[x[0]]; }).map(function (x) { return x[0] + ' ' + m[x[0]] + ' cm'; }).join(', ');
+    }).join('\n');
+    var dias = [];
+    for (var i = 6; i >= 0; i--) {
+      var d = addDias(dPes, -i), x = diaInfo(d, b, aj), sd = Store.get('saude_dia', d) || {};
+      var at = atividadesDe(d).map(function (a) { return a.t + (a.p ? ' (' + a.p.replace(/^ · /, '') + ')' : ''); }).join('; ');
+      dias.push('- ' + SEMANA[weekday(d)] + ' ' + br(d) + ': ' + (x.n ? nInt(x.k) + ' kcal comidas, ' + nInt(x.p) + ' g proteína' : 'sem refeições registradas') +
+        ', gasto estimado ' + nInt(x.gasto) + ' kcal' + (sd.passos ? ', ' + nInt(sd.passos) + ' passos' : '') + (at ? ', atividades: ' + at : ', sem treino'));
+    }
+    return 'Analise a semana de um homem de ' + BAL.altura + ' cm que quer emagrecer preservando músculo, com musculação, cardio e pilates. ' +
+      'Metas: ' + PESO_META + ' kg; 2.000 kcal nos dias úteis e 2.800 no fim de semana; 160 a 180 g de proteína por dia. ' +
+      'Dados da balança de bioimpedância (oscila até 1 kg com água; julgue pela tendência, não por uma pesagem):\n' + pes + '\n' +
+      (t.nivel ? 'Tendência (média das 3 últimas pesagens contra as anteriores): gordura ' + kg1(t.dg) + ' kg, massa magra ' + kg1(t.dm) + ' kg, peso ' + kg1(t.dp) + ' kg.\n' : 'Ainda há menos de 4 pesagens; não tire conclusões firmes sobre a composição.\n') +
+      (med ? 'Medidas com fita:\n' + med + '\n' : '') +
+      'Os 7 dias até a pesagem de ' + br(dPes) + ':\n' + dias.join('\n') + '\n' +
+      'Regras: seja direto e específico com os números acima; não invente dados que não estão aqui; não sugira jejum nem cortes radicais; se faltam registros, diga isso em vez de supor. ' +
+      'Responda somente com um objeto JSON: {"nivel":"bom|ok|atencao","resumo":"até 2 frases","pontos":["até 3 observações curtas"],"ajuste":"uma ação principal para a próxima semana"}.';
+  }
+  function analisaSemana(dPes, auto) {
+    if (semBusy) return;
+    if (auto && (Store.get('semanas', dPes) || semTentou[dPes])) return;
+    semTentou[dPes] = 1;
+    semBusy = true; semMsg = '';
+    // Marca antes de chamar, para outro aparelho aberto não pedir a mesma análise.
+    Store.set('semanas', dPes, { data: dPes, pendente: true, criado: new Date().toISOString() });
+    renderSaude();
+    Store.sample().then(function (sample) {
+      if (!sample) throw new Error('indisponivel');
+      return sample.json(semPrompt(dPes), { modelTier: 'default', cache: false });
+    }).then(function (r) {
+      Store.set('semanas', dPes, {
+        data: dPes, nivel: ['bom', 'ok', 'atencao'].indexOf(r.nivel) > -1 ? r.nivel : 'ok',
+        resumo: String(r.resumo || ''), pontos: Array.isArray(r.pontos) ? r.pontos.slice(0, 3).map(String) : [],
+        ajuste: String(r.ajuste || ''), criado: new Date().toISOString()
+      });
+    }).catch(function (e) {
+      Store.del('semanas', dPes);
+      semMsg = e && e.message === 'indisponivel' ? 'A análise automática não está disponível aqui.' : 'Não consegui analisar agora. Tente de novo.';
+    }).then(function () { semBusy = false; renderSaude(); });
+  }
+  function blocoSemana(box, dPes) {
+    box.appendChild(h('h3', { text: 'Análise da semana' }));
+    var a = Store.get('semanas', dPes);
+    if (a && a.resumo) {
+      var NV = { bom: 'No caminho certo', ok: 'Dá para ajustar', atencao: 'Atenção' };
+      var v = h('div', { class: 'verdict ' + a.nivel }, h('b', { text: NV[a.nivel] || NV.ok }), h('p', { text: a.resumo }));
+      if (a.pontos && a.pontos.length) { var ul = h('ul'); a.pontos.forEach(function (x) { ul.appendChild(h('li', { text: x })); }); v.appendChild(ul); }
+      if (a.ajuste) v.appendChild(h('p', {}, h('b', { text: 'Próxima semana: ' }), document.createTextNode(a.ajuste)));
+      box.appendChild(v);
+    } else if (semBusy || (a && a.pendente && Date.now() - new Date(a.criado).getTime() < 120000)) {
+      box.appendChild(h('p', { class: 'tip', text: 'Analisando a semana...' }));
+      return;
+    } else box.appendChild(h('p', { class: 'tip', text: 'Junta pesagem, composição, cintura, refeições, treinos e passos dos 7 dias até a pesagem de ' + br(dPes) + '.' }));
+    var bt = h('button', { type: 'button', class: 'howbtn', id: 'sem-go', text: a && a.resumo ? 'Analisar de novo' : 'Analisar a semana' });
+    bt.addEventListener('click', function () { analisaSemana(dPes, false); });
+    box.appendChild(bt);
+    if (semMsg) box.appendChild(h('p', { class: 'tip', 'aria-live': 'polite', text: semMsg }));
+  }
+
   /* Balança e relógio: dados que chegam do Health Connect (Zepp) */
   function renderSaude() {
     var box = $('hc-box'); if (!box) return;
@@ -3525,6 +3687,10 @@ window.MOVES = (function () {
     if (cks.length) {
       var iUlt = cks.length - 1;
       blocoComp('Última pesagem', iUlt);
+      var dU = cks[iUlt];
+      blocoSemana(box, dU);
+      // Pesagem nova (até 3 dias) ainda sem análise: analisa sozinho, uma vez.
+      if (Store.loaded('semanas') && Store.loaded('composicao') && !Store.get('semanas', dU) && dU >= addDias(today, -3) && !semBusy) setTimeout(function () { analisaSemana(dU, true); }, 1500);
       // Histórico: a pesagem mais recente até a data escolhida no topo, se for outra.
       var iSel = -1;
       for (var q = cks.length - 1; q >= 0; q--) { if (cks[q] <= foodDate) { iSel = q; break; } }
