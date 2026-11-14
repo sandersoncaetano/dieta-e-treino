@@ -3494,23 +3494,25 @@ window.MOVES = (function () {
       return;
     }
     var f1 = function (v, cas) { return Number(v).toLocaleString('pt-BR', { minimumFractionDigits: cas, maximumFractionDigits: cas }); };
-    if (cks.length) {
-      var ult = comp[cks[cks.length - 1]], ant = cks.length > 1 ? comp[cks[cks.length - 2]] : null;
-      box.appendChild(h('p', { class: 'tip', text: 'Última pesagem na balança: ' + dsem(ult.data) + ', ' + br(ult.data) + (ult.hora ? ' às ' + ult.hora : '') + (ant ? '. Comparação com ' + br(ant.data) + '.' : '.') }));
-      var linhas = [
-        ['Peso', 'peso_kg', ' kg', 1],
-        ['Gordura', 'gordura_pct', ' %', 1],
-        ['Gordura em kg', '_gkg', ' kg', 1],
-        ['Massa magra', 'massa_magra_kg', ' kg', 1],
-        ['Massa óssea', 'massa_ossea_kg', ' kg', 1],
-        ['Água', 'agua_kg', ' kg', 1],
-        ['Metabolismo basal', 'tmb_kcal', ' kcal', 0]
-      ];
-      var val = function (d, k) {
-        if (!d) return null;
-        if (k === '_gkg') return d.peso_kg && d.gordura_pct ? d.peso_kg * d.gordura_pct / 100 : null;
-        return typeof d[k] === 'number' ? d[k] : null;
-      };
+    var val = function (d, k) {
+      if (!d) return null;
+      if (k === '_gkg') return d.peso_kg && d.gordura_pct ? d.peso_kg * d.gordura_pct / 100 : null;
+      return typeof d[k] === 'number' ? d[k] : null;
+    };
+    var linhas = [
+      ['Peso', 'peso_kg', ' kg', 1],
+      ['Gordura', 'gordura_pct', ' %', 1],
+      ['Gordura em kg', '_gkg', ' kg', 1],
+      ['Massa magra', 'massa_magra_kg', ' kg', 1],
+      ['Massa óssea', 'massa_ossea_kg', ' kg', 1],
+      ['Água', 'agua_kg', ' kg', 1],
+      ['Metabolismo basal', 'tmb_kcal', ' kcal', 0]
+    ];
+    // Um bloco de pesagem: valores e diferença para a pesagem anterior.
+    function blocoComp(tit, idx) {
+      var ult = comp[cks[idx]], ant = idx > 0 ? comp[cks[idx - 1]] : null;
+      box.appendChild(h('h3', { text: tit }));
+      box.appendChild(h('p', { class: 'tip', text: dsem(ult.data) + ', ' + br(ult.data) + (ult.hora ? ' às ' + ult.hora : '') + (ant ? '. Diferença para ' + br(ant.data) + '.' : '.') }));
       var lst = h('div', { class: 'hc-list' });
       linhas.forEach(function (l) {
         var v = val(ult, l[1]); if (v == null) return;
@@ -3520,9 +3522,19 @@ window.MOVES = (function () {
       });
       box.appendChild(lst);
     }
+    if (cks.length) {
+      var iUlt = cks.length - 1;
+      blocoComp('Última pesagem', iUlt);
+      // Histórico: a pesagem mais recente até a data escolhida no topo, se for outra.
+      var iSel = -1;
+      for (var q = cks.length - 1; q >= 0; q--) { if (cks[q] <= foodDate) { iSel = q; break; } }
+      if (iSel >= 0 && iSel !== iUlt) blocoComp('Até ' + br(foodDate) + ' (data do topo)', iSel);
+      else if (iSel < 0) box.appendChild(h('p', { class: 'tip', text: 'Não há pesagem da balança até ' + br(foodDate) + '.' }));
+    }
     if (sks.length) {
-      box.appendChild(h('h3', { text: 'Últimos dias' }));
-      var ult7 = sks.slice(-7).reverse();
+      box.appendChild(h('h3', { text: foodDate === today ? 'Últimos 7 dias' : '7 dias até ' + br(foodDate) }));
+      var ult7 = sks.filter(function (k) { return k <= foodDate; }).slice(-7).reverse();
+      if (!ult7.length) { box.appendChild(h('p', { class: 'tip', text: 'Sem dados até essa data.' })); return; }
       // Mostra só as colunas que têm dado (ex.: sem relógio à noite, não há sono).
       var cols = [['Sono', 'sono_min', function (v) { return v > 0 ? Math.floor(v / 60) + 'h' + String(v % 60).padStart(2, '0') : '–'; }],
         ['FC repouso', 'fc_repouso', function (v) { return v + ' bpm'; }],
