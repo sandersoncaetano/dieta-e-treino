@@ -3522,13 +3522,25 @@ window.MOVES = (function () {
     }
     if (sks.length) {
       box.appendChild(h('h3', { text: 'Últimos dias' }));
+      var ult7 = sks.slice(-7).reverse();
+      // Mostra só as colunas que têm dado (ex.: sem relógio à noite, não há sono).
+      var cols = [['Sono', 'sono_min', function (v) { return v > 0 ? Math.floor(v / 60) + 'h' + String(v % 60).padStart(2, '0') : '–'; }],
+        ['FC repouso', 'fc_repouso', function (v) { return v + ' bpm'; }],
+        ['Passos', 'passos', function (v) { return nInt(v); }]].filter(function (c) {
+          return ult7.some(function (k) { return typeof sd[k][c[1]] === 'number'; });
+        });
       var tab = h('div', { class: 'hc-list hc-dias' });
-      tab.appendChild(h('div', { class: 'hc-lin hc-cab' }, h('span', { text: 'Dia' }), h('span', { text: 'Sono' }), h('span', { text: 'FC repouso' }), h('span', { text: 'Passos' })));
-      sks.slice(-7).reverse().forEach(function (k) {
+      var grade = '1.3fr' + cols.map(function () { return ' 1fr'; }).join('');
+      var lin = function (cels, cab) {
+        var d = h('div', { class: 'hc-lin' + (cab ? ' hc-cab' : '') });
+        d.style.gridTemplateColumns = grade;
+        cels.forEach(function (t) { d.appendChild(h('span', { text: t })); });
+        tab.appendChild(d);
+      };
+      lin(['Dia'].concat(cols.map(function (c) { return c[0]; })), true);
+      ult7.forEach(function (k) {
         var x = sd[k];
-        var sono = typeof x.sono_min === 'number' && x.sono_min > 0 ? Math.floor(x.sono_min / 60) + 'h' + String(x.sono_min % 60).padStart(2, '0') : '–';
-        tab.appendChild(h('div', { class: 'hc-lin' }, h('span', { text: dsem(k).slice(0, 3) + ' ' + ddmm(k) }), h('span', { text: sono }),
-          h('span', { text: x.fc_repouso ? x.fc_repouso + ' bpm' : '–' }), h('span', { text: typeof x.passos === 'number' ? nInt(x.passos) : '–' })));
+        lin([dsem(k).slice(0, 3) + ' ' + ddmm(k)].concat(cols.map(function (c) { return typeof x[c[1]] === 'number' ? c[2](x[c[1]]) : '–'; })));
       });
       box.appendChild(tab);
     }
