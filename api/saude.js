@@ -58,6 +58,10 @@ async function recebe(uid, p) {
     if (d && d.type && d.id) await banco('saude_registros?user_id=eq.' + uid + '&tipo=eq.' + enc(d.type) + '&rid=eq.' + enc(d.id), { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
   }
 
+  const janela = (dia) => {
+    const ini = new Date(dia + 'T00:00:00-03:00'), fim = new Date(ini.getTime() + 864e5);
+    return '&tempo=gte.' + enc(ini.toISOString()) + '&tempo=lt.' + enc(fim.toISOString());
+  };
   // 2) Composição corporal por dia (último valor do dia de cada medida).
   const CAMPOS = {
     weight: ['peso_kg', (r) => r.kilograms],
@@ -67,21 +71,33 @@ async function recebe(uid, p) {
     body_water_mass: ['agua_kg', (r) => r.kilograms],
     basal_metabolic_rate: ['tmb_kcal', (r) => r.watts != null ? Math.round(r.watts * 20.65) : null]
   };
+  // Dias afetados por este envio; o valor de cada dia é recalculado com tudo o que já está guardado,
+  // dando preferência à balança (Zepp) sobre outras fontes, como o Google Fit.
+  const diasAfet = new Set();
+  for (const tipo of Object.keys(CAMPOS)) for (const r of (p[tipo] || [])) { const t = tempoDe(r), d = t && diaLocal(t); if (d) diasAfet.add(d); }
+  const prio = (o) => /huami|zepp|amazfit/i.test(o || '') ? 2 : 1;
   const comp = {};
-  for (const tipo of Object.keys(CAMPOS)) {
-    for (const r of (p[tipo] || [])) {
-      const t = tempoDe(r), dia = t && diaLocal(t), v = CAMPOS[tipo][1](r);
-      if (!dia || v == null || isNaN(v)) continue;
-      const c = comp[dia] || (comp[dia] = { _t: {} }), campo = CAMPOS[tipo][0];
-      if (!c._t[campo] || t > c._t[campo]) { c._t[campo] = t; c[campo] = Math.round(v * 100) / 100; if (tipo === 'weight') c.hora = horaLocal(t); }
+  for (const dia of diasAfet) {
+    const regs = await banco('saude_registros?select=tipo,tempo,valor,origem&user_id=eq.' + uid + '&tipo=in.(' + Object.keys(CAMPOS).join(',') + ')' + janela(dia));
+    const c = { _k: {} };
+    for (const x of (regs || [])) {
+      const [campo, fn] = CAMPOS[x.tipo], v = fn(x.valor);
+      if (v == null || isNaN(v)) continue;
+      const chave = [prio(x.origem), new Date(x.tempo).getTime()], ant = c._k[campo];
+      if (!ant || chave[0] > ant[0] || (chave[0] === ant[0] && chave[1] > ant[1])) {
+        c._k[campo] = chave; c[campo] = Math.round(v * 100) / 100;
+        if (x.tipo === 'weight') c.hora = horaLocal(x.tempo);
+      }
     }
+    delete c._k;
+    if (Object.keys(c).length) comp[dia] = c;
   }
   const dias = Object.keys(comp);
   if (dias.length) {
     const atual = await docs(uid, 'composicao', dias), pesos = await docs(uid, 'peso', dias);
     const novos = {}, novosPeso = {};
     for (const dia of dias) {
-      const c = comp[dia]; delete c._t;
+      const c = comp[dia];
       novos[dia] = Object.assign({}, atual[dia] || {}, c, { data: dia, origem: 'health-connect', atualizado: new Date().toISOString() });
       // Peso do dia: preenche se não houver um digitado à mão.
       if (c.peso_kg && (!pesos[dia] || pesos[dia].origem === 'health-connect')) {
@@ -102,10 +118,6 @@ async function recebe(uid, p) {
   const diasSono = new Set(), diasPassos = new Set();
   for (const r of (p.sleep || [])) { const d = r.session_end_time && diaLocal(r.session_end_time); if (d) { diasSono.add(d); pega(d); } }
   for (const r of (p.steps || [])) { const d = r.start_time && diaLocal(r.start_time); if (d) { diasPassos.add(d); pega(d); } }
-  const janela = (dia) => {
-    const ini = new Date(dia + 'T00:00:00-03:00'), fim = new Date(ini.getTime() + 864e5);
-    return '&tempo=gte.' + enc(ini.toISOString()) + '&tempo=lt.' + enc(fim.toISOString());
-  };
   for (const dia of diasPassos) {
     const r = await banco('saude_registros?select=valor&user_id=eq.' + uid + '&tipo=eq.steps' + janela(dia));
     pega(dia).passos = (r || []).reduce((s, x) => s + (Number(x.valor.count) || 0), 0);

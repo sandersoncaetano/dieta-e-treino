@@ -494,6 +494,7 @@ footer .col { display: grid; gap: 10px; }
     <section class="panel" id="balanco"></section>
     <section class="panel" id="h-peso"></section>
     <section class="panel" id="h-comp"></section>
+    <section class="panel" id="h-passos"></section>
     <section class="panel" id="h-evo"></section>
     <section class="panel">
       <h2>Painel de força</h2>
@@ -2104,7 +2105,7 @@ window.MOVES = (function () {
   }
   function over(c) { return c.tipo === 'corrida' && ((c.fc_media || 0) > 150 || (c.esforco || 0) > 6); }
   function anaResumo(sid) {
-    var x = Store.get('analises', sid); if (!x) return null;
+    var x = Store.get('analises', sid); if (!x || !x.veredito) return null;
     var v = VERED[x.veredito] || VERED.estavel;
     return h('div', { class: 'verdict ' + v[1] }, h('b', { text: v[0] + ': ' + (x.titulo || '') }), h('p', { text: x.diagnostico }), h('a', { href: '#historico', class: 'link', text: 'Ver análise completa no Histórico', on: { click: function () { histSel = x.data; histMes = x.data.slice(0, 7); } } }));
   }
@@ -2206,6 +2207,14 @@ window.MOVES = (function () {
   /* Gasto fora do exercício: com passos do relógio/celular, 10% da TMB (digestão e rotina)
      mais o custo dos passos fora dos treinos (0,5 kcal por kg por km, passo de 0,75 m).
      Sem passos, 25% da TMB, como antes. */
+  /* Meta de proteína pela massa magra medida na balança: 2,3 a 2,6 g por kg de massa magra
+     (faixa usada para quem treina em déficit). Sem balança, 160 a 180 g. */
+  function protMeta(d) {
+    var c = compAte(d || Store.day(), 'massa_magra_kg');
+    if (!c) return { min: 160, max: 180, mm: null };
+    return { min: Math.round(c.massa_magra_kg * 2.3 / 5) * 5, max: Math.round(c.massa_magra_kg * 2.6 / 5) * 5, mm: c.massa_magra_kg };
+  }
+  function protTxt(d) { var m = protMeta(d); return m.min + ' a ' + m.max; }
   function baseDia(d) {
     var tmb = tmbDe(d), sd = Store.get('saude_dia', d), r = { tmb: tmb, tmbBalanca: !!compAte(d, 'tmb_kcal') };
     if (sd && typeof sd.passos === 'number' && sd.passos > 0) {
@@ -2621,7 +2630,7 @@ window.MOVES = (function () {
     gl('Gasto estimado', '', nInt(t.gasto) + ' kcal', 'tot');
     box.appendChild(gt);
     box.appendChild(h('div', { class: 'mini-stats' },
-      h('div', {}, h('b', { text: nInt(t.p) + ' g' }), h('span', { text: 'proteína (meta 160 a 180)' })),
+      h('div', {}, h('b', { text: nInt(t.p) + ' g' }), h('span', { text: 'proteína (meta ' + protTxt(d) + ')' })),
       h('div', {}, h('b', { text: nInt(t.g) + ' g' }), h('span', { text: 'gordura' })),
       h('div', {}, h('b', { text: nInt(t.c) + ' g' }), h('span', { text: 'carboidrato' }))));
     var acts = atividadesDe(d);
@@ -2713,7 +2722,7 @@ window.MOVES = (function () {
     var rec = pts.slice(-3), ant = pts.slice(Math.max(0, pts.length - 6), pts.length - 3);
     var med = function (a, k) { return a.reduce(function (s, x) { return s + x[k]; }, 0) / a.length; };
     var t = { n: pts.length, de: ant[0].d, ate: rec[rec.length - 1].d, dg: med(rec, 'g') - med(ant, 'g'), dm: med(rec, 'm') - med(ant, 'm'), dp: med(rec, 'p') - med(ant, 'p') };
-    if (t.dm <= -1 && t.dp < 0 && -t.dm >= -t.dp * 0.4) { t.nivel = 'atencao'; t.msg = 'Boa parte do peso perdido está saindo da massa magra. Garanta 160 a 180 g de proteína por dia, mantenha a musculação e evite dias muito abaixo da meta de calorias.'; }
+    if (t.dm <= -1 && t.dp < 0 && -t.dm >= -t.dp * 0.4) { t.nivel = 'atencao'; t.msg = 'Boa parte do peso perdido está saindo da massa magra. Garanta ' + protTxt() + ' g de proteína por dia, mantenha a musculação e evite dias muito abaixo da meta de calorias.'; }
     else if (t.dg <= -0.5 && t.dm > -1) { t.nivel = 'bom'; t.msg = 'A perda está vindo da gordura e a massa magra se mantém. É exatamente o que se quer.'; }
     else if (t.dg > 0.5) { t.nivel = 'ok'; t.msg = 'A gordura subiu nas últimas pesagens. Confira o saldo de calorias das últimas semanas.'; }
     else { t.nivel = 'ok'; t.msg = 'Sem mudança clara ainda. Bioimpedância oscila com água; continue pesando sempre no mesmo horário.'; }
@@ -2750,6 +2759,36 @@ window.MOVES = (function () {
       box.appendChild(h('div', { class: 'verdict ' + t.nivel }, h('b', { text: NV[t.nivel] }),
         h('p', { text: 'Média das 3 últimas pesagens contra as anteriores: gordura ' + fx(t.dg) + ' kg, massa magra ' + fx(t.dm) + ' kg. ' + t.msg })));
     } else box.appendChild(h('p', { class: 'tip', text: 'A tendência aparece a partir da 4ª pesagem. Uma pesagem isolada varia até 1 kg só com água.' }));
+  }
+  /* Passos: média por dia em cada semana (segunda a domingo) */
+  function renderPassosH() {
+    var box = $('h-passos'); if (!box) return; box.textContent = '';
+    box.appendChild(h('h2', { text: 'Passos' }));
+    var sd = Store.all('saude_dia') || {}, hoje = Store.day(), sem = {};
+    Object.keys(sd).forEach(function (k) {
+      if (typeof sd[k].passos !== 'number' || k > hoje) return;
+      var s0 = segDe(k), w = sem[s0] || (sem[s0] = { n: 0, t: 0 });
+      w.n++; w.t += sd[k].passos;
+    });
+    var segs = Object.keys(sem).sort().slice(-8);
+    if (!segs.length) { box.appendChild(h('p', { class: 'tip', text: 'Os passos chegam do relógio e do celular pelo Health Connect. Assim que houver dados, a média de cada semana aparece aqui.' })); return; }
+    var med = segs.map(function (s0) { return sem[s0].t / sem[s0].n; });
+    var mx = Math.max.apply(null, med.concat([10000])) * 1.1;
+    var W = 320, H = 150, x0 = 4, x1 = W - 4, y1 = 120, bw = (x1 - x0) / segs.length;
+    var svg = sv('svg', { viewBox: '0 0 ' + W + ' ' + H, class: 'chart', role: 'img', 'aria-label': 'Média de passos por dia em cada semana' });
+    var yMeta = y1 - 8000 / mx * (y1 - 10);
+    sv('line', { x1: x0, x2: x1, y1: yMeta, y2: yMeta, stroke: 'var(--fg)', 'stroke-dasharray': '3 3' }, svg);
+    segs.forEach(function (s0, i) {
+      var v = med[i], hh = v / mx * (y1 - 10), atual = s0 === segDe(hoje);
+      sv('rect', { x: x0 + i * bw + 4, y: y1 - hh, width: bw - 8, height: hh, rx: 3, fill: atual ? 'var(--far)' : 'var(--accent)' }, svg);
+      sv('text', { x: x0 + i * bw + bw / 2, y: y1 - hh - 4, 'text-anchor': 'middle', text: (v / 1000).toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + 'k' }, svg);
+      sv('text', { x: x0 + i * bw + bw / 2, y: H - 12, 'text-anchor': 'middle', text: ddmm(s0) }, svg);
+    });
+    box.appendChild(svg);
+    box.appendChild(legenda([['Média por dia na semana', 'var(--accent)'], ['Semana atual (parcial)', 'var(--far)'], ['Referência de 8 mil', 'var(--fg)']]));
+    var ult = med[med.length - 1], ant = med.length > 1 ? med[med.length - 2] : null;
+    var kcal = Math.round(1000 * pesoAte(hoje) * 0.000375);
+    box.appendChild(h('p', { class: 'tip', text: 'Esta semana: ' + nInt(ult) + ' passos por dia' + (ant ? ' (semana passada: ' + nInt(ant) + ')' : '') + '. Cada mil passos a mais gastam cerca de ' + kcal + ' kcal no seu peso, e isso já entra no gasto do dia.' }));
   }
   function sessoesEx(id) {
     return treinosOk().map(function (r) { var it = (r.v.itens || {})[id]; if (!(it && it.series > 0 && it.kg)) return null; var rr = repsDe(it); return { d: r.v.data, kg: it.kg, reps: Math.max.apply(null, rr), soma: rr.reduce(function (a, b) { return a + b; }, 0), series: it.series, nome: it.nome }; })
@@ -2947,6 +2986,9 @@ window.MOVES = (function () {
     var m = anaMet(id); if (!m || anaBusy[id]) return Promise.resolve();
     var ant = anaAnteriores(m, 6);
     anaBusy[id] = true; anaMsg[id] = ''; renderAtiv(); renderCardio();
+    // Trava: avisa outros aparelhos ou abas que esta análise já está sendo feita.
+    var antes = Store.get('analises', id);
+    Store.set('analises', id, Object.assign({}, antes || {}, { trava: new Date().toISOString() }));
     return Store.sample().then(function (sample) {
       if (!sample) throw new Error('indisponivel');
       return sample.json(anaPrompt(m, ant), { modelTier: 'default', cache: false });
@@ -2960,15 +3002,17 @@ window.MOVES = (function () {
         sugestao: String(r.sugestao || ''), chave: anaChave(m), base: ant.length, criado: new Date().toISOString()
       });
     }).catch(function (e) {
+      if (antes) Store.set('analises', id, antes); else Store.del('analises', id);
       anaMsg[id] = e && e.message === 'indisponivel' ? 'A análise automática não está disponível aqui.' : 'Não consegui analisar agora. Toque em Analisar.';
     }).then(function () { delete anaBusy[id]; renderAtiv(); renderCardio(); });
   }
   function anaPendentes() {
-    if (anaFila) return;
+    if (anaFila || !Store.loaded('analises') || !Store.loaded('strava')) return;
     var lim = addDias(Store.day(), -21), st = Store.all('strava');
     var ids = Object.keys(st).filter(function (k) {
       var a = st[k]; if (!anaValida(a) || a.data < lim) return false;
       var x = Store.get('analises', k), m = anaMet(k);
+      if (x && x.trava && Date.now() - new Date(x.trava).getTime() < 180000) return false;
       return !x || x.chave !== anaChave(m);
     }).sort(function (x, y) { return st[x].data < st[y].data ? -1 : 1; }).slice(-5);
     if (!ids.length) return;
@@ -2980,6 +3024,7 @@ window.MOVES = (function () {
   var VERED = { evolucao: ['Evolução', 'bom'], estavel: ['Estável', ''], queda: ['Queda', 'atencao'], atencao: ['Atenção', 'atencao'], inicio: ['Começo da série', ''] };
   function anaCard(id) {
     var a = Store.get('strava', id), x = Store.get('analises', id), m = anaMet(id), ant = anaAnteriores(m, 6);
+    if (x && !x.veredito) x = null;
     var card = h('article', { class: 'ana' });
     var v = x ? VERED[x.veredito] || VERED.estavel : null;
     card.appendChild(h('div', { class: 'lift-head' }, h('h3', { text: SEMANA[new Date(a.data + 'T12:00:00').getDay()] + ', ' + br(a.data) + ' · ' + (a.nome || anaGrupoNome(m.grupo)) }),
@@ -3042,7 +3087,7 @@ window.MOVES = (function () {
   }
   function renderHist() {
     var b = balDados(), segs = balSemanas(b), aj = balAjuste(b, segs).kcal;
-    renderCal(); renderDia(b, aj); renderSemanaH(b, aj); renderAtiv(); renderBalanco(); renderPesoH(); renderCompH(); renderEvo();
+    renderCal(); renderDia(b, aj); renderSemanaH(b, aj); renderAtiv(); renderBalanco(); renderPesoH(); renderCompH(); renderPassosH(); renderEvo();
     var mon = segDe(histSel), fim = addDias(mon, 6);
     function naSemana(d) { return d >= mon && d <= fim; }
     var tr = treinosOk(), ca = cardioTudo(), lo = lombarOk();
@@ -3112,7 +3157,7 @@ window.MOVES = (function () {
       'Responda somente com um objeto JSON neste formato: ' +
       '{"itens":[{"nome":"texto","quantidade":"texto","kcal":0,"proteina_g":0,"gordura_g":0}],"kcal":0,"proteina_g":0,"gordura_g":0,"carbo_g":0,"observacao":"texto","avaliacao":{"nivel":"bom","texto":"texto"}}. ' +
       'Em observacao, escreva no máximo uma frase em português dizendo o que precisou ser estimado. ' +
-      'Em avaliacao, avalie esta refeição como um nutricionista franco. O objetivo do usuário é emagrecer preservando músculo, com ' + metaDia(doc.data) + ' kcal no dia e 160 a 180 g de proteína. ' +
+      'Em avaliacao, avalie esta refeição como um nutricionista franco. O objetivo do usuário é emagrecer preservando músculo, com ' + metaDia(doc.data) + ' kcal no dia e ' + protTxt(doc.data) + ' g de proteína. ' +
       'Antes desta refeição ele já tinha ' + Math.round(kOut) + ' kcal e ' + Math.round(pOut) + ' g de proteína no dia. ' +
       'Use nivel "bom" quando a refeição ajuda o objetivo, "ok" quando é aceitável com ressalva e "atencao" quando pesa contra o objetivo. ' +
       'Em texto, escreva até duas frases curtas em português: diga qual alimento mais pesou ou mais ajudou, com o motivo (gordura, calorias, pouca proteína, boa proteína) e, se couber, uma troca concreta. ' +
@@ -3477,9 +3522,9 @@ window.MOVES = (function () {
       return '- ' + tipoNome(m.tipo) + ': ' + (m.relato || '(sem relato)') + ' = ' + (m.kcal || 0) + ' kcal, ' + (m.proteina_g || 0) + ' g de proteína';
     }).join('\n');
     return 'Você é um nutricionista franco fazendo o fechamento do dia alimentar de um adulto que quer emagrecer preservando músculo. ' +
-      'Metas do dia: ' + meta + ' kcal, sem ficar abaixo de ' + piso + ' kcal, e 160 a 180 g de proteína. A meta da semana é 15.600 kcal. ' +
+      'Metas do dia: ' + meta + ' kcal, sem ficar abaixo de ' + piso + ' kcal, e ' + protTxt(d) + ' g de proteína. A meta da semana é 15.600 kcal. ' +
       'Totais do dia, já calculados: ' + t.k + ' kcal e ' + t.p + ' g de proteína. Saldo: ' + (rest >= 0 ? 'cabem mais ' + rest + ' kcal' : 'passou ' + (-rest) + ' kcal') + '. ' +
-      (t.p < 160 ? 'Faltam ' + (160 - t.p) + ' g de proteína para o mínimo. ' : 'A meta de proteína foi atingida. ') +
+      (t.p < protMeta(d).min ? 'Faltam ' + (protMeta(d).min - t.p) + ' g de proteína para o mínimo. ' : 'A meta de proteína foi atingida. ') +
       'Semana até este dia: ' + wk + ' kcal em ' + Object.keys(days).length + ' dia(s) registrado(s). ' + quando + ' ' +
       'Referência: 1 scoop de whey de 35 g, com água, tem 129 kcal e 21 g de proteína. ' +
       'Refeições do dia:\n' + lista + '\n' +
@@ -3595,7 +3640,7 @@ window.MOVES = (function () {
         ', gasto estimado ' + nInt(x.gasto) + ' kcal' + (sd.passos ? ', ' + nInt(sd.passos) + ' passos' : '') + (at ? ', atividades: ' + at : ', sem treino'));
     }
     return 'Analise a semana de um homem de ' + BAL.altura + ' cm que quer emagrecer preservando músculo, com musculação, cardio e pilates. ' +
-      'Metas: ' + PESO_META + ' kg; 2.000 kcal nos dias úteis e 2.800 no fim de semana; 160 a 180 g de proteína por dia. ' +
+      'Metas: ' + PESO_META + ' kg; 2.000 kcal nos dias úteis e 2.800 no fim de semana; ' + protTxt(dPes) + ' g de proteína por dia (2,3 a 2,6 g por kg de massa magra). ' +
       'Dados da balança de bioimpedância (oscila até 1 kg com água; julgue pela tendência, não por uma pesagem):\n' + pes + '\n' +
       (t.nivel ? 'Tendência (média das 3 últimas pesagens contra as anteriores): gordura ' + kg1(t.dg) + ' kg, massa magra ' + kg1(t.dm) + ' kg, peso ' + kg1(t.dp) + ' kg.\n' : 'Ainda há menos de 4 pesagens; não tire conclusões firmes sobre a composição.\n') +
       (med ? 'Medidas com fita:\n' + med + '\n' : '') +
@@ -3961,13 +4006,13 @@ window.MOVES = (function () {
       var i = h('i', { class: over ? 'over' : '' }); i.style.width = Math.min(100, pct) + '%';
       return h('div', { class: 'track' }, i);
     }
-    var left = meta - k;
+    var left = meta - k, pm = protMeta(foodDate);
     box.appendChild(h('div', { class: 'gauge' },
       h('div', { class: 'gauge-top' }, h('strong', { text: nInt(k) + ' de ' + nInt(meta) + ' kcal' }), h('span', { text: left >= 0 ? 'Faltam ' + nInt(left) : nInt(-left) + ' acima' })),
       bar(k / meta * 100, left < 0)));
     box.appendChild(h('div', { class: 'gauge' },
-      h('div', { class: 'gauge-top' }, h('strong', { text: nInt(p) + ' g de proteína' }), h('span', { text: p >= 160 ? 'Meta atingida' : 'Faltam ' + nInt(160 - p) + ' a ' + nInt(180 - p) + ' g' })),
-      bar(p / 160 * 100, false)));
+      h('div', { class: 'gauge-top' }, h('strong', { text: nInt(p) + ' g de proteína' }), h('span', { text: p >= pm.min ? 'Meta atingida' : 'Faltam ' + nInt(pm.min - p) + ' a ' + nInt(pm.max - p) + ' g' })),
+      bar(p / pm.min * 100, false)));
     var mon = new Date(today + 'T12:00:00'); mon.setDate(mon.getDate() - ((mon.getDay() + 6) % 7));
     var from = Store.day(mon), wk = 0, days = {};
     sorted('refeicoes').forEach(function (r) { if (r.v.data >= from) { wk += r.v.kcal || 0; days[r.v.data] = 1; } });
