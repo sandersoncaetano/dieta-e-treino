@@ -35,8 +35,8 @@ jobs:
           KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
         run: |
           if [ -z "$KEYSTORE_PASSWORD" ]; then
-            echo "::error::Crie o segredo ANDROID_KEYSTORE_PASSWORD em Settings > Secrets and variables > Actions."
-            exit 1
+            echo "::warning::Sem o segredo ANDROID_KEYSTORE_PASSWORD: só testa a compilação, sem publicar."
+            exit 0
           fi
           if [ ! -f android/release.p12 ]; then
             keytool -genkeypair -v -storetype PKCS12 -keystore android/release.p12 -alias dietaetreino \
@@ -56,10 +56,15 @@ jobs:
           VERSAO: ${{ github.run_number }}
         run: |
           set -o pipefail
-          gradle -p android assembleRelease --no-daemon --stacktrace 2>&1 | tee build.log
+          if [ -z "$KEYSTORE_PASSWORD" ]; then
+            gradle -p android assembleDebug --no-daemon 2>&1 | tee build.log
+            exit 0
+          fi
+          gradle -p android assembleRelease --no-daemon 2>&1 | tee build.log
           cp android/app/build/outputs/apk/release/app-release.apk dieta-e-treino-sync.apk
 
       - name: Publicar versão
+        if: hashFiles('dieta-e-treino-sync.apk') != ''
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
