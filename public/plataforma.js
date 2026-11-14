@@ -210,7 +210,7 @@
     var d = document.createElement('details');
     d.className = 'conta-menu';
     d.innerHTML = '<summary aria-label="Conta"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg><span>Conta</span></summary>' +
-      '<div class="conta-pop"><button type="button" id="pl-uso">Uso da IA</button><button type="button" id="pl-con">Conectar ou reconectar Strava</button><button type="button" id="pl-sair">Sair</button></div>';
+      '<div class="conta-pop"><button type="button" id="pl-uso">Uso da IA</button><button type="button" id="pl-con">Conectar ou reconectar Strava</button><button type="button" id="pl-hc">Health Connect (balança e relógio)</button><button type="button" id="pl-sair">Sair</button></div>';
     var rec = document.getElementById('t-receitas');
     if (rec && rec.parentNode) {
       var col = document.createElement('div');
@@ -224,7 +224,56 @@
     document.addEventListener('click', function (e) { if (d.open && !d.contains(e.target)) d.open = false; });
     d.querySelector('#pl-con').addEventListener('click', function () { api('/api/strava-conectar', {}).then(function (j) { location.href = j.url; }); });
     d.querySelector('#pl-uso').addEventListener('click', function () { d.open = false; painelUso(sb); });
+    d.querySelector('#pl-hc').addEventListener('click', function () { d.open = false; painelHC(); });
     d.querySelector('#pl-sair').addEventListener('click', function () { sb.auth.signOut().then(function () { location.reload(); }); });
+  }
+
+  /* Health Connect: endereço e chave para o app "Health Connect Webhook" */
+  function painelHC() {
+    var velho = document.getElementById('pl-hc-box'); if (velho) velho.remove();
+    var box = document.createElement('div');
+    box.id = 'pl-hc-box';
+    box.setAttribute('role', 'dialog'); box.setAttribute('aria-label', 'Health Connect');
+    box.setAttribute('style', 'position:fixed;inset:0;z-index:9500;background:rgba(0,0,0,.35);display:grid;place-items:center;padding:16px');
+    box.innerHTML = '<div style="background:var(--bg,#fff);color:var(--fg,#142338);max-width:460px;width:100%;max-height:90vh;overflow:auto;border-radius:16px;padding:18px;display:grid;gap:12px">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;gap:12px"><h2 style="margin:0;font-size:1.4rem">Health Connect</h2><button type="button" id="pl-hc-x" style="font:inherit;font-weight:700;border:0;background:none;color:inherit;font-size:1.4rem" aria-label="Fechar">×</button></div>' +
+      '<div id="pl-hc-c">Carregando...</div></div>';
+    document.body.appendChild(box);
+    function fecha() { box.remove(); }
+    box.addEventListener('click', function (e) { if (e.target === box) fecha(); });
+    box.querySelector('#pl-hc-x').addEventListener('click', fecha);
+    var c = box.querySelector('#pl-hc-c');
+    var est = 'font:inherit;font-weight:700;min-height:44px;padding:8px 14px;border-radius:10px;border:2px solid var(--accent,#1a5fd0);background:transparent;color:inherit';
+    function campo(rot, valor, id) {
+      return '<div style="display:grid;gap:6px"><strong>' + rot + '</strong><code id="' + id + '" style="word-break:break-all;background:var(--panel,#f2f5fa);padding:8px;border-radius:8px;user-select:all">' + valor + '</code>' +
+        '<button type="button" data-copia="' + id + '" style="' + est + ';justify-self:start">Copiar</button></div>';
+    }
+    function mostra(j) {
+      var quando = j.ultimoEnvio ? new Date(j.ultimoEnvio).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : 'nenhum ainda';
+      c.innerHTML = '<div style="display:grid;gap:14px">' +
+        '<p style="margin:0">O Zepp grava peso, composição, sono e frequência cardíaca no Health Connect. O app <strong>Health Connect Webhook</strong> (Play Store) lê de lá e envia para cá.</p>' +
+        '<ol style="margin:0;padding-left:1.2em;display:grid;gap:6px">' +
+        '<li>Instale o Health Connect Webhook e dê permissão de leitura.</li>' +
+        '<li>Em <em>Data types</em>, ligue: Weight, Body fat, Lean body mass, Bone mass, Basal metabolic rate, Resting heart rate, Sleep e Steps.</li>' +
+        '<li>Em <em>Webhooks</em>, adicione o endereço abaixo, formato JSON.</li>' +
+        '<li>Adicione o cabeçalho <code>x-api-key</code> com a chave abaixo e toque em <em>Test</em>.</li>' +
+        '<li>Ligue a sincronização automática (a cada 1 hora basta).</li></ol>' +
+        campo('Endereço', j.url, 'pl-hc-url') + campo('Chave (cabeçalho x-api-key)', j.chave, 'pl-hc-key') +
+        '<p style="margin:0">Último envio recebido: <strong>' + quando + '</strong></p>' +
+        '<p style="margin:0;font-size:.9em">A chave dá acesso só para enviar dados ao app. Se ela vazar, gere outra (a antiga para de funcionar).</p>' +
+        '<button type="button" id="pl-hc-novo" style="' + est + ';justify-self:start">Gerar nova chave</button></div>';
+      c.querySelectorAll('[data-copia]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          var t = document.getElementById(b.getAttribute('data-copia')).textContent;
+          (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(function () { b.textContent = 'Copiado'; }, function () { b.textContent = 'Selecione e copie'; });
+        });
+      });
+      c.querySelector('#pl-hc-novo').addEventListener('click', function () {
+        c.querySelector('#pl-hc-novo').disabled = true;
+        api('/api/saude', { novo: true }).then(mostra, function (e) { c.textContent = 'Erro: ' + e.message; });
+      });
+    }
+    api('/api/saude', {}).then(mostra, function (e) { c.textContent = 'Não consegui abrir: ' + e.message; });
   }
 
   /* Painel de uso da IA */

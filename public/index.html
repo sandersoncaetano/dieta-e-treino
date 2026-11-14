@@ -286,6 +286,11 @@ td.neg { color: var(--stop); font-weight: 700; }
 .freq-list { display: flex; flex-direction: column; gap: 6px; }
 .freq { text-align: left; min-height: 40px; padding: 8px 12px; border-radius: 8px; border: 2px solid var(--line); background: transparent; color: inherit; font: inherit; }
 .freq:active { border-color: var(--accent); }
+.hc-list { display: grid; gap: 2px; margin: 8px 0 4px; }
+.hc-lin { display: grid; grid-template-columns: 1fr auto 5.5em; gap: 8px; align-items: baseline; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.hc-dif { text-align: right; color: var(--muted); font-size: .92em; }
+.hc-dias .hc-lin { grid-template-columns: 1.3fr 1fr 1.2fr 1fr; }
+.hc-cab { color: var(--muted); font-size: .9em; }
 .dur { height: 40px; padding: 0 14px; border-radius: 8px; border: 2px solid var(--line); background: transparent; font-variant-numeric: tabular-nums; }
 .dur[aria-pressed="true"] { border-color: var(--fg); font-weight: 700; }
 .go { height: 62px; border: 0; border-radius: 10px; background: var(--accent); color: var(--on-accent); font: 800 1.3rem var(--display); font-variant-numeric: tabular-nums; }
@@ -412,6 +417,7 @@ footer .col { display: grid; gap: 10px; }
       <p class="side-note" id="peso-msg" aria-live="polite"></p>
       <div id="peso-info"></div>
     </section>
+    <section class="panel" id="hc-box"></section>
     <section class="panel" id="med-box"></section>
   </section>
 
@@ -512,9 +518,9 @@ footer .col { display: grid; gap: 10px; }
 
 <script>
 var Store = (function () {
-  var COLLS = ['treinos', 'cardio', 'lombar', 'cargas', 'imagens', 'refeicoes', 'descansos', 'dias', 'peso', 'strava', 'receitas', 'analises', 'medidas'];
+  var COLLS = ['treinos', 'cardio', 'lombar', 'cargas', 'imagens', 'refeicoes', 'descansos', 'dias', 'peso', 'strava', 'receitas', 'analises', 'medidas', 'composicao', 'saude_dia'];
   var KEY = 'caderno-treino';
-  var cache = { treinos: {}, cardio: {}, lombar: {}, cargas: {}, imagens: {}, refeicoes: {}, descansos: {}, dias: {}, peso: {}, strava: {}, receitas: {}, analises: {}, medidas: {} };
+  var cache = {}; COLLS.forEach(function (c) { cache[c] = {}; });
   var subs = [], db = null, mode = 'loading';
   var timers = {}, inflight = {}, gone = {};
   function notice(t) { var n = document.getElementById('notice'); if (n) { n.textContent = t; n.hidden = !t; } }
@@ -3476,6 +3482,56 @@ window.MOVES = (function () {
   function medNum(v) { var n = num(v); return n && n > 10 && n < 250 ? Math.round(n * 10) / 10 : null; }
   function cm1(v) { return fmtN(v, 1) + ' cm'; }
   function sinalCm(x) { x = Math.round(x * 10) / 10; return (x > 0 ? '+' : x < 0 ? '−' : '') + fmtN(Math.abs(x), 1) + ' cm'; }
+  /* Balança e relógio: dados que chegam do Health Connect (Zepp) */
+  function renderSaude() {
+    var box = $('hc-box'); if (!box) return;
+    box.textContent = '';
+    box.appendChild(h('h2', { text: 'Balança e relógio' }));
+    var comp = Store.all('composicao'), sd = Store.all('saude_dia');
+    var cks = Object.keys(comp).sort(), sks = Object.keys(sd).sort();
+    if (!cks.length && !sks.length) {
+      box.appendChild(h('p', { class: 'tip', text: 'Ainda sem dados. Para receber da balança e do relógio sem digitar, abra Conta, no topo, e toque em Health Connect.' }));
+      return;
+    }
+    var f1 = function (v, cas) { return Number(v).toLocaleString('pt-BR', { minimumFractionDigits: cas, maximumFractionDigits: cas }); };
+    if (cks.length) {
+      var ult = comp[cks[cks.length - 1]], ant = cks.length > 1 ? comp[cks[cks.length - 2]] : null;
+      box.appendChild(h('p', { class: 'tip', text: 'Última pesagem na balança: ' + dsem(ult.data) + ', ' + br(ult.data) + (ult.hora ? ' às ' + ult.hora : '') + (ant ? '. Comparação com ' + br(ant.data) + '.' : '.') }));
+      var linhas = [
+        ['Peso', 'peso_kg', ' kg', 1],
+        ['Gordura', 'gordura_pct', ' %', 1],
+        ['Gordura em kg', '_gkg', ' kg', 1],
+        ['Massa magra', 'massa_magra_kg', ' kg', 1],
+        ['Massa óssea', 'massa_ossea_kg', ' kg', 1],
+        ['Metabolismo basal', 'tmb_kcal', ' kcal', 0]
+      ];
+      var val = function (d, k) {
+        if (!d) return null;
+        if (k === '_gkg') return d.peso_kg && d.gordura_pct ? d.peso_kg * d.gordura_pct / 100 : null;
+        return typeof d[k] === 'number' ? d[k] : null;
+      };
+      var lst = h('div', { class: 'hc-list' });
+      linhas.forEach(function (l) {
+        var v = val(ult, l[1]); if (v == null) return;
+        var a = val(ant, l[1]), dif = a == null ? '' : (v - a);
+        var difTxt = dif === '' || Math.abs(dif) < Math.pow(10, -l[3]) / 2 ? '' : (dif > 0 ? '+' : '−') + f1(Math.abs(dif), l[3]) + l[2];
+        lst.appendChild(h('div', { class: 'hc-lin' }, h('span', { text: l[0] }), h('strong', { text: f1(v, l[3]) + l[2] }), h('span', { class: 'hc-dif', text: difTxt })));
+      });
+      box.appendChild(lst);
+    }
+    if (sks.length) {
+      box.appendChild(h('h3', { text: 'Últimos dias' }));
+      var tab = h('div', { class: 'hc-list hc-dias' });
+      tab.appendChild(h('div', { class: 'hc-lin hc-cab' }, h('span', { text: 'Dia' }), h('span', { text: 'Sono' }), h('span', { text: 'FC repouso' }), h('span', { text: 'Passos' })));
+      sks.slice(-7).reverse().forEach(function (k) {
+        var x = sd[k];
+        var sono = typeof x.sono_min === 'number' && x.sono_min > 0 ? Math.floor(x.sono_min / 60) + 'h' + String(x.sono_min % 60).padStart(2, '0') : '–';
+        tab.appendChild(h('div', { class: 'hc-lin' }, h('span', { text: dsem(k).slice(0, 3) + ' ' + ddmm(k) }), h('span', { text: sono }),
+          h('span', { text: x.fc_repouso ? x.fc_repouso + ' bpm' : '–' }), h('span', { text: typeof x.passos === 'number' ? nInt(x.passos) : '–' })));
+      });
+      box.appendChild(tab);
+    }
+  }
   function renderMed() {
     var box = $('med-box'); if (!box) return;
     if (box.contains(document.activeElement) && document.activeElement.tagName === 'INPUT') return;
@@ -3633,6 +3689,7 @@ window.MOVES = (function () {
       });
       box.appendChild(ls);
     }
+    renderSaude();
     renderMed();
     var ult = ks.length ? all[ks[0]].kg : null;
     if (ult !== null) box.appendChild(h('p', { class: 'tip', text: ult - PESO_META > 0 ? 'Faltam ' + kg1(ult - PESO_META) + ' kg para os ' + PESO_META + ' kg.' : 'Meta de ' + PESO_META + ' kg alcançada.' }));
