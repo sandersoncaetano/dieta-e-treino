@@ -296,15 +296,21 @@
     box.querySelector('#pl-uso-x').addEventListener('click', fecha);
     var desde = new Date(); desde.setDate(1); desde.setHours(0, 0, 0, 0);
     var mesAnt = new Date(desde); mesAnt.setMonth(mesAnt.getMonth() - 1);
-    Promise.all([config(), sb.from('uso_ia').select('criado,tipo,entrada,saida,imagens').order('criado', { ascending: true }).limit(20000)]).then(function (r) {
-      var cfg = r[0], q = r[1], c = box.querySelector('#pl-uso-c');
+    var cotP = fetch('/api/cotacao').then(function (x) { return x.ok ? x.json() : null; }).catch(function () { return null; });
+    Promise.all([config(), sb.from('uso_ia').select('criado,tipo,entrada,saida,imagens').order('criado', { ascending: true }).limit(20000), cotP]).then(function (r) {
+      var cfg = r[0], q = r[1], cot = r[2], c = box.querySelector('#pl-uso-c');
+      var moeda = 'USD';
+      try { moeda = localStorage.getItem('dt-moeda') === 'BRL' ? 'BRL' : 'USD'; } catch (e) {}
       cfg = { precoEntrada: Number(cfg.precoEntrada) || 3, precoSaida: Number(cfg.precoSaida) || 15, cotacaoDolar: Number(cfg.cotacaoDolar) || null };
       if (q.error) { c.textContent = 'Não consegui ler o uso: ' + q.error.message; return; }
       var rows = q.data || [];
       if (!rows.length) { c.textContent = 'Nenhuma chamada à IA registrada ainda.'; return; }
       function custo(x) { return (x.entrada * cfg.precoEntrada + x.saida * cfg.precoSaida) / 1e6; }
       function soma(lista) { var t = { n: 0, tok: 0, img: 0, usd: 0 }; lista.forEach(function (x) { t.n++; t.tok += x.entrada + x.saida; t.img += x.imagens; t.usd += custo(x); }); return t; }
-      function dinheiro(v) { var s = 'US$ ' + v.toFixed(v < 1 ? 3 : 2).replace('.', ','); if (cfg.cotacaoDolar) s += ' (R$ ' + (v * cfg.cotacaoDolar).toFixed(2).replace('.', ',') + ')'; return s; }
+      function dinheiro(v) {
+        if (moeda === 'BRL' && cot && cot.valor) { var b = v * cot.valor; return 'R$ ' + b.toFixed(2).replace('.', ','); }
+        return 'US$ ' + v.toFixed(v < 1 ? 3 : 2).replace('.', ',');
+      }
       function mil(n) { return n >= 1000 ? Math.round(n / 1000).toLocaleString('pt-BR') + ' mil' : String(n); }
       function ch(n) { return n + (n === 1 ? ' chamada' : ' chamadas'); }
       function dia0(d) { var x = new Date(d); x.setHours(0, 0, 0, 0); return x; }
@@ -313,7 +319,15 @@
       var diasUso = Math.round((hoje - inicio) / 864e5) + 1;
       var lin = 'display:flex;flex-wrap:wrap;justify-content:space-between;gap:2px 12px;padding:9px 0;border-bottom:1px solid var(--line,#c6d4e8)';
       var sub = 'font-size:.88rem;color:var(--muted,#4f5f78)';
-      var h = '<div style="min-width:0">';
+      function monta() {
+      var bt = function (m, rot) { return '<button type="button" data-moeda="' + m + '" aria-pressed="' + (moeda === m) + '" style="flex:1;min-height:44px;border:0;border-radius:9px;font:inherit;font-weight:700;' + (moeda === m ? 'background:var(--bg,#fff);color:var(--accent,#1a5fd0);box-shadow:0 1px 3px rgba(20,35,56,.15)' : 'background:transparent;color:var(--muted,#4f5f78)') + '">' + rot + '</button>'; };
+      var h = '<div style="min-width:0">' +
+        '<div role="group" aria-label="Moeda" style="display:flex;gap:4px;padding:4px;margin-bottom:6px;background:var(--mat,#e4ecf8);border-radius:12px">' + bt('USD', 'Dólar (US$)') + bt('BRL', 'Real (R$)') + '</div>';
+      if (moeda === 'BRL') {
+        h += cot && cot.valor
+          ? '<p style="margin:0 0 4px;' + sub + '">Dólar a R$ ' + cot.valor.toFixed(2).replace('.', ',') + (cot.quando ? ', cotação de ' + new Date(cot.quando).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '') + ' (' + cot.fonte + ').</p>'
+          : '<p style="margin:0 0 4px;' + sub + '">Não consegui buscar a cotação agora; mostrando em dólar.</p>';
+      }
       var per = [['Hoje', rows.filter(function (x) { return new Date(x.criado) >= hoje; })]];
       if (diasUso > 1) per.push([diasUso >= 7 ? 'Últimos 7 dias' : 'Desde o início (' + inicio.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) + ')', rows.filter(function (x) { return new Date(x.criado) >= (diasUso >= 7 ? sete : inicio); })]);
       if (diasUso > 7) per.push(['Este mês', rows.filter(function (x) { return new Date(x.criado) >= desde; })]);
@@ -332,8 +346,17 @@
         h += '<div style="' + lin + ';display:block"><div style="display:flex;justify-content:space-between;gap:12px"><strong>' + (nomes[k] || k) + '</strong><span style="white-space:nowrap">' + dinheiro(t.usd) + '</span></div>' +
           '<div style="' + sub + '">' + ch(t.n) + (t.img ? ', ' + t.img + (t.img === 1 ? ' foto' : ' fotos') : '') + ' · ' + mil(t.tok) + ' tokens</div></div>';
       });
-      h += '<p style="margin:12px 0 0;' + sub + '">Estimativa com US$ ' + cfg.precoEntrada + ' por milhão de tokens de entrada e US$ ' + cfg.precoSaida + ' de saída. O valor cobrado de fato está em console.anthropic.com, em Usage e Billing.</p></div>';
+      h += '<p style="margin:12px 0 0;' + sub + '">Estimativa com US$ ' + cfg.precoEntrada + ' por milhão de tokens de entrada e US$ ' + cfg.precoSaida + ' de saída. O valor cobrado de fato está em console.anthropic.com, em Usage e Billing, em dólar' + (moeda === 'BRL' ? '; a fatura do cartão em reais pode vir um pouco diferente por causa de IOF e da cotação do banco' : '') + '.</p></div>';
       c.innerHTML = h;
+      c.querySelectorAll('[data-moeda]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          moeda = b.getAttribute('data-moeda');
+          try { localStorage.setItem('dt-moeda', moeda); } catch (e) {}
+          monta();
+        });
+      });
+      }
+      monta();
     });
   }
 
