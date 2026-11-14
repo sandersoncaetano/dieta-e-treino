@@ -286,8 +286,8 @@
     var box = document.createElement('div');
     box.id = 'pl-uso-box';
     box.setAttribute('role', 'dialog'); box.setAttribute('aria-label', 'Uso da IA');
-    box.setAttribute('style', 'position:fixed;inset:0;z-index:9500;background:rgba(0,0,0,.35);display:grid;place-items:center;padding:16px');
-    box.innerHTML = '<div style="background:var(--bg,#fff);color:var(--fg,#142338);max-width:440px;width:100%;max-height:90vh;overflow:auto;border-radius:16px;padding:18px;display:grid;gap:12px">' +
+    box.setAttribute('style', 'position:fixed;inset:0;z-index:9500;background:rgba(0,0,0,.35);display:grid;place-items:center;grid-template-columns:minmax(0,1fr);padding:16px');
+    box.innerHTML = '<div style="background:var(--bg,#fff);color:var(--fg,#142338);max-width:440px;width:100%;min-width:0;box-sizing:border-box;max-height:90vh;overflow:auto;overflow-wrap:anywhere;border-radius:16px;padding:18px;display:grid;gap:12px">' +
       '<div style="display:flex;justify-content:space-between;align-items:center;gap:12px"><h2 style="margin:0;font-size:1.4rem">Uso da IA</h2><button type="button" id="pl-uso-x" style="font:inherit;font-weight:700;border:0;background:none;color:inherit;font-size:1.4rem" aria-label="Fechar">×</button></div>' +
       '<div id="pl-uso-c">Carregando...</div></div>';
     document.body.appendChild(box);
@@ -296,41 +296,43 @@
     box.querySelector('#pl-uso-x').addEventListener('click', fecha);
     var desde = new Date(); desde.setDate(1); desde.setHours(0, 0, 0, 0);
     var mesAnt = new Date(desde); mesAnt.setMonth(mesAnt.getMonth() - 1);
-    Promise.all([config(), sb.from('uso_ia').select('criado,tipo,entrada,saida,imagens').gte('criado', mesAnt.toISOString()).order('criado', { ascending: false }).limit(5000)]).then(function (r) {
+    Promise.all([config(), sb.from('uso_ia').select('criado,tipo,entrada,saida,imagens').order('criado', { ascending: true }).limit(20000)]).then(function (r) {
       var cfg = r[0], q = r[1], c = box.querySelector('#pl-uso-c');
       cfg = { precoEntrada: Number(cfg.precoEntrada) || 3, precoSaida: Number(cfg.precoSaida) || 15, cotacaoDolar: Number(cfg.cotacaoDolar) || null };
       if (q.error) { c.textContent = 'Não consegui ler o uso: ' + q.error.message; return; }
       var rows = q.data || [];
+      if (!rows.length) { c.textContent = 'Nenhuma chamada à IA registrada ainda.'; return; }
       function custo(x) { return (x.entrada * cfg.precoEntrada + x.saida * cfg.precoSaida) / 1e6; }
-      function soma(lista) { var t = { n: 0, entrada: 0, saida: 0, img: 0, usd: 0 }; lista.forEach(function (x) { t.n++; t.entrada += x.entrada; t.saida += x.saida; t.img += x.imagens; t.usd += custo(x); }); return t; }
+      function soma(lista) { var t = { n: 0, tok: 0, img: 0, usd: 0 }; lista.forEach(function (x) { t.n++; t.tok += x.entrada + x.saida; t.img += x.imagens; t.usd += custo(x); }); return t; }
       function dinheiro(v) { var s = 'US$ ' + v.toFixed(v < 1 ? 3 : 2).replace('.', ','); if (cfg.cotacaoDolar) s += ' (R$ ' + (v * cfg.cotacaoDolar).toFixed(2).replace('.', ',') + ')'; return s; }
-      function mil(n) { return n.toLocaleString('pt-BR'); }
-      var hoje = new Date(); hoje.setHours(0, 0, 0, 0);
-      var sete = new Date(hoje); sete.setDate(sete.getDate() - 6);
-      var per = [
-        ['Hoje', rows.filter(function (x) { return new Date(x.criado) >= hoje; })],
-        ['Últimos 7 dias', rows.filter(function (x) { return new Date(x.criado) >= sete; })],
-        ['Este mês', rows.filter(function (x) { return new Date(x.criado) >= desde; })],
-        ['Mês passado', rows.filter(function (x) { var d = new Date(x.criado); return d >= mesAnt && d < desde; })]
-      ];
-      var td = 'style="padding:6px 4px;border-bottom:1px solid var(--line,#c6d4e8);text-align:right;font-variant-numeric:tabular-nums"';
-      var th = 'style="padding:6px 4px;border-bottom:1px solid var(--line,#c6d4e8);text-align:left"';
-      var h = '<table style="width:100%;border-collapse:collapse;font-size:.95rem"><thead><tr><th ' + th + '>Período</th><th ' + td + '>Chamadas</th><th ' + td + '>Custo estimado</th></tr></thead><tbody>';
-      per.forEach(function (p) { var t = soma(p[1]); h += '<tr><td ' + th + '>' + p[0] + '</td><td ' + td + '>' + t.n + '</td><td ' + td + '>' + dinheiro(t.usd) + '</td></tr>'; });
-      h += '</tbody></table>';
+      function mil(n) { return n >= 1000 ? Math.round(n / 1000).toLocaleString('pt-BR') + ' mil' : String(n); }
+      function ch(n) { return n + (n === 1 ? ' chamada' : ' chamadas'); }
+      function dia0(d) { var x = new Date(d); x.setHours(0, 0, 0, 0); return x; }
+      var hoje = dia0(new Date()), sete = new Date(hoje); sete.setDate(sete.getDate() - 6);
+      var inicio = dia0(rows[0].criado);
+      var diasUso = Math.round((hoje - inicio) / 864e5) + 1;
+      var lin = 'display:flex;flex-wrap:wrap;justify-content:space-between;gap:2px 12px;padding:9px 0;border-bottom:1px solid var(--line,#c6d4e8)';
+      var sub = 'font-size:.88rem;color:var(--muted,#4f5f78)';
+      var h = '<div style="min-width:0">';
+      var per = [['Hoje', rows.filter(function (x) { return new Date(x.criado) >= hoje; })]];
+      if (diasUso > 1) per.push([diasUso >= 7 ? 'Últimos 7 dias' : 'Desde o início (' + inicio.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) + ')', rows.filter(function (x) { return new Date(x.criado) >= (diasUso >= 7 ? sete : inicio); })]);
+      if (diasUso > 7) per.push(['Este mês', rows.filter(function (x) { return new Date(x.criado) >= desde; })]);
+      var ant = rows.filter(function (x) { var d = new Date(x.criado); return d >= mesAnt && d < desde; });
+      if (ant.length) per.push(['Mês passado', ant]);
+      per.forEach(function (p) { var t = soma(p[1]); h += '<div style="' + lin + '"><strong>' + p[0] + '</strong><span>' + ch(t.n) + ' · ' + dinheiro(t.usd) + '</span></div>'; });
+      var tot = soma(rows), med = tot.usd / diasUso;
+      h += '<p style="margin:12px 0 0">Em ' + diasUso + (diasUso === 1 ? ' dia' : ' dias') + ' de uso, a média é de <strong>' + dinheiro(med) + ' por dia</strong>, o que daria cerca de <strong>' + dinheiro(med * 30) + ' por mês</strong>.</p>';
+      if (diasUso < 7) h += '<p style="margin:6px 0 0;' + sub + '">Com poucos dias de uso, a média ainda oscila: os primeiros dias tiveram testes e análises de histórico que não se repetem todo dia.</p>';
       var nomes = { refeicao: 'Refeições', dia: 'Fechar o dia', receita: 'Receitas', atividade: 'Análise de atividades', semana: 'Análise da semana', outro: 'Outros' };
-      var mes = per[2][1], tipos = {};
-      mes.forEach(function (x) { (tipos[x.tipo] = tipos[x.tipo] || []).push(x); });
-      h += '<h3 style="margin:6px 0 0;font-size:1.05rem">Este mês, por tipo</h3><table style="width:100%;border-collapse:collapse;font-size:.95rem"><thead><tr><th ' + th + '>Tipo</th><th ' + td + '>Chamadas</th><th ' + td + '>Tokens</th><th ' + td + '>Custo</th></tr></thead><tbody>';
+      var tipos = {};
+      rows.forEach(function (x) { (tipos[x.tipo] = tipos[x.tipo] || []).push(x); });
+      h += '<h3 style="margin:16px 0 2px;font-size:1.1rem">Por tipo, desde o início</h3>';
       Object.keys(tipos).sort(function (a, b) { return soma(tipos[b]).usd - soma(tipos[a]).usd; }).forEach(function (k) {
         var t = soma(tipos[k]);
-        h += '<tr><td ' + th + '>' + (nomes[k] || k) + (t.img ? ' <small>(' + t.img + ' fotos)</small>' : '') + '</td><td ' + td + '>' + t.n + '</td><td ' + td + '>' + mil(t.entrada + t.saida) + '</td><td ' + td + '>' + dinheiro(t.usd) + '</td></tr>';
+        h += '<div style="' + lin + ';display:block"><div style="display:flex;justify-content:space-between;gap:12px"><strong>' + (nomes[k] || k) + '</strong><span style="white-space:nowrap">' + dinheiro(t.usd) + '</span></div>' +
+          '<div style="' + sub + '">' + ch(t.n) + (t.img ? ', ' + t.img + (t.img === 1 ? ' foto' : ' fotos') : '') + ' · ' + mil(t.tok) + ' tokens</div></div>';
       });
-      if (!mes.length) h += '<tr><td colspan="4" ' + th + '>Nenhuma chamada ainda neste mês.</td></tr>';
-      h += '</tbody></table>';
-      var tm = soma(mes), dias = Math.max(1, new Date().getDate()), fimMes = new Date(desde.getFullYear(), desde.getMonth() + 1, 0).getDate();
-      if (tm.n) h += '<p style="margin:0">Média de ' + dinheiro(tm.usd / dias) + ' por dia. No ritmo atual, o mês fecha em cerca de ' + dinheiro(tm.usd / dias * fimMes) + '.</p>';
-      h += '<p style="margin:0;font-size:.85rem;opacity:.8">Estimativa com US$ ' + cfg.precoEntrada + ' por milhão de tokens de entrada e US$ ' + cfg.precoSaida + ' de saída. O valor cobrado de fato está em console.anthropic.com, em Usage e Billing.</p>';
+      h += '<p style="margin:12px 0 0;' + sub + '">Estimativa com US$ ' + cfg.precoEntrada + ' por milhão de tokens de entrada e US$ ' + cfg.precoSaida + ' de saída. O valor cobrado de fato está em console.anthropic.com, em Usage e Billing.</p></div>';
       c.innerHTML = h;
     });
   }
