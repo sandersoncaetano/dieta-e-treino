@@ -187,6 +187,26 @@ input[type="date"] { height: 46px; }
 .big-saldo.def { color: var(--accent); }
 .big-saldo.sup { color: var(--stop); }
 .chart { width: 100%; height: auto; display: block; }
+.seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; padding: 4px; margin: 4px 0 14px; background: var(--mat); border-radius: 12px; }
+.seg button { min-height: 44px; border: 0; border-radius: 9px; background: transparent; font-weight: 700; color: var(--muted); }
+.seg button[aria-selected="true"] { background: var(--bg); color: var(--accent); box-shadow: 0 1px 3px rgba(20,35,56,.15); }
+.g-dica { margin: 0 0 10px; }
+.gcard-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.gcard-top h2 { flex: 1; }
+.g-exp { flex: none; width: 44px; height: 44px; border-radius: 10px; border: 2px solid var(--line); background: var(--bg); color: var(--accent); font-size: 1.3rem; font-weight: 800; line-height: 1; }
+.g-sub { color: var(--muted); font-size: .92rem; margin: 2px 0 8px; }
+.g-box { position: relative; height: 230px; }
+.g-vazio { color: var(--muted); font-size: .95rem; padding: 6px 0; }
+.g-per { display: flex; gap: 6px; flex-wrap: wrap; margin: 6px 0 10px; }
+.g-per button { min-height: 36px; padding: 4px 12px; border-radius: 999px; border: 2px solid var(--line); background: var(--bg); font-weight: 700; font-size: .9rem; }
+.g-per button[aria-pressed="true"] { border-color: var(--accent); background: var(--accent); color: var(--on-accent); }
+.g-modal { position: fixed; inset: 0; z-index: 9600; background: var(--bg); display: flex; flex-direction: column; padding: max(12px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left)); }
+.g-modal .gcard-top { align-items: center; }
+.g-modal .g-box { flex: 1; height: auto; min-height: 0; }
+.g-fechar { width: 44px; height: 44px; border: 0; background: none; font-size: 1.8rem; font-weight: 700; }
+.a-item + .a-item { margin-top: 16px; }
+.a-item h3 { font-size: 1.15rem; margin-bottom: 4px; }
+.g-sep { margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--line); }
 .chart text { font: 600 11px var(--body); fill: var(--muted); }
 .chart-leg { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: .85rem; color: var(--muted); }
 .chart-leg span::before { content: ""; display: inline-block; width: 12px; height: 4px; border-radius: 2px; margin-right: 5px; vertical-align: 3px; background: var(--c); }
@@ -476,34 +496,52 @@ footer .col { display: grid; gap: 10px; }
   </section>
 
   <section class="view" id="v-historico" hidden>
-    <section class="panel" id="h-cal"></section>
-    <section class="panel" id="h-dia"></section>
-    <section class="panel" id="h-semana"></section>
-    <section class="panel">
-      <h2>Atividades da semana</h2>
-      <div class="stats">
-        <div class="stat"><b id="s-treinos">0</b><span>treinos</span></div>
-        <div class="stat"><b id="s-cardio">0</b><span>cardios</span></div>
-        <div class="stat"><b id="s-lombar">0</b><span>pilates</span></div>
-        <div class="stat"><b id="s-km">0</b><span>km de cardio</span></div>
-        <div class="stat"><b id="s-tempo">0 min</b><span>tempo total</span></div>
-        <div class="stat"><b id="s-kcal">0</b><span>kcal no relógio</span></div>
-      </div>
-    </section>
-    <section class="panel" id="h-ativ"></section>
-    <section class="panel" id="balanco"></section>
-    <section class="panel" id="h-peso"></section>
-    <section class="panel" id="h-comp"></section>
-    <section class="panel" id="h-passos"></section>
-    <section class="panel" id="h-evo"></section>
-    <section class="panel">
-      <h2>Painel de força</h2>
-      <p class="lede">Se a carga ou as repetições caírem por duas sessões seguidas, ajustamos a corrida ou as calorias.</p>
-      <div class="table-wrap"><table>
-        <thead><tr><th scope="col">Exercício</th><th scope="col">Início</th><th scope="col">Atual</th><th scope="col">Dif.</th></tr></thead>
-        <tbody id="forca"></tbody>
-      </table></div>
-    </section>
+    <div class="seg" role="tablist" aria-label="Seções do histórico">
+      <button type="button" role="tab" id="hs-registro" data-sec="registro">Registro</button>
+      <button type="button" role="tab" id="hs-graficos" data-sec="graficos">Gráficos</button>
+      <button type="button" role="tab" id="hs-analises" data-sec="analises">Análises</button>
+    </div>
+    <div id="h-sec-registro" role="tabpanel" aria-labelledby="hs-registro">
+      <section class="panel" id="h-cal"></section>
+      <section class="panel" id="h-dia"></section>
+      <section class="panel" id="h-semana"></section>
+      <section class="panel">
+        <h2>Atividades da semana</h2>
+        <div class="stats">
+          <div class="stat"><b id="s-treinos">0</b><span>treinos</span></div>
+          <div class="stat"><b id="s-cardio">0</b><span>cardios</span></div>
+          <div class="stat"><b id="s-lombar">0</b><span>pilates</span></div>
+          <div class="stat"><b id="s-km">0</b><span>km de cardio</span></div>
+          <div class="stat"><b id="s-tempo">0 min</b><span>tempo total</span></div>
+          <div class="stat"><b id="s-kcal">0</b><span>kcal no relógio</span></div>
+        </div>
+      </section>
+    </div>
+    <div id="h-sec-graficos" role="tabpanel" aria-labelledby="hs-graficos" hidden>
+      <p class="tip g-dica">Toque no gráfico para ver os valores. Toque em ⤢ para ampliar e mudar o período.</p>
+      <section class="panel" id="g-calorias"></section>
+      <section class="panel" id="h-peso"></section>
+      <section class="panel" id="h-comp"></section>
+      <section class="panel" id="g-cintura"></section>
+      <section class="panel" id="h-passos"></section>
+      <section class="panel" id="g-corrida"></section>
+      <section class="panel" id="h-evo"></section>
+    </div>
+    <div id="h-sec-analises" role="tabpanel" aria-labelledby="hs-analises" hidden>
+      <section class="panel" id="a-semana"></section>
+      <section class="panel" id="a-corpo"></section>
+      <section class="panel" id="balanco"></section>
+      <section class="panel" id="h-ativ"></section>
+      <section class="panel">
+        <h2>Painel de força</h2>
+        <p class="lede">Se a carga ou as repetições caírem por duas sessões seguidas, ajustamos a corrida ou as calorias.</p>
+        <div class="table-wrap"><table>
+          <thead><tr><th scope="col">Exercício</th><th scope="col">Início</th><th scope="col">Atual</th><th scope="col">Dif.</th></tr></thead>
+          <tbody id="forca"></tbody>
+        </table></div>
+      </section>
+    </div>
+  </section>
   </section>
 </div></main>
 
@@ -2649,27 +2687,26 @@ window.MOVES = (function () {
   }
   function renderSemanaH(b, aj) {
     var box = $('h-semana'); box.textContent = '';
-    var seg = segDe(histSel), hoje = Store.day();
-    box.appendChild(h('h2', { text: 'Semana de ' + br(seg) + ' a ' + br(addDias(seg, 6)) }));
-    var W = 320, H = 170, top = 14, base = 140, info = [], max = 2000;
-    for (var i = 0; i < 7; i++) { var d = addDias(seg, i), t = diaInfo(d, b, aj); t.d = d; info.push(t); max = Math.max(max, t.k, d <= hoje ? t.gasto : 0, t.meta); }
-    max = Math.ceil(max / 500) * 500;
-    var svg = sv('svg', { viewBox: '0 0 ' + W + ' ' + H, class: 'chart', role: 'img', 'aria-label': 'Consumido e gasto estimado em cada dia da semana' });
-    [0, .5, 1].forEach(function (f) {
-      var y = base - (base - top) * f;
-      sv('line', { x1: 34, x2: W, y1: y, y2: y, stroke: 'var(--line)', 'stroke-width': 1 }, svg);
-      sv('text', { x: 0, y: y + 4, text: (max * f / 1000).toLocaleString('pt-BR') + ' mil' }, svg);
+    var seg = segDe(histSel), hoje = Store.day(), info = [];
+    for (var i = 0; i < 7; i++) { var d = addDias(seg, i), t = diaInfo(d, b, aj); t.d = d; info.push(t); }
+    var gbox = h('div'); box.appendChild(gbox);
+    var L = ['seg', 'ter', 'qua', 'qui', 'sex', 'sáb', 'dom'];
+    grafico(gbox, {
+      id: 'semana', titulo: 'Semana de ' + br(seg) + ' a ' + br(addDias(seg, 6)), sub: 'Consumido, gasto estimado e meta',
+      dados: function () {
+        var ac = cor('accent'), st = cor('stop');
+        return {
+          type: 'bar',
+          data: { labels: info.map(function (t, k) { return L[k] + ' ' + ddmm(t.d); }), datasets: [
+            { type: 'bar', label: 'Consumido', data: info.map(function (t) { return t.n ? Math.round(t.k) : null; }), backgroundColor: info.map(function (t) { return t.k > t.meta ? st : ac; }), borderRadius: 5, order: 2 },
+            { type: 'bar', label: 'Gasto estimado', data: info.map(function (t) { return t.d <= hoje ? Math.round(t.gasto) : null; }), backgroundColor: alfa(cor('far'), 0.8), borderRadius: 5, order: 3 },
+            { type: 'line', label: 'Meta', data: info.map(function (t) { return t.meta; }), borderColor: cor('fg'), borderWidth: 1.5, borderDash: [4, 4], pointRadius: 0, stepped: 'middle', order: 1 }
+          ] },
+          options: { scales: { x: { ticks: { callback: function (v, k) { return L[k]; } } }, y: { beginAtZero: true, ticks: { callback: function (v) { return fmtN0(v / 1000, 1) + ' mil'; } } } } },
+          dicas: { label: function (it) { return ' ' + it.dataset.label + ': ' + nInt(it.raw) + ' kcal'; } }
+        };
+      }
     });
-    var L = ['S', 'T', 'Q', 'Q', 'S', 'S', 'D'], gw = (W - 40) / 7;
-    info.forEach(function (t, i) {
-      var x = 40 + i * gw, bw = gw / 2 - 4, sc = (base - top) / max;
-      if (t.n) sv('rect', { x: x + 2, y: base - t.k * sc, width: bw, height: t.k * sc, rx: 3, fill: t.k > t.meta ? 'var(--stop)' : 'var(--accent)' }, svg);
-      if (t.d <= hoje) sv('rect', { x: x + 2 + bw + 2, y: base - t.gasto * sc, width: bw, height: t.gasto * sc, rx: 3, fill: 'var(--far)' }, svg);
-      sv('line', { x1: x, x2: x + gw - 2, y1: base - t.meta * sc, y2: base - t.meta * sc, stroke: 'var(--fg)', 'stroke-width': 1.5, 'stroke-dasharray': '3 3' }, svg);
-      sv('text', { x: x + gw / 2 - 4, y: H - 12, text: L[i], 'font-weight': t.d === histSel ? 900 : 600 }, svg);
-    });
-    box.appendChild(svg);
-    box.appendChild(legenda([['Consumido', 'var(--accent)'], ['Acima da meta', 'var(--stop)'], ['Gasto estimado', 'var(--far)'], ['Meta do dia', 'var(--fg)']]));
     var fech = info.filter(function (t) { return t.n && t.d < hoje; });
     var ck = 0, cg = 0, cp = 0;
     fech.forEach(function (t) { ck += t.k; cg += t.gasto; cp += t.p; });
@@ -2680,40 +2717,40 @@ window.MOVES = (function () {
       h('div', {}, h('b', { text: fech.length ? (ck - cg <= 0 ? '−' : '+') + nInt(Math.abs(ck - cg)) : '–' }), h('span', { text: 'saldo nos ' + fech.length + ' dias fechados' })),
       h('div', {}, h('b', { text: fech.length ? nInt(cp / fech.length) + ' g' : '–' }), h('span', { text: 'proteína por dia' }))));
   }
-  function renderPesoH() {
-    var box = $('h-peso'); box.textContent = '';
-    box.appendChild(h('h2', { text: 'Tendência de peso' }));
-    var ks = Object.keys(Store.all('peso')).sort().filter(function (d) { return d >= addDias(Store.day(), -182); });
-    if (ks.length < 2) { box.appendChild(h('p', { class: 'tip', text: 'Registre o peso uma vez por semana na aba Peso. A partir da segunda pesagem, a tendência aparece aqui.' })); return; }
-    var pts = ks.map(function (d) { return { d: d, v: Store.get('peso', d).kg }; });
-    var tr = pts.map(function (p, i) {
+  function pesoPts() {
+    var ks = Object.keys(Store.all('peso')).sort();
+    var pts = ks.map(function (d) { return { d: d, v: Store.get('peso', d).kg }; }).filter(function (p) { return typeof p.v === 'number'; });
+    pts.forEach(function (p) {
       var w = pts.filter(function (q) { return q.d <= p.d && q.d > addDias(p.d, -28); });
-      return w.reduce(function (a, q) { return a + q.v; }, 0) / w.length;
+      p.m = w.reduce(function (a, q) { return a + q.v; }, 0) / w.length;
     });
-    var vals = pts.map(function (p) { return p.v; }).concat([PESO_META]);
-    var mn = Math.floor(Math.min.apply(null, vals) - 1), mx = Math.ceil(Math.max.apply(null, vals) + 1);
-    var W = 320, H = 160, x0 = 30, x1 = W - 6, y0 = 10, y1 = 130;
-    var t0 = new Date(pts[0].d + 'T12:00:00').getTime(), t1 = Math.max(new Date(pts[pts.length - 1].d + 'T12:00:00').getTime(), t0 + 864e5);
-    function X(d) { return x0 + (new Date(d + 'T12:00:00').getTime() - t0) / (t1 - t0) * (x1 - x0); }
-    function Y(v) { return y1 - (v - mn) / (mx - mn) * (y1 - y0); }
-    var svg = sv('svg', { viewBox: '0 0 ' + W + ' ' + H, class: 'chart', role: 'img', 'aria-label': 'Pesagens e média de 4 semanas' });
-    [mn, (mn + mx) / 2, mx].forEach(function (v) { sv('line', { x1: x0, x2: x1, y1: Y(v), y2: Y(v), stroke: 'var(--line)' }, svg); sv('text', { x: 0, y: Y(v) + 4, text: Math.round(v) }, svg); });
-    if (PESO_META >= mn) sv('line', { x1: x0, x2: x1, y1: Y(PESO_META), y2: Y(PESO_META), stroke: 'var(--fg)', 'stroke-dasharray': '3 3' }, svg);
-    pts.forEach(function (p) { sv('circle', { cx: X(p.d), cy: Y(p.v), r: 3, fill: 'var(--far)' }, svg); });
-    sv('polyline', { points: pts.map(function (p, i) { return X(p.d) + ',' + Y(tr[i]); }).join(' '), fill: 'none', stroke: 'var(--accent)', 'stroke-width': 2.5, 'stroke-linejoin': 'round' }, svg);
-    sv('text', { x: x0, y: H - 10, text: br(pts[0].d) }, svg);
-    sv('text', { x: x1 - 30, y: H - 10, text: br(pts[pts.length - 1].d) }, svg);
-    box.appendChild(svg);
-    box.appendChild(legenda([['Pesagem', 'var(--far)'], ['Média de 4 semanas', 'var(--accent)'], ['Meta de ' + PESO_META + ' kg', 'var(--fg)']]));
-    var dif = tr[tr.length - 1] - tr[0];
-    box.appendChild(h('p', { class: 'tip', text: 'Média atual: ' + kg1(tr[tr.length - 1]) + ' kg. Variação da média no período: ' + (dif > 0 ? '+' : dif < 0 ? '−' : '') + kg1(Math.abs(dif)) + ' kg. Uma pesagem isolada varia com água e sal; olhe a linha, que junta as últimas 4 semanas.' }));
+    return pts;
+  }
+  function renderPesoH() {
+    grafico($('h-peso'), {
+      id: 'peso', titulo: 'Peso', sub: 'Pesagens e média de 4 semanas', periodos: ['3M', '6M', '1A', 'Tudo'], per: '6M',
+      dados: function (per) {
+        var d0 = desde(per), pts = pesoPts().filter(function (p) { return p.d >= d0; });
+        if (pts.length < 2) return { vazio: 'Aparece a partir da segunda pesagem.' };
+        var x0 = diaNum(pts[0].d), x1 = diaNum(pts[pts.length - 1].d);
+        return {
+          type: 'line', xDias: true,
+          data: { datasets: [
+            { label: 'Média de 4 semanas', data: pts.map(function (p) { return { x: diaNum(p.d), y: Math.round(p.m * 10) / 10 }; }), borderColor: cor('accent'), backgroundColor: alfa(cor('accent'), 0.1), fill: true, borderWidth: 3, pointRadius: 0, pointHoverRadius: 4, tension: 0.35 },
+            { label: 'Pesagem', data: pts.map(function (p) { return { x: diaNum(p.d), y: p.v }; }), showLine: false, borderColor: cor('far'), backgroundColor: cor('far'), pointRadius: 4, pointHoverRadius: 6 },
+            { label: 'Meta de ' + PESO_META + ' kg', data: [{ x: x0, y: PESO_META }, { x: x1, y: PESO_META }], borderColor: cor('fg'), borderDash: [4, 4], borderWidth: 1.5, pointRadius: 0, semDica: true }
+          ] },
+          dicas: { label: function (it) { return ' ' + it.dataset.label + ': ' + kg1(it.raw.y) + ' kg'; } }
+        };
+      }
+    });
   }
   /* Gordura × massa magra: de onde vem a perda de peso */
   function compPontos() {
     var c = Store.all('composicao') || {};
     return Object.keys(c).sort().map(function (k) { return c[k]; })
       .filter(function (x) { return x.peso_kg && x.gordura_pct && x.massa_magra_kg; })
-      .map(function (x) { return { d: x.data, g: x.peso_kg * x.gordura_pct / 100, m: x.massa_magra_kg, p: x.peso_kg }; });
+      .map(function (x) { return { d: x.data, g: x.peso_kg * x.gordura_pct / 100, m: x.massa_magra_kg, p: x.peso_kg, pct: x.gordura_pct }; });
   }
   // Tendência: média das 3 últimas pesagens contra a média das até 3 anteriores.
   function compTendencia() {
@@ -2729,74 +2766,65 @@ window.MOVES = (function () {
     return t;
   }
   function renderCompH() {
-    var box = $('h-comp'); if (!box) return; box.textContent = '';
-    box.appendChild(h('h2', { text: 'Gordura e massa magra' }));
-    var pts = compPontos().filter(function (p) { return p.d >= addDias(Store.day(), -182); });
-    if (pts.length < 2) { box.appendChild(h('p', { class: 'tip', text: 'Aparece a partir da segunda pesagem com a balança (ela chega sozinha pelo Health Connect). Mostra se o peso que sai é gordura ou músculo.' })); return; }
-    var p0 = pts[0];
-    var dg = pts.map(function (p) { return p.g - p0.g; }), dm = pts.map(function (p) { return p.m - p0.m; });
-    var vals = dg.concat(dm, [0]);
-    var mn = Math.floor(Math.min.apply(null, vals) - 0.5), mx = Math.ceil(Math.max.apply(null, vals) + 0.5);
-    var W = 320, H = 160, x0 = 30, x1 = W - 6, y0 = 10, y1 = 130;
-    var t0 = new Date(p0.d + 'T12:00:00').getTime(), t1 = Math.max(new Date(pts[pts.length - 1].d + 'T12:00:00').getTime(), t0 + 864e5);
-    function X(d) { return x0 + (new Date(d + 'T12:00:00').getTime() - t0) / (t1 - t0) * (x1 - x0); }
-    function Y(v) { return y1 - (v - mn) / (mx - mn) * (y1 - y0); }
-    var svg = sv('svg', { viewBox: '0 0 ' + W + ' ' + H, class: 'chart', role: 'img', 'aria-label': 'Variação de gordura e de massa magra desde a primeira pesagem' });
-    [mn, 0, mx].forEach(function (v) { sv('line', { x1: x0, x2: x1, y1: Y(v), y2: Y(v), stroke: v === 0 ? 'var(--fg)' : 'var(--line)', 'stroke-dasharray': v === 0 ? '3 3' : '' }, svg); sv('text', { x: 0, y: Y(v) + 4, text: (v > 0 ? '+' : '') + v }, svg); });
-    [[dg, 'var(--far)'], [dm, 'var(--accent)']].forEach(function (s2) {
-      sv('polyline', { points: pts.map(function (p, i) { return X(p.d) + ',' + Y(s2[0][i]); }).join(' '), fill: 'none', stroke: s2[1], 'stroke-width': 2.5, 'stroke-linejoin': 'round' }, svg);
-      pts.forEach(function (p, i) { sv('circle', { cx: X(p.d), cy: Y(s2[0][i]), r: 3, fill: s2[1] }, svg); });
+    grafico($('h-comp'), {
+      id: 'comp', titulo: 'Gordura e massa magra', sub: 'Pela balança, em kg', periodos: ['3M', '6M', 'Tudo'], per: 'Tudo',
+      dados: function (per) {
+        var d0 = desde(per), pts = compPontos().filter(function (p) { return p.d >= d0; });
+        if (pts.length < 2) return { vazio: 'Aparece a partir da segunda pesagem com a balança (chega sozinha pelo Health Connect).' };
+        return {
+          type: 'line', xDias: true,
+          data: { datasets: [
+            { label: 'Gordura', yAxisID: 'y', data: pts.map(function (p) { return { x: diaNum(p.d), y: Math.round(p.g * 10) / 10, pct: p.pct }; }), borderColor: cor('hi'), backgroundColor: cor('hi'), borderWidth: 3, pointRadius: 4, pointHoverRadius: 6, tension: 0.25 },
+            { label: 'Massa magra', yAxisID: 'y1', data: pts.map(function (p) { return { x: diaNum(p.d), y: Math.round(p.m * 10) / 10 }; }), borderColor: cor('accent'), backgroundColor: cor('accent'), borderWidth: 3, pointRadius: 4, pointHoverRadius: 6, tension: 0.25 }
+          ] },
+          // Os dois eixos com a mesma amplitude em kg, para 1 kg de gordura e 1 kg de massa magra ocuparem a mesma altura.
+          options: (function () {
+            var g = pts.map(function (p) { return p.g; }), m = pts.map(function (p) { return p.m; });
+            var amp = Math.max(3, Math.max.apply(null, g) - Math.min.apply(null, g), Math.max.apply(null, m) - Math.min.apply(null, m)) * 1.15;
+            var cg = (Math.max.apply(null, g) + Math.min.apply(null, g)) / 2, cm = (Math.max.apply(null, m) + Math.min.apply(null, m)) / 2;
+            var tk = function (v) { return fmtN0(v, 1); };
+            return { scales: {
+              y: { position: 'left', min: cg - amp / 2, max: cg + amp / 2, title: { display: true, text: 'gordura', color: cor('hi') }, ticks: { color: cor('hi'), callback: tk, maxTicksLimit: 6 } },
+              y1: { position: 'right', min: cm - amp / 2, max: cm + amp / 2, grid: { drawOnChartArea: false }, title: { display: true, text: 'magra', color: cor('accent') }, ticks: { color: cor('accent'), callback: tk, maxTicksLimit: 6 } }
+            } };
+          })(),
+          dicas: { label: function (it) { return ' ' + it.dataset.label + ': ' + kg1(it.raw.y) + ' kg' + (it.raw.pct ? ' (' + kg1(it.raw.pct) + '%)' : ''); } }
+        };
+      }
     });
-    sv('text', { x: x0, y: H - 10, text: br(p0.d) }, svg);
-    sv('text', { x: x1 - 30, y: H - 10, text: br(pts[pts.length - 1].d) }, svg);
-    box.appendChild(svg);
-    box.appendChild(legenda([['Gordura (kg)', 'var(--far)'], ['Massa magra (kg)', 'var(--accent)']]));
-    var u = pts[pts.length - 1], fx = function (v) { return (v > 0 ? '+' : v < 0 ? '−' : '') + kg1(Math.abs(v)); };
-    box.appendChild(h('p', { text: 'Desde ' + br(p0.d) + ': gordura ' + fx(u.g - p0.g) + ' kg, massa magra ' + fx(u.m - p0.m) + ' kg, peso ' + fx(u.p - p0.p) + ' kg.' }));
-    var t = compTendencia();
-    if (t.nivel) {
-      var NV = { bom: 'No caminho certo', ok: 'Acompanhe', atencao: 'Atenção' };
-      box.appendChild(h('div', { class: 'verdict ' + t.nivel }, h('b', { text: NV[t.nivel] }),
-        h('p', { text: 'Média das 3 últimas pesagens contra as anteriores: gordura ' + fx(t.dg) + ' kg, massa magra ' + fx(t.dm) + ' kg. ' + t.msg })));
-    } else box.appendChild(h('p', { class: 'tip', text: 'A tendência aparece a partir da 4ª pesagem. Uma pesagem isolada varia até 1 kg só com água.' }));
   }
-  /* Passos: média por dia em cada semana (segunda a domingo) */
+  /* Passos por dia com média móvel de 7 dias */
   function renderPassosH() {
-    var box = $('h-passos'); if (!box) return; box.textContent = '';
-    box.appendChild(h('h2', { text: 'Passos' }));
-    var sd = Store.all('saude_dia') || {}, hoje = Store.day(), sem = {};
-    Object.keys(sd).forEach(function (k) {
-      if (typeof sd[k].passos !== 'number' || k > hoje) return;
-      var s0 = segDe(k), w = sem[s0] || (sem[s0] = { n: 0, t: 0 });
-      w.n++; w.t += sd[k].passos;
+    grafico($('h-passos'), {
+      id: 'passos', titulo: 'Passos', sub: 'Por dia, com média de 7 dias', periodos: ['1M', '3M', '6M'], per: '1M',
+      dados: function (per) {
+        var sd = Store.all('saude_dia') || {}, hoje = Store.day();
+        var ks = Object.keys(sd).filter(function (k) { return typeof sd[k].passos === 'number' && k <= hoje; }).sort();
+        if (!ks.length) return { vazio: 'Os passos chegam do relógio e do celular pelo Health Connect.' };
+        var d0 = desde(per); if (d0 < ks[0]) d0 = ks[0];
+        var ds = []; for (var d = d0; d <= hoje; d = addDias(d, 1)) ds.push(d);
+        var v = ds.map(function (d) { return sd[d] && typeof sd[d].passos === 'number' ? sd[d].passos : null; });
+        var mm = ds.map(function (d, i) {
+          var j = v.slice(Math.max(0, i - 6), i + 1).filter(function (x) { return x !== null; });
+          return j.length ? Math.round(j.reduce(function (a, b) { return a + b; }, 0) / j.length) : null;
+        });
+        return {
+          type: 'bar',
+          data: { labels: ds.map(ddmm), datasets: [
+            { type: 'bar', label: 'Passos no dia', data: v, backgroundColor: alfa(cor('accent'), 0.75), borderRadius: 4, order: 2 },
+            { type: 'line', label: 'Média de 7 dias', data: mm, borderColor: cor('fg'), backgroundColor: cor('fg'), borderWidth: 2.5, pointRadius: 0, pointHoverRadius: 4, tension: 0.35, order: 1 }
+          ] },
+          options: { scales: { y: { beginAtZero: true, ticks: { callback: function (x) { return fmtN0(x / 1000, 0) + ' mil'; } } } } },
+          dicas: { label: function (it) { return ' ' + it.dataset.label + ': ' + nInt(it.raw); } }
+        };
+      }
     });
-    var segs = Object.keys(sem).sort().slice(-8);
-    if (!segs.length) { box.appendChild(h('p', { class: 'tip', text: 'Os passos chegam do relógio e do celular pelo Health Connect. Assim que houver dados, a média de cada semana aparece aqui.' })); return; }
-    var med = segs.map(function (s0) { return sem[s0].t / sem[s0].n; });
-    var mx = Math.max.apply(null, med.concat([10000])) * 1.1;
-    var W = 320, H = 150, x0 = 4, x1 = W - 4, y1 = 120, bw = (x1 - x0) / segs.length;
-    var svg = sv('svg', { viewBox: '0 0 ' + W + ' ' + H, class: 'chart', role: 'img', 'aria-label': 'Média de passos por dia em cada semana' });
-    var yMeta = y1 - 8000 / mx * (y1 - 10);
-    sv('line', { x1: x0, x2: x1, y1: yMeta, y2: yMeta, stroke: 'var(--fg)', 'stroke-dasharray': '3 3' }, svg);
-    segs.forEach(function (s0, i) {
-      var v = med[i], hh = v / mx * (y1 - 10), atual = s0 === segDe(hoje);
-      sv('rect', { x: x0 + i * bw + 4, y: y1 - hh, width: bw - 8, height: hh, rx: 3, fill: atual ? 'var(--far)' : 'var(--accent)' }, svg);
-      sv('text', { x: x0 + i * bw + bw / 2, y: y1 - hh - 4, 'text-anchor': 'middle', text: (v / 1000).toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + 'k' }, svg);
-      sv('text', { x: x0 + i * bw + bw / 2, y: H - 12, 'text-anchor': 'middle', text: ddmm(s0) }, svg);
-    });
-    box.appendChild(svg);
-    box.appendChild(legenda([['Média por dia na semana', 'var(--accent)'], ['Semana atual (parcial)', 'var(--far)'], ['Referência de 8 mil', 'var(--fg)']]));
-    var ult = med[med.length - 1], ant = med.length > 1 ? med[med.length - 2] : null;
-    var kcal = Math.round(1000 * pesoAte(hoje) * 0.000375);
-    box.appendChild(h('p', { class: 'tip', text: 'Esta semana: ' + nInt(ult) + ' passos por dia' + (ant ? ' (semana passada: ' + nInt(ant) + ')' : '') + '. Cada mil passos a mais gastam cerca de ' + kcal + ' kcal no seu peso, e isso já entra no gasto do dia.' }));
   }
   function sessoesEx(id) {
     return treinosOk().map(function (r) { var it = (r.v.itens || {})[id]; if (!(it && it.series > 0 && it.kg)) return null; var rr = repsDe(it); return { d: r.v.data, kg: it.kg, reps: Math.max.apply(null, rr), soma: rr.reduce(function (a, b) { return a + b; }, 0), series: it.series, nome: it.nome }; })
       .filter(Boolean).sort(function (a, b) { return a.d < b.d ? -1 : 1; });
   }
-  function renderEvo() {
-    var box = $('h-evo'); box.textContent = '';
-    box.appendChild(h('h2', { text: 'Evolução dos treinos' }));
+  function evoNomes() {
     var nomes = {};
     treinosOk().forEach(function (r) { var it = r.v.itens || {}; Object.keys(it).forEach(function (k) { if (it[k].series > 0 && it[k].kg) nomes[k] = it[k].nome || k; }); });
     var cont = {};
@@ -2807,60 +2835,57 @@ window.MOVES = (function () {
       var e = L.length ? TREINOS[L[0]].ex.filter(function (x) { return x.id === k; })[0] : null;
       nomes[k] += e ? ' (' + e.sets + '×' + e.reps + ', treino ' + L.join('/') + ')' : '';
     });
+    return nomes;
+  }
+  function renderEvo() {
+    var box = $('h-evo'); box.textContent = '';
+    var nomes = evoNomes();
     var ids = Object.keys(nomes).sort(function (a, b) { return nomes[a].localeCompare(nomes[b], 'pt-BR'); });
-    if (!ids.length) { box.appendChild(h('p', { class: 'tip', text: 'Conclua treinos com carga confirmada para ver a evolução.' })); return; }
-    if (!evoEx || ids.indexOf(evoEx) < 0) evoEx = ids.indexOf('supino_deitado') > -1 ? 'supino_deitado' : ids[0];
-    var sel = h('select', { id: 'evo-ex', 'aria-label': 'Exercício' });
-    ids.forEach(function (k) { var o = h('option', { value: k, text: nomes[k] }); if (k === evoEx) o.selected = true; sel.appendChild(o); });
-    sel.addEventListener('change', function () { evoEx = sel.value; renderEvo(); });
-    box.appendChild(h('div', { class: 'field' }, h('label', { for: 'evo-ex', text: 'Exercício' }), sel));
-    var ss = sessoesEx(evoEx);
-    ss.forEach(function (x) { x.rm = x.kg * (1 + x.reps / 30); x.vol = x.kg * x.soma; });
-    var best = ss.reduce(function (a, x) { return !a || x.kg > a.kg ? x : a; }, null);
-    var bestRm = ss.reduce(function (a, x) { return !a || x.rm > a.rm ? x : a; }, null);
-    var fst = ss[0], lst = ss[ss.length - 1];
-    box.appendChild(h('div', { class: 'mini-stats' },
-      h('div', {}, h('b', { text: kgTxt(best.kg) }), h('span', { text: 'maior carga (' + br(best.d) + ')' })),
-      h('div', {}, h('b', { text: kgTxt(Math.round(bestRm.rm)) }), h('span', { text: '1RM estimado' })),
-      h('div', {}, h('b', { text: ss.length }), h('span', { text: ss.length === 1 ? 'sessão' : 'sessões' }))));
-    if (ss.length > 1) {
-      var W = 320, H = 150, x0 = 30, x1 = W - 8, y0 = 10, y1 = 118;
-      var vals = ss.map(function (x) { return x.rm; }).concat(ss.map(function (x) { return x.kg; }));
-      var mn = Math.floor(Math.min.apply(null, vals) * .9), mx = Math.ceil(Math.max.apply(null, vals) * 1.05);
-      function X(i) { return x0 + (ss.length === 1 ? 0 : i / (ss.length - 1)) * (x1 - x0); }
-      function Y(v) { return y1 - (v - mn) / Math.max(1, mx - mn) * (y1 - y0); }
-      var svg = sv('svg', { viewBox: '0 0 ' + W + ' ' + H, class: 'chart', role: 'img', 'aria-label': 'Carga e 1RM estimado por sessão' });
-      [mn, mx].forEach(function (v) { sv('line', { x1: x0, x2: x1, y1: Y(v), y2: Y(v), stroke: 'var(--line)' }, svg); sv('text', { x: 0, y: Y(v) + 4, text: Math.round(v) }, svg); });
-      [['rm', 'var(--far)', '4 3'], ['kg', 'var(--accent)', '']].forEach(function (s2) {
-        sv('polyline', { points: ss.map(function (x, i) { return X(i) + ',' + Y(x[s2[0]]); }).join(' '), fill: 'none', stroke: s2[1], 'stroke-width': 2.5, 'stroke-dasharray': s2[2] }, svg);
-        ss.forEach(function (x, i) { sv('circle', { cx: X(i), cy: Y(x[s2[0]]), r: 3.5, fill: s2[1] }, svg); });
+    var c1 = h('div'), c2 = h('div', { class: 'g-sep' });
+    box.appendChild(c1); box.appendChild(c2);
+    if (!ids.length) { c1.appendChild(h('h2', { text: 'Carga por exercício' })); c1.appendChild(h('p', { class: 'g-vazio', text: 'Conclua treinos com carga confirmada para ver a evolução.' })); }
+    else {
+      if (!evoEx || ids.indexOf(evoEx) < 0) evoEx = ids.indexOf('supino_deitado') > -1 ? 'supino_deitado' : ids[0];
+      var sel = h('select', { id: 'evo-ex', 'aria-label': 'Exercício' });
+      ids.forEach(function (k) { var o = h('option', { value: k, text: nomes[k] }); if (k === evoEx) o.selected = true; sel.appendChild(o); });
+      sel.addEventListener('change', function () { evoEx = sel.value; renderEvo(); });
+      grafico(c1, {
+        id: 'forca', titulo: 'Carga por exercício', sub: 'Carga usada e 1RM estimado (Epley)', periodos: ['3M', '6M', 'Tudo'], per: 'Tudo',
+        extra: h('div', { class: 'field' }, h('label', { for: 'evo-ex', text: 'Exercício' }), sel),
+        dados: function (per) {
+          var d0 = desde(per), ss = sessoesEx(evoEx).filter(function (x) { return x.d >= d0; });
+          if (ss.length < 2) return { vazio: 'Com duas sessões deste exercício, o gráfico aparece.' };
+          ss.forEach(function (x) { x.rm = x.kg * (1 + x.reps / 30); });
+          return {
+            type: 'line', xDias: true,
+            data: { datasets: [
+              { label: 'Carga usada', data: ss.map(function (x) { return { x: diaNum(x.d), y: x.kg, s: x }; }), borderColor: cor('accent'), backgroundColor: cor('accent'), borderWidth: 3, pointRadius: 4, pointHoverRadius: 6, tension: 0.2 },
+              { label: '1RM estimado', data: ss.map(function (x) { return { x: diaNum(x.d), y: Math.round(x.rm * 10) / 10 }; }), borderColor: cor('far'), backgroundColor: cor('far'), borderDash: [5, 4], borderWidth: 2.5, pointRadius: 3, pointHoverRadius: 5, tension: 0.2 }
+            ] },
+            dicas: { label: function (it) { var s = it.raw.s; return ' ' + it.dataset.label + ': ' + kg1(it.raw.y) + ' kg' + (s ? ' (' + s.series + ' séries, até ' + s.reps + ' reps)' : ''); } }
+          };
+        }
       });
-      sv('text', { x: x0, y: H - 8, text: br(fst.d) }, svg); sv('text', { x: x1 - 30, y: H - 8, text: br(lst.d) }, svg);
-      box.appendChild(svg);
-      box.appendChild(legenda([['Carga usada', 'var(--accent)'], ['1RM estimado', 'var(--far)']]));
-      var dk = lst.kg - fst.kg;
-      box.appendChild(h('p', { class: 'tip', text: 'Da primeira à última sessão: ' + (dk > 0 ? '+' : '') + String(Math.round(dk * 10) / 10).replace('.', ',') + ' kg. O 1RM estimado combina carga e repetições (fórmula de Epley).' }));
-    } else {
-      box.appendChild(h('p', { class: 'tip', text: 'Com duas sessões deste exercício, o gráfico aparece.' }));
     }
-    var hoje = Store.day(), segs = [];
-    for (var i = 7; i >= 0; i--) segs.push(segDe(addDias(hoje, -7 * i)));
-    var vol = segs.map(function (sg) {
-      var n = 0;
-      treinosOk().forEach(function (r) { if (r.v.data >= sg && r.v.data <= addDias(sg, 6)) { var it = r.v.itens || {}; Object.keys(it).forEach(function (k) { n += it[k].series || 0; }); } });
-      return n;
+    grafico(c2, {
+      id: 'series', titulo: 'Séries de musculação por semana', periodos: ['3M', '6M', '1A'], per: '3M',
+      dados: function (per) {
+        var hoje = Store.day(), n = Math.max(4, Math.round((PER_DIAS[per] || 91) / 7)), segs = [];
+        for (var i = n - 1; i >= 0; i--) segs.push(segDe(addDias(hoje, -7 * i)));
+        var vol = segs.map(function (sg) {
+          var t = 0;
+          treinosOk().forEach(function (r) { if (r.v.data >= sg && r.v.data <= addDias(sg, 6)) { var it = r.v.itens || {}; Object.keys(it).forEach(function (k) { t += it[k].series || 0; }); } });
+          return t;
+        });
+        if (!vol.some(function (v) { return v > 0; })) return { vazio: 'Sem treinos de musculação no período.' };
+        return {
+          type: 'bar',
+          data: { labels: segs.map(ddmm), datasets: [{ label: 'Séries', data: vol, backgroundColor: segs.map(function (s3, i) { return i === segs.length - 1 ? cor('accent') : alfa(cor('accent'), 0.45); }), borderRadius: 5 }] },
+          options: { scales: { y: { beginAtZero: true } } },
+          dicas: { title: function (its) { return its.length ? 'Semana de ' + its[0].label : ''; }, label: function (it) { return ' ' + it.raw + ' séries'; } }
+        };
+      }
     });
-    var W2 = 320, H2 = 130, b0 = 104, vmax = Math.max(40, Math.max.apply(null, vol));
-    var svg2 = sv('svg', { viewBox: '0 0 ' + W2 + ' ' + H2, class: 'chart', role: 'img', 'aria-label': 'Séries de musculação por semana' });
-    var gw = (W2 - 10) / 8;
-    vol.forEach(function (v, i) {
-      var hh = v / vmax * (b0 - 14);
-      sv('rect', { x: 6 + i * gw + 4, y: b0 - hh, width: gw - 8, height: hh, rx: 3, fill: i === 7 ? 'var(--accent)' : 'var(--far)' }, svg2);
-      if (v) sv('text', { x: 6 + i * gw + gw / 2 - 7, y: b0 - hh - 3, text: v }, svg2);
-      sv('text', { x: 6 + i * gw + 2, y: H2 - 8, text: br(segs[i]) }, svg2);
-    });
-    box.appendChild(h('h3', { text: 'Séries de musculação por semana' }));
-    box.appendChild(svg2);
   }
   /* Análise das atividades */
   var ANA_V = 1, anaBusy = {}, anaMsg = {}, anaFila = false;
@@ -3050,34 +3075,11 @@ window.MOVES = (function () {
     card.appendChild(bt);
     return card;
   }
-  function anaTendencia(box) {
-    var st = Store.all('strava');
-    var rs = Object.keys(st).filter(function (k) { return anaGrupo(st[k]) === 'corrida' && st[k].km > 0 && st[k].fc && anaValida(st[k]); })
-      .sort(function (x, y) { return st[x].data < st[y].data ? -1 : 1; }).slice(-12).map(anaMet);
-    if (rs.length < 3) return;
-    box.appendChild(h('h3', { text: 'Tendência da corrida' }));
-    box.appendChild(h('p', { class: 'tip', text: 'Metros por batimento: quanto você corre a cada batida do coração. Subir é sinal de condicionamento melhorando.' }));
-    var W = 320, H = 140, x0 = 34, x1 = W - 8, y0 = 10, y1 = 108;
-    var vs = rs.map(function (r) { return r.efic; }), mn = Math.min.apply(null, vs), mx = Math.max.apply(null, vs);
-    if (mx - mn < .1) { mn -= .05; mx += .05; }
-    function X(i) { return x0 + (rs.length === 1 ? 0 : i * (x1 - x0) / (rs.length - 1)); }
-    function Y(v) { return y1 - (v - mn) / (mx - mn) * (y1 - y0); }
-    var svg = sv('svg', { viewBox: '0 0 ' + W + ' ' + H, class: 'chart', role: 'img', 'aria-label': 'Metros por batimento nas últimas corridas' });
-    [mn, mx].forEach(function (v) { sv('line', { x1: x0, x2: x1, y1: Y(v), y2: Y(v), stroke: 'var(--line)' }, svg); sv('text', { x: 0, y: Y(v) + 4, text: fmtN(v, 2) }, svg); });
-    sv('polyline', { points: rs.map(function (r, i) { return X(i) + ',' + Y(r.efic); }).join(' '), fill: 'none', stroke: 'var(--accent)', 'stroke-width': 2.5 }, svg);
-    rs.forEach(function (r, i) { var c = sv('circle', { cx: X(i), cy: Y(r.efic), r: 3.5, fill: 'var(--accent)' }, svg); sv('title', { text: br(r.data) + ': ' + fmtN(r.efic, 2) + ' m/bat., ' + clock(r.pace) + '/km, FC ' + r.fc }, c); });
-    sv('text', { x: x0, y: H - 8, text: br(rs[0].data) }, svg); sv('text', { x: x1 - 30, y: H - 8, text: br(rs[rs.length - 1].data) }, svg);
-    box.appendChild(svg);
-    var meio = Math.floor(rs.length / 2), a1 = media(rs.slice(0, meio), 'efic'), a2 = media(rs.slice(meio), 'efic');
-    var p = (a2 - a1) / a1 * 100;
-    box.appendChild(h('p', { class: 'tip', text: 'Corridas mais recentes contra as mais antigas: ' + (Math.abs(p) < 2 ? 'estável' : (p > 0 ? 'melhora de ' : 'queda de ') + fmtN(Math.abs(p), 1) + '%') + ' em metros por batimento, com ritmo médio de ' + clock(media(rs.slice(meio), 'pace')) + '/km e FC média de ' + Math.round(media(rs.slice(meio), 'fc')) + ' bpm.' }));
-  }
   function renderAtiv() {
     var box = $('h-ativ'); if (!box) return;
     box.textContent = '';
     box.appendChild(h('h2', { text: 'Análise das atividades' }));
     box.appendChild(h('p', { class: 'lede', text: 'Cada atividade do Strava comparada com as anteriores do mesmo tipo. As novas são analisadas depois de atualizar o Strava.' }));
-    anaTendencia(box);
     var mon = segDe(histSel), fim = addDias(mon, 6), st = Store.all('strava');
     var ids = Object.keys(st).filter(function (k) { return anaValida(st[k]) && st[k].data >= mon && st[k].data <= fim; })
       .sort(function (x, y) { return st[x].data < st[y].data ? 1 : st[x].data > st[y].data ? -1 : (x < y ? 1 : -1); });
@@ -3085,9 +3087,275 @@ window.MOVES = (function () {
     if (!ids.length) { box.appendChild(h('p', { class: 'tip', text: 'Nenhuma atividade do Strava nesta semana.' })); return; }
     ids.forEach(function (k) { box.appendChild(anaCard(k)); });
   }
+  /* Gráficos interativos (Chart.js): toque mostra valores, ⤢ amplia em tela cheia com troca de período */
+  var CHART_URL = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js';
+  var chartP = null, graficos = {}, gPer = {}, gAnimou = {};
+  function chartLib() {
+    if (window.Chart) return Promise.resolve(window.Chart);
+    if (!chartP) chartP = new Promise(function (ok, no) {
+      var s = document.createElement('script'); s.src = CHART_URL;
+      s.onload = function () { ok(window.Chart); };
+      s.onerror = function () { chartP = null; no(new Error('chart')); };
+      document.head.appendChild(s);
+    });
+    return chartP;
+  }
+  function cor(n) { return getComputedStyle(document.documentElement).getPropertyValue('--' + n).trim() || '#1a5fd0'; }
+  function alfa(hex, a) { var x = hex.replace('#', ''); if (x.length !== 6) return hex; return 'rgba(' + parseInt(x.slice(0, 2), 16) + ',' + parseInt(x.slice(2, 4), 16) + ',' + parseInt(x.slice(4, 6), 16) + ',' + a + ')'; }
+  function diaNum(d) { return Math.floor(new Date(d + 'T12:00:00').getTime() / 864e5); }
+  function numDia(n) { return Store.day(new Date(n * 864e5 + 432e5)); }
+  var PER_DIAS = { '1M': 30, '3M': 91, '6M': 182, '1A': 365 };
+  function desde(per) { return PER_DIAS[per] ? addDias(Store.day(), -PER_DIAS[per]) : '0000-00-00'; }
+  function perNome(per) { return { '1M': 'último mês', '3M': 'últimos 3 meses', '6M': 'últimos 6 meses', '1A': 'último ano', 'Tudo': 'todo o período' }[per] || ''; }
+  function fmtN0(v, c) { return Number(v).toLocaleString('pt-BR', { minimumFractionDigits: c || 0, maximumFractionDigits: c || 0 }); }
+  function temaGrafico(c, chave, grande) {
+    var fg = cor('fg'), mut = cor('muted'), lin = cor('line');
+    var opt = c.options || {};
+    var xDias = c.xDias;
+    var escalas = opt.scales || {};
+    var base = { grid: { color: alfa(lin.length === 7 ? lin : '#c6d4e8', 0.55), drawTicks: false }, border: { display: false }, ticks: { color: mut, padding: 6, font: { size: grande ? 13 : 11, weight: '600' } } };
+    var sc = {};
+    var xs = Object.assign({}, base, { grid: { display: false } }, escalas.x || {});
+    if (xDias) {
+      xs.type = 'linear';
+      xs.ticks = Object.assign({}, base.ticks, { maxTicksLimit: grande ? 8 : 5, callback: function (v) { return ddmm(numDia(v)); } });
+    } else xs.ticks = Object.assign({}, base.ticks, { maxRotation: 0, autoSkip: true, maxTicksLimit: grande ? 12 : 7 }, (escalas.x || {}).ticks || {});
+    sc.x = xs;
+    Object.keys(escalas).forEach(function (k) { if (k !== 'x') sc[k] = Object.assign({}, base, escalas[k], { ticks: Object.assign({}, base.ticks, (escalas[k] || {}).ticks || {}) }); });
+    if (!sc.y) sc.y = Object.assign({}, base);
+    var nds = (c.data.datasets || []).filter(function (d) { return !d.semLegenda; }).length;
+    var anim = !gAnimou[chave]; gAnimou[chave] = 1;
+    return {
+      type: c.type, data: c.data,
+      options: {
+        responsive: true, maintainAspectRatio: false, animation: anim ? { duration: 450 } : false,
+        interaction: { mode: c.modo || 'index', intersect: false, axis: 'x' },
+        layout: { padding: { top: 6, right: 4 } },
+        scales: sc,
+        plugins: {
+          legend: { display: nds > 1, position: 'bottom', labels: { usePointStyle: true, pointStyle: 'circle', boxWidth: 8, boxHeight: 8, padding: 14, color: fg, font: { size: grande ? 14 : 12, weight: '600' }, filter: function (it, d) { return !d.datasets[it.datasetIndex].semLegenda; } } },
+          tooltip: {
+            backgroundColor: alfa(fg.length === 7 ? fg : '#142338', 0.94), titleColor: '#fff', bodyColor: '#fff', padding: 10, cornerRadius: 10, boxPadding: 4, usePointStyle: true,
+            titleFont: { size: 13, weight: '700' }, bodyFont: { size: 13 },
+            filter: function (it) { return it.raw !== null && it.raw !== undefined && !(it.dataset.semDica); },
+            callbacks: Object.assign({ title: function (its) { if (!its.length) return ''; var x = its[0].parsed.x; return xDias ? dsem(numDia(x)) + ', ' + br(numDia(x)) : its[0].label; } }, c.dicas || {})
+          }
+        }
+      }
+    };
+  }
+  function desenhaGrafico(area, cfg, per, chave, grande) {
+    if (graficos[chave]) { graficos[chave].destroy(); delete graficos[chave]; }
+    area.textContent = '';
+    if (grande && cfg.periodos) {
+      var chips = h('div', { class: 'g-per', role: 'group', 'aria-label': 'Período' });
+      cfg.periodos.forEach(function (p) {
+        var b = h('button', { type: 'button', 'aria-pressed': String(p === per), text: p });
+        b.addEventListener('click', function () { gPer[cfg.id] = p; gAnimou[chave] = 0; desenhaGrafico(area, cfg, p, chave, true); });
+        chips.appendChild(b);
+      });
+      area.appendChild(chips);
+    }
+    var c = cfg.dados(per, grande);
+    if (!c || c.vazio) { area.appendChild(h('p', { class: 'g-vazio', text: (c && c.vazio) || 'Sem dados ainda.' })); return; }
+    if (grande) area.style.cssText = 'display:flex;flex-direction:column;flex:1;min-height:0';
+    var wrap = h('div', { class: 'g-box' }), cv = h('canvas', { role: 'img', 'aria-label': cfg.titulo + (cfg.periodos ? ', ' + perNome(per) : '') });
+    wrap.appendChild(cv); area.appendChild(wrap);
+    chartLib().then(function (Chart) {
+      if (!cv.isConnected) return;
+      Chart.defaults.font.family = getComputedStyle(document.body).fontFamily;
+      graficos[chave] = new Chart(cv, temaGrafico(c, chave, grande));
+    }, function () { wrap.remove(); area.appendChild(h('p', { class: 'g-vazio', text: 'Não consegui carregar os gráficos. Confira a internet e abra de novo.' })); });
+  }
+  function grafico(box, cfg) {
+    box.textContent = '';
+    var per = gPer[cfg.id] || cfg.per || 'Tudo';
+    var exp = h('button', { type: 'button', class: 'g-exp', id: 'gexp-' + cfg.id, 'aria-label': 'Ampliar: ' + cfg.titulo, text: '⤢' });
+    exp.addEventListener('click', function () { ampliaGrafico(cfg); });
+    box.appendChild(h('div', { class: 'gcard-top' }, h('h2', { text: cfg.titulo }), exp));
+    if (cfg.sub || cfg.periodos) box.appendChild(h('p', { class: 'g-sub', text: [cfg.sub, cfg.periodos ? perNome(per) : ''].filter(Boolean).join(' · ') }));
+    if (cfg.extra) box.appendChild(cfg.extra);
+    var area = h('div'); box.appendChild(area);
+    desenhaGrafico(area, cfg, per, cfg.id, false);
+  }
+  var gModal = null;
+  function fechaGrafico(viaVoltar) {
+    if (!gModal) return;
+    var m = gModal; gModal = null;
+    if (graficos[m.chave]) { graficos[m.chave].destroy(); delete graficos[m.chave]; }
+    m.el.remove(); document.body.style.overflow = '';
+    if (!viaVoltar) { try { history.back(); } catch (e) {} }
+    renderGraficos();
+    var b = $('gexp-' + m.id); if (b) b.focus();
+  }
+  function ampliaGrafico(cfg) {
+    fechaGrafico(true);
+    var el = h('div', { class: 'g-modal', role: 'dialog', 'aria-modal': 'true', 'aria-label': cfg.titulo });
+    var x = h('button', { type: 'button', class: 'g-fechar', 'aria-label': 'Fechar', text: '×' });
+    x.addEventListener('click', function () { fechaGrafico(false); });
+    el.appendChild(h('div', { class: 'gcard-top' }, h('h2', { text: cfg.titulo }), x));
+    if (cfg.sub) el.appendChild(h('p', { class: 'g-sub', text: cfg.sub }));
+    var area = h('div'); el.appendChild(area);
+    document.body.appendChild(el); document.body.style.overflow = 'hidden';
+    gModal = { el: el, id: cfg.id, chave: cfg.id + ':grande' };
+    try { history.pushState({ grafico: 1 }, ''); } catch (e) {}
+    gAnimou[gModal.chave] = 0;
+    desenhaGrafico(area, cfg, gPer[cfg.id] || cfg.per || 'Tudo', gModal.chave, true);
+    x.focus();
+  }
+  window.addEventListener('popstate', function () { if (gModal) fechaGrafico(true); });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && gModal) fechaGrafico(false); });
+
+  /* Seções do Histórico: Registro, Gráficos e Análises */
+  var histSec = 'registro';
+  try { histSec = localStorage.getItem('dt-hist-sec') || 'registro'; } catch (e) {}
+  function histMostra(sec, soMostra) {
+    histSec = sec;
+    try { localStorage.setItem('dt-hist-sec', sec); } catch (e) {}
+    ['registro', 'graficos', 'analises'].forEach(function (s2) {
+      var b = $('hs-' + s2); if (b) b.setAttribute('aria-selected', String(s2 === sec));
+      var p = $('h-sec-' + s2); if (p) p.hidden = s2 !== sec;
+    });
+    if (sec === 'graficos' && !soMostra) renderGraficos();
+  }
+  ['registro', 'graficos', 'analises'].forEach(function (s2) {
+    var b = $('hs-' + s2); if (b) b.addEventListener('click', function () { histMostra(s2); });
+  });
+  histMostra(histSec, true);
+  function renderGraficos() {
+    if (histSec !== 'graficos' || $('h-sec-graficos').hidden) return;
+    if (gModal) return;
+    var b = balDados(), aj = balAjuste(b, balSemanas(b)).kcal;
+    grafCalorias(b, aj); renderPesoH(); renderCompH(); grafCintura($('g-cintura'), 'cintura'); renderPassosH(); grafCorrida(); renderEvo();
+  }
+
+  function grafCalorias(b, aj) {
+    grafico($('g-calorias'), {
+      id: 'calorias', titulo: 'Calorias por dia', sub: 'Consumido, gasto estimado e meta', periodos: ['1M', '3M', '6M'], per: '1M',
+      dados: function (per) {
+        var hoje = Store.day(), d0 = desde(per), ds = [];
+        var primeiro = Object.keys(b.ing).sort()[0];
+        if (!primeiro) return { vazio: 'Registre refeições para ver o gráfico.' };
+        if (d0 < primeiro) d0 = primeiro;
+        for (var d = d0; d <= hoje; d = addDias(d, 1)) ds.push(d);
+        var info = ds.map(function (d) { return diaInfo(d, b, aj); });
+        var ac = cor('accent'), st = cor('stop');
+        return {
+          type: 'bar',
+          data: {
+            labels: ds.map(ddmm),
+            datasets: [
+              { type: 'bar', label: 'Consumido', data: info.map(function (t) { return t.n ? Math.round(t.k) : null; }), backgroundColor: info.map(function (t) { return t.k > t.meta ? st : ac; }), borderRadius: 4, order: 2, barPercentage: 0.8 },
+              { type: 'line', label: 'Gasto estimado', data: info.map(function (t) { return Math.round(t.gasto); }), borderColor: cor('far'), backgroundColor: cor('far'), borderWidth: 2.5, pointRadius: 0, pointHoverRadius: 4, tension: 0.3, order: 1 },
+              { type: 'line', label: 'Meta', data: info.map(function (t) { return t.meta; }), borderColor: cor('fg'), borderWidth: 1.5, borderDash: [4, 4], pointRadius: 0, stepped: 'middle', order: 0 }
+            ]
+          },
+          options: { scales: { y: { beginAtZero: true, ticks: { callback: function (v) { return fmtN0(v / 1000, 1) + ' mil'; } } } } },
+          dicas: { label: function (it) { return ' ' + it.dataset.label + ': ' + nInt(it.raw) + ' kcal'; } }
+        };
+      }
+    });
+  }
+  function grafCintura(box, id) {
+    if (!box) return;
+    grafico(box, {
+      id: id, titulo: 'Cintura', sub: '3 dedos acima do umbigo, em cm', periodos: ['3M', '6M', 'Tudo'], per: 'Tudo',
+      dados: function (per) {
+        var all = Store.all('medidas'), d0 = desde(per);
+        var ks = Object.keys(all).sort().filter(function (k) { return all[k].cintura && k >= d0; });
+        if (ks.length < 2) return { vazio: 'Aparece a partir da segunda medida da cintura (aba Medidas).' };
+        return {
+          type: 'line', xDias: true,
+          data: { datasets: [
+            { label: 'Cintura', data: ks.map(function (k) { return { x: diaNum(k), y: all[k].cintura }; }), borderColor: cor('accent'), backgroundColor: alfa(cor('accent'), 0.12), fill: true, borderWidth: 3, pointRadius: 4, pointHoverRadius: 6, tension: 0.25 },
+            { label: 'Etapa de 102 cm', data: [{ x: diaNum(ks[0]), y: 102 }, { x: diaNum(ks[ks.length - 1]), y: 102 }], borderColor: cor('fg'), borderDash: [4, 4], borderWidth: 1.5, pointRadius: 0, semDica: true }
+          ] },
+          dicas: { label: function (it) { return ' ' + fmtN0(it.raw.y, 1) + ' cm'; } }
+        };
+      }
+    });
+  }
+  function corridaPts() {
+    var st = Store.all('strava');
+    return Object.keys(st).filter(function (k) { return anaGrupo(st[k]) === 'corrida' && st[k].km > 0 && st[k].fc && anaValida(st[k]); })
+      .sort(function (x, y) { return st[x].data < st[y].data ? -1 : 1; }).map(anaMet);
+  }
+  function grafCorrida() {
+    grafico($('g-corrida'), {
+      id: 'corrida', titulo: 'Eficiência da corrida', sub: 'Metros por batimento: subir é condicionamento melhorando', periodos: ['3M', '6M', 'Tudo'], per: 'Tudo',
+      dados: function (per) {
+        var d0 = desde(per), rs = corridaPts().filter(function (r) { return r.data >= d0; });
+        if (rs.length < 2) return { vazio: 'Aparece a partir da segunda corrida com frequência cardíaca no Strava.' };
+        return {
+          type: 'line', xDias: true,
+          data: { datasets: [{ label: 'Metros por batimento', data: rs.map(function (r) { return { x: diaNum(r.data), y: r.efic, r: r }; }), borderColor: cor('accent'), backgroundColor: cor('accent'), borderWidth: 3, pointRadius: 4, pointHoverRadius: 6, tension: 0.25 }] },
+          dicas: { label: function (it) { var r = it.raw.r; return [' ' + fmtN(r.efic, 2) + ' m por batimento', ' ' + fmtN(r.km, 1) + ' km a ' + clock(r.pace) + '/km', ' FC média ' + r.fc + ' bpm']; } }
+        };
+      }
+    });
+  }
+  /* Seção Análises: textos e avaliações, separados dos gráficos */
+  function renderAnaSemana() {
+    var box = $('a-semana'); if (!box) return;
+    box.textContent = '';
+    box.appendChild(h('h2', { text: 'Análise da semana' }));
+    var cks = Object.keys(Store.all('composicao') || {}).sort();
+    var sem = Store.all('semanas') || {}, ks = Object.keys(sem).filter(function (k) { return sem[k].resumo; }).sort().reverse();
+    if (!cks.length && !ks.length) { box.appendChild(h('p', { class: 'tip', text: 'Quando chegar uma pesagem da balança, a IA analisa a semana e o resultado aparece aqui.' })); return; }
+    if (cks.length) {
+      var dU = cks[cks.length - 1];
+      blocoSemana(box, dU, 'Pesagem de ' + dsem(dU) + ', ' + br(dU));
+      ks = ks.filter(function (k) { return k !== dU; });
+    }
+    if (ks.length) {
+      box.appendChild(h('h3', { text: 'Semanas anteriores' }));
+      var NV = { bom: 'No caminho certo', ok: 'Dá para ajustar', atencao: 'Atenção' };
+      ks.forEach(function (k) {
+        var a = sem[k], d = h('details', { class: 'mais' }, h('summary', { text: br(k) + ' · ' + (NV[a.nivel] || NV.ok) }));
+        var v = h('div', { class: 'verdict ' + a.nivel }, h('p', { text: a.resumo }));
+        if (a.pontos && a.pontos.length) { var ul = h('ul'); a.pontos.forEach(function (x) { ul.appendChild(h('li', { text: x })); }); v.appendChild(ul); }
+        if (a.ajuste) v.appendChild(h('p', {}, h('b', { text: 'Ajuste: ' }), document.createTextNode(a.ajuste)));
+        d.appendChild(v); box.appendChild(d);
+      });
+    }
+  }
+  function renderCorpo() {
+    var box = $('a-corpo'); if (!box) return;
+    box.textContent = '';
+    box.appendChild(h('h2', { text: 'Corpo e condicionamento' }));
+    var itens = 0, fx = function (v, c) { return (v > 0 ? '+' : v < 0 ? '−' : '') + fmtN0(Math.abs(v), c === undefined ? 1 : c); };
+    function item(tit, filhos) { itens++; var d = h('div', { class: 'a-item' }, h('h3', { text: tit })); filhos.forEach(function (f) { d.appendChild(f); }); box.appendChild(d); }
+    var pp = pesoPts().filter(function (p) { return p.d >= addDias(Store.day(), -182); });
+    if (pp.length >= 2) {
+      var u = pp[pp.length - 1], dif = u.m - pp[0].m;
+      item('Peso', [h('p', { text: 'Média de 4 semanas: ' + kg1(u.m) + ' kg. Variação da média desde ' + br(pp[0].d) + ': ' + fx(dif) + ' kg. Faltam ' + kg1(Math.max(0, u.m - PESO_META)) + ' kg para a meta de ' + PESO_META + ' kg.' }),
+        h('p', { class: 'tip', text: 'Uma pesagem isolada varia com água e sal; a média de 4 semanas mostra a tendência real.' })]);
+    }
+    var cp = compPontos();
+    if (cp.length >= 2) {
+      var c0 = cp[0], c1 = cp[cp.length - 1], t = compTendencia(), fs = [h('p', { text: 'Desde ' + br(c0.d) + ': gordura ' + fx(c1.g - c0.g) + ' kg, massa magra ' + fx(c1.m - c0.m) + ' kg, peso ' + fx(c1.p - c0.p) + ' kg.' })];
+      if (t.nivel) {
+        var NV2 = { bom: 'No caminho certo', ok: 'Acompanhe', atencao: 'Atenção' };
+        fs.push(h('div', { class: 'verdict ' + t.nivel }, h('b', { text: NV2[t.nivel] }), h('p', { text: 'Média das 3 últimas pesagens contra as anteriores: gordura ' + fx(t.dg) + ' kg, massa magra ' + fx(t.dm) + ' kg. ' + t.msg })));
+      } else fs.push(h('p', { class: 'tip', text: 'A tendência aparece a partir da 4ª pesagem com a balança. Uma pesagem isolada varia até 1 kg só com água.' }));
+      item('Gordura e massa magra', fs);
+    }
+    var sd = Store.all('saude_dia') || {}, hoje = Store.day(), s0 = segDe(hoje), s1 = addDias(s0, -7);
+    var mediaP = function (a, b) { var v = Object.keys(sd).filter(function (k) { return k >= a && k <= b && typeof sd[k].passos === 'number'; }).map(function (k) { return sd[k].passos; }); return v.length ? v.reduce(function (x, y) { return x + y; }, 0) / v.length : null; };
+    var pa = mediaP(s0, hoje), pb = mediaP(s1, addDias(s0, -1));
+    if (pa !== null || pb !== null) {
+      item('Passos', [h('p', { text: (pa !== null ? 'Esta semana: ' + nInt(pa) + ' por dia' : 'Sem passos nesta semana ainda') + (pb !== null ? '; semana passada: ' + nInt(pb) + '.' : '.') + ' Cada mil passos a mais gastam cerca de ' + Math.round(1000 * pesoAte(hoje) * 0.000375) + ' kcal no seu peso, e isso já entra no gasto do dia.' })]);
+    }
+    var rs = corridaPts().slice(-12);
+    if (rs.length >= 3) {
+      var meio = Math.floor(rs.length / 2), a1 = media(rs.slice(0, meio), 'efic'), a2 = media(rs.slice(meio), 'efic'), pc = (a2 - a1) / a1 * 100;
+      item('Corrida', [h('p', { text: 'Corridas mais recentes contra as mais antigas: ' + (Math.abs(pc) < 2 ? 'estável' : (pc > 0 ? 'melhora de ' : 'queda de ') + fmtN(Math.abs(pc), 1) + '%') + ' em metros por batimento, com ritmo médio de ' + clock(media(rs.slice(meio), 'pace')) + '/km e FC média de ' + Math.round(media(rs.slice(meio), 'fc')) + ' bpm.' })]);
+    }
+    if (!itens) box.appendChild(h('p', { class: 'tip', text: 'Com pesagens, passos e corridas registrados, os resumos aparecem aqui.' }));
+  }
   function renderHist() {
     var b = balDados(), segs = balSemanas(b), aj = balAjuste(b, segs).kcal;
-    renderCal(); renderDia(b, aj); renderSemanaH(b, aj); renderAtiv(); renderBalanco(); renderPesoH(); renderCompH(); renderPassosH(); renderEvo();
+    renderCal(); renderDia(b, aj); renderSemanaH(b, aj); renderAtiv(); renderBalanco(); renderAnaSemana(); renderCorpo(); renderGraficos();
     var mon = segDe(histSel), fim = addDias(mon, 6);
     function naSemana(d) { return d >= mon && d <= fim; }
     var tr = treinosOk(), ca = cardioTudo(), lo = lombarOk();
@@ -3655,7 +3923,7 @@ window.MOVES = (function () {
     semBusy = true; semMsg = '';
     // Marca antes de chamar, para outro aparelho aberto não pedir a mesma análise.
     Store.set('semanas', dPes, { data: dPes, pendente: true, criado: new Date().toISOString() });
-    renderSaude();
+    renderSaude(); renderAnaSemana();
     Store.sample().then(function (sample) {
       if (!sample) throw new Error('indisponivel');
       return sample.json(semPrompt(dPes), { modelTier: 'default', cache: false });
@@ -3668,10 +3936,10 @@ window.MOVES = (function () {
     }).catch(function (e) {
       Store.del('semanas', dPes);
       semMsg = e && e.message === 'indisponivel' ? 'A análise automática não está disponível aqui.' : 'Não consegui analisar agora. Tente de novo.';
-    }).then(function () { semBusy = false; renderSaude(); });
+    }).then(function () { semBusy = false; renderSaude(); renderAnaSemana(); });
   }
-  function blocoSemana(box, dPes) {
-    box.appendChild(h('h3', { text: 'Análise da semana' }));
+  function blocoSemana(box, dPes, titulo) {
+    box.appendChild(h('h3', { text: titulo || 'Análise da semana' }));
     var a = Store.get('semanas', dPes);
     if (a && a.resumo) {
       var NV = { bom: 'No caminho certo', ok: 'Dá para ajustar', atencao: 'Atenção' };
@@ -3879,22 +4147,9 @@ window.MOVES = (function () {
     }
     return box;
   }
-  function medGrafico(box, ks, all) {
-    var pts = ks.filter(function (k) { return all[k].cintura; });
-    if (pts.length < 2) return;
-    var W = 320, H = 140, x0 = 36, x1 = W - 8, y0 = 10, y1 = 108;
-    var vs = pts.map(function (k) { return all[k].cintura; }), mn = Math.min.apply(null, vs), mx = Math.max.apply(null, vs);
-    if (mx - mn < 2) { mn -= 1; mx += 1; }
-    var t0 = new Date(pts[0] + 'T12:00:00').getTime(), t1 = new Date(pts[pts.length - 1] + 'T12:00:00').getTime();
-    function X(k) { return t1 === t0 ? (x0 + x1) / 2 : x0 + (new Date(k + 'T12:00:00').getTime() - t0) / (t1 - t0) * (x1 - x0); }
-    function Y(v) { return y1 - (v - mn) / (mx - mn) * (y1 - y0); }
-    box.appendChild(h('h3', { text: 'Cintura ao longo do tempo' }));
-    var svg = sv('svg', { viewBox: '0 0 ' + W + ' ' + H, class: 'chart', role: 'img', 'aria-label': 'Cintura em centímetros por data' });
-    [mn, mx].forEach(function (v) { sv('line', { x1: x0, x2: x1, y1: Y(v), y2: Y(v), stroke: 'var(--line)' }, svg); sv('text', { x: 0, y: Y(v) + 4, text: fmtN(v, 1) }, svg); });
-    sv('polyline', { points: pts.map(function (k) { return X(k) + ',' + Y(all[k].cintura); }).join(' '), fill: 'none', stroke: 'var(--accent)', 'stroke-width': 2.5 }, svg);
-    pts.forEach(function (k) { var c = sv('circle', { cx: X(k), cy: Y(all[k].cintura), r: 3.5, fill: 'var(--accent)' }, svg); sv('title', { text: br(k) + ': ' + cm1(all[k].cintura) }, c); });
-    sv('text', { x: x0, y: H - 8, text: br(pts[0]) }, svg); sv('text', { x: x1 - 30, y: H - 8, text: br(pts[pts.length - 1]) }, svg);
-    box.appendChild(svg);
+  function medGrafico(box) {
+    var d = h('div', { class: 'g-sep' }); box.appendChild(d);
+    grafCintura(d, 'cintura-med');
   }
   function renderPeso() {
     var inp = $('peso-kg');
