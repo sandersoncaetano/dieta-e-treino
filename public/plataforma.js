@@ -249,16 +249,20 @@
         '<button type="button" data-copia="' + id + '" style="' + est + ';justify-self:start">Copiar</button></div>';
     }
     function mostra(j) {
+      var APK = 'https://github.com/sandersoncaetano/dieta-e-treino/releases/latest/download/dieta-e-treino-sync.apk';
+      var link = 'dietaetreino://config?url=' + encodeURIComponent(j.url) + '&chave=' + encodeURIComponent(j.chave);
       var quando = j.ultimoEnvio ? new Date(j.ultimoEnvio).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : 'nenhum ainda';
       c.innerHTML = '<div style="display:grid;gap:14px">' +
-        '<p style="margin:0">O Zepp grava peso, composição, sono e frequência cardíaca no Health Connect. O app <strong>Health Connect Webhook</strong> (Play Store) lê de lá e envia para cá.</p>' +
+        '<p style="margin:0">O Zepp grava peso, composição, sono e frequência cardíaca no Health Connect. O app Android <strong>Dieta e Treino Sync</strong> lê de lá e envia para cá a cada hora.</p>' +
         '<ol style="margin:0;padding-left:1.2em;display:grid;gap:6px">' +
-        '<li>Instale o Health Connect Webhook e dê permissão de leitura.</li>' +
-        '<li>Em <em>Data types</em>, ligue: Weight, Body fat, Lean body mass, Bone mass, Basal metabolic rate, Resting heart rate, Sleep e Steps.</li>' +
-        '<li>Em <em>Webhooks</em>, adicione o endereço abaixo, formato JSON.</li>' +
-        '<li>Adicione o cabeçalho <code>x-api-key</code> com a chave abaixo e toque em <em>Test</em>.</li>' +
-        '<li>Ligue a sincronização automática (a cada 1 hora basta).</li></ol>' +
+        '<li><a href="' + APK + '">Baixe o app</a> e instale (o Android vai pedir para permitir a instalação pelo navegador).</li>' +
+        '<li>Volte aqui e toque em <strong>Configurar app Android</strong>.</li>' +
+        '<li>No app, toque em <strong>Permitir leitura no Health Connect</strong>, libere tudo, inclusive a leitura em segundo plano, e depois em <strong>Sincronizar agora</strong>.</li></ol>' +
+        '<a id="pl-hc-cfg" href="' + link + '" style="' + est + ';justify-self:start;text-decoration:none;display:inline-grid;place-items:center;background:var(--accent,#1a5fd0);color:#fff">Configurar app Android</a>' +
+        '<details><summary>Configurar à mão ou usar outro app</summary><div style="display:grid;gap:12px;margin-top:10px">' +
+        '<p style="margin:0">Serve também para o app Health Connect Webhook: endereço abaixo, formato JSON, cabeçalho <code>x-api-key</code> com a chave.</p>' +
         campo('Endereço', j.url, 'pl-hc-url') + campo('Chave (cabeçalho x-api-key)', j.chave, 'pl-hc-key') +
+        '</div></details>' +
         '<p style="margin:0">Último envio recebido: <strong>' + quando + '</strong></p>' +
         '<p style="margin:0;font-size:.9em">A chave dá acesso só para enviar dados ao app. Se ela vazar, gere outra (a antiga para de funcionar).</p>' +
         '<button type="button" id="pl-hc-novo" style="' + est + ';justify-self:start">Gerar nova chave</button></div>';

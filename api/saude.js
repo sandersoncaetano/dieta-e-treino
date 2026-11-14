@@ -64,6 +64,7 @@ async function recebe(uid, p) {
     body_fat: ['gordura_pct', (r) => r.percentage],
     lean_body_mass: ['massa_magra_kg', (r) => r.kilograms],
     bone_mass: ['massa_ossea_kg', (r) => r.kilograms],
+    body_water_mass: ['agua_kg', (r) => r.kilograms],
     basal_metabolic_rate: ['tmb_kcal', (r) => r.watts != null ? Math.round(r.watts * 20.65) : null]
   };
   const comp = {};

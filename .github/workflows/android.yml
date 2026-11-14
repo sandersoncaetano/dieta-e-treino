@@ -1,0 +1,84 @@
+name: App Android (Dieta e Treino Sync)
+
+on:
+  push:
+    branches: [main]
+    paths: ['android/**', '.github/workflows/android.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android
+  cancel-in-progress: false
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+
+      # Chave de assinatura: fica no repositório protegida pela senha do segredo ANDROID_KEYSTORE_PASSWORD.
+      # Sem ela, cada versão teria assinatura diferente e o Android recusaria a atualização.
+      - name: Chave de assinatura
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          if [ -z "$KEYSTORE_PASSWORD" ]; then
+            echo "::error::Crie o segredo ANDROID_KEYSTORE_PASSWORD em Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+          if [ ! -f android/release.p12 ]; then
+            keytool -genkeypair -v -storetype PKCS12 -keystore android/release.p12 -alias dietaetreino \
+              -keyalg RSA -keysize 4096 -validity 36500 -storepass "$KEYSTORE_PASSWORD" -keypass "$KEYSTORE_PASSWORD" \
+              -dname "CN=Dieta e Treino Sync"
+            git config user.name "github-actions"
+            git config user.email "github-actions@users.noreply.github.com"
+            git add android/release.p12
+            git commit -m "Chave de assinatura do app Android (protegida por senha)"
+            git pull --rebase -q && git push
+          fi
+
+      - name: Compilar APK
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEYSTORE_FILE: ${{ github.workspace }}/android/release.p12
+          VERSAO: ${{ github.run_number }}
+        run: |
+          set -o pipefail
+          gradle -p android assembleRelease --no-daemon --stacktrace 2>&1 | tee build.log
+          cp android/app/build/outputs/apk/release/app-release.apk dieta-e-treino-sync.apk
+
+      - name: Publicar versão
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "android-v${{ github.run_number }}" dieta-e-treino-sync.apk \
+            --title "Dieta e Treino Sync 1.0.${{ github.run_number }}" \
+            --notes "App Android que leva os dados do Health Connect para o Dieta e Treino." --latest
+
+      # Guarda o fim do log num ramo separado para conferir erros de compilação.
+      - name: Log
+        if: always()
+        run: |
+          [ -f build.log ] || echo "sem log de compilação" > build.log
+          tail -c 60000 build.log > /tmp/build.log
+          git fetch -q origin android-build-log || true
+          git checkout -q --orphan android-build-log
+          git rm -rq --cached . || true
+          cp /tmp/build.log build.log
+          echo "${{ job.status }} run ${{ github.run_number }} $(date -u)" > status.txt
+          git config user.name "github-actions"; git config user.email "github-actions@users.noreply.github.com"
+          git add build.log status.txt
+          git commit -qm "log ${{ github.run_number }}"
+          git push -qf origin android-build-log
