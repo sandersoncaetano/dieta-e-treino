@@ -9,6 +9,7 @@ function tipoDe(p) {
   if (p.includes('fechamento do dia')) return 'dia';
   if (p.includes('Analise a atividade atual')) return 'atividade';
   if (p.includes('Analise a semana')) return 'semana';
+  if (p.includes('Feche a semana')) return 'fechamento';
   if (p.includes('estimando uma refeição')) return 'refeicao';
   return 'outro';
 }
