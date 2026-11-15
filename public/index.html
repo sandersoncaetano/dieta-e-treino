@@ -3168,7 +3168,7 @@ window.MOVES = (function () {
     if (grande && cfg.periodos) {
       var chips = h('div', { class: 'g-per', role: 'group', 'aria-label': 'Período' });
       cfg.periodos.forEach(function (p) {
-        var b = h('button', { type: 'button', 'aria-pressed': String(p === per), text: p });
+        var b = h('button', { type: 'button', 'aria-pressed': String(p === per), text: { '1M': '1 mês', '3M': '3 meses', '6M': '6 meses', '1A': '1 ano', 'Tudo': 'Tudo' }[p] || p });
         b.addEventListener('click', function () { gPer[cfg.id] = p; gAnimou[chave] = 0; desenhaGrafico(area, cfg, p, chave, true); });
         chips.appendChild(b);
       });
