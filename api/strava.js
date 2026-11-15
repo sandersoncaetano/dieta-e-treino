@@ -79,12 +79,64 @@ async function desempenho(uid, token, args) {
   };
 }
 
+// Detalhe completo de uma atividade, para a aba Desempenho: números, splits, melhores marcas,
+// séries ao longo do percurso (reduzidas a ~240 pontos) e as zonas de FC do atleta.
+function reduz(arr, n) {
+  if (!arr || arr.length <= n) return arr || null;
+  const passo = arr.length / n, out = [];
+  for (let i = 0; i < n; i++) out.push(arr[Math.floor(i * passo)]);
+  out.push(arr[arr.length - 1]);
+  return out;
+}
+async function detalhe(uid, token, args) {
+  const id = encodeURIComponent(args.activity_id);
+  const [d, st, zonas] = await Promise.all([
+    strava(token, '/activities/' + id),
+    strava(token, '/activities/' + id + '/streams?keys=time,distance,heartrate,velocity_smooth,altitude,watts,cadence&key_by_type=true').catch(() => ({})),
+    strava(token, '/athlete/zones').catch(() => null)
+  ]);
+  await guardaCalorias(uid, [d]);
+  const s = (k) => (st && st[k] && st[k].data) || null;
+  const N = 240;
+  const r1 = (v) => (v == null ? null : Math.round(v * 10) / 10);
+  return {
+    id: String(d.id), nome: d.name, tipo: d.sport_type || d.type, inicio: String(d.start_date_local || '').replace('Z', ''),
+    km: d.distance ? Math.round(d.distance) / 1000 : 0, mov: d.moving_time, dec: d.elapsed_time, elev: d.total_elevation_gain,
+    vmed: d.average_speed, vmax: d.max_speed, fc: d.average_heartrate || null, fcmax: d.max_heartrate || null,
+    watts: d.average_watts || null, wmax: d.max_watts || null, kj: d.kilojoules || null, cad: d.average_cadence || null,
+    kcal: d.calories || null, esforco: d.suffer_score || null, prs: d.pr_count || 0, conquistas: d.achievement_count || 0,
+    dispositivo: d.device_name || null, ini_latlng: d.start_latlng || null, temp: d.average_temp ?? null,
+    splits: (d.splits_metric || []).map((x) => ({ km: Math.round(x.distance) / 1000, seg: x.moving_time, v: x.average_speed, fc: x.average_heartrate ? Math.round(x.average_heartrate) : null, elev: x.elevation_difference })),
+    melhores: (d.best_efforts || []).map((x) => ({ nome: x.name, seg: x.moving_time, pr: x.pr_rank || null })),
+    serie: {
+      t: reduz(s('time'), N), d: reduz(s('distance'), N)?.map((v) => Math.round(v)),
+      fc: reduz(s('heartrate'), N), v: reduz(s('velocity_smooth'), N)?.map(r1),
+      alt: reduz(s('altitude'), N)?.map(r1), w: reduz(s('watts'), N), cad: reduz(s('cadence'), N)
+    },
+    // Tempo em cada zona: calculado com a série completa de FC e tempo, não a reduzida.
+    zonas_fc: (() => {
+      // Sem permissão de perfil, usa as zonas padrão do Strava para FC máxima de 180.
+      const z = (zonas && zonas.heart_rate && zonas.heart_rate.zones) || [{ min: 0, max: 106 }, { min: 107, max: 140 }, { min: 141, max: 158 }, { min: 159, max: 175 }, { min: 176, max: -1 }];
+      const hr = s('heartrate'), tm = s('time');
+      if (!z || !hr || !tm) return null;
+      const seg = z.map(() => 0);
+      for (let i = 1; i < hr.length; i++) {
+        const dt = Math.min(30, tm[i] - tm[i - 1]);
+        const k = z.findIndex((zz) => hr[i] >= zz.min && (zz.max === -1 || hr[i] <= zz.max));
+        if (k >= 0) seg[k] += dt;
+      }
+      return z.map((zz, i) => ({ min: zz.min, max: zz.max, seg: seg[i], padrao: !(zonas && zonas.heart_rate) }));
+    })()
+  };
+}
+
 export default rota(async (req, res) => {
   if (req.method !== 'POST') return responde(res, 405, { erro: 'Use POST' });
   const u = await usuario(req);
   const { ferramenta, args = {} } = await corpo(req);
   const token = await tokenValido(u.id);
   if (ferramenta === 'list_activities') return responde(res, 200, { payload: await listar(u.id, token, args) });
+  if (ferramenta === 'get_activity_detail') return responde(res, 200, { payload: await detalhe(u.id, token, args) });
   if (ferramenta === 'get_activity_performance') return responde(res, 200, { payload: await desempenho(u.id, token, args) });
   responde(res, 400, { erro: 'Ferramenta desconhecida' });
 });

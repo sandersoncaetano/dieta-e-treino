@@ -9,7 +9,7 @@ export default rota(async (req, res) => {
     response_type: 'code',
     redirect_uri: base + '/api/strava-retorno',
     approval_prompt: 'auto',
-    scope: 'read,activity:read_all',
+    scope: 'read,activity:read_all,profile:read_all',
     state: assina(u.id)
   });
   responde(res, 200, { url: 'https://www.strava.com/oauth/authorize?' + q });
