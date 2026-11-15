@@ -207,7 +207,15 @@ input[type="date"] { height: 46px; }
 .a-item + .a-item { margin-top: 16px; }
 .a-item h3 { font-size: 1.15rem; margin-bottom: 4px; }
 .fech-tab th, .fech-tab td { padding: 8px 6px; }
+table.fech-tab { font-size: .9rem; }
+table.fech-tab th, table.fech-tab td { padding: 7px 3px; }
 table.fech-tab th:first-child { white-space: nowrap; }
+.fech-gasto { margin: 14px 0; padding: 12px 14px; background: var(--mat); border-radius: 12px; }
+.fech-gasto h3 { margin: 0 0 6px; font-size: 1.1rem; }
+.fg-lin { display: flex; justify-content: space-between; gap: 10px; padding: 5px 0; border-bottom: 1px solid var(--line); }
+.fg-lin strong { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.fech-gasto .tip { margin: 2px 0 4px; font-size: .88rem; }
+.fg-res { margin: 10px 0 4px; font-weight: 700; }
 .stats.fech-st { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 12px; }
 .stats.fech-st .stat b { font-size: 1.6rem; white-space: nowrap; }
 .fech-tab td { text-align: right; font-variant-numeric: tabular-nums; }
@@ -3385,13 +3393,18 @@ window.MOVES = (function () {
     };
     r.saldo = r.comeu - r.gasto;
     r.kgGordura = r.saldo / 7700;
+    // De onde veio o gasto (só dias registrados, os mesmos dos totais).
+    r.gTmb = soma(reg, 'tmb'); r.gEx = soma(reg, 'ex'); r.gRel = soma(reg, 'rel');
+    r.gRot = reg.reduce(function (a, t) { return a + t.bd.rotina; }, 0);
+    r.gAj = r.gasto - r.gTmb - r.gRot - r.gEx;
+    r.semTreino = r.saldo + r.gEx;
     if (r.saldoUteis < 0 && r.saldoFds > 0) r.devolveu = Math.round(r.saldoFds / -r.saldoUteis * 100);
     return r;
   }
   function fechPrompt(r) {
     var linhas = r.dias.filter(function (t) { return !t.fut; }).map(function (t) {
       return '- ' + DSEMF[t.i] + ' ' + br(t.d) + ': ' + (t.n ? nInt(t.k) + ' kcal comidas (meta ' + nInt(t.meta) + '), ' + nInt(t.p) + ' g proteína' : 'sem refeições registradas') +
-        ', gasto estimado ' + nInt(t.gasto) + ' kcal' + (t.n ? ', saldo ' + (t.saldo > 0 ? '+' : '') + nInt(t.saldo) : '') +
+        ', gasto estimado ' + nInt(t.gasto) + ' kcal' + (t.ex ? ' (exercício ' + nInt(t.ex) + ' kcal considerados; relógio marcou ' + nInt(t.rel) + ')' : '') + (t.n ? ', saldo ' + (t.saldo > 0 ? '+' : '') + nInt(t.saldo) : '') +
         (t.ativ.length ? '; atividades: ' + t.ativ.map(function (a) { return a.t; }).join(', ') : '; sem treino');
     }).join('\n');
     var cp = compPontos(), pes = cp.slice(-3).map(function (p) { return br(p.d) + ' ' + kg1(p.p) + ' kg (gordura ' + kg1(p.g) + ' kg, magra ' + kg1(p.m) + ' kg)'; }).join('; ');
@@ -3400,6 +3413,7 @@ window.MOVES = (function () {
       'Saldo = comido menos gasto estimado (negativo é déficit).\n' + linhas + '\n' +
       'Totais dos dias registrados (' + r.nReg + '): comeu ' + nInt(r.comeu) + ' kcal, gasto ' + nInt(r.gasto) + ', saldo ' + nInt(r.saldo) + ' kcal (cerca de ' + kg1(Math.abs(r.kgGordura)) + ' kg de gordura ' + (r.saldo < 0 ? 'perdida' : 'ganha') + '). ' +
       'Saldo de segunda a sexta: ' + nInt(r.saldoUteis) + ' kcal; sábado e domingo: ' + nInt(r.saldoFds) + ' kcal' + (r.devolveu ? ' (o fim de semana devolveu ' + r.devolveu + '% do déficit dos dias úteis)' : '') + '. ' +
+      'Gasto da semana: metabolismo basal ' + nInt(r.gTmb) + ', rotina e passos ' + nInt(r.gRot) + ', exercício ' + nInt(r.gEx) + ' kcal considerados (o relógio marcou ' + nInt(r.gRel) + '; o app desconta o metabolismo do período e usa 70%)' + (Math.abs(r.gAj) >= 50 ? ', ajuste pelo histórico ' + nInt(r.gAj) : '') + '. Sem os treinos, o saldo seria ' + nInt(r.semTreino) + ' kcal. Comente quanto os treinos contribuíram para a perda esperada. ' +
       'Proteína média: ' + nInt(r.prot) + ' g/dia.' + (pes ? ' Pesagens recentes: ' + pes + '.' : '') + '\n' +
       'Regras: diga com números quanto o fim de semana pesou no resultado; trate exceções sociais como normais quando a semana segue no caminho e alerte só se virarem padrão; não sugira jejum, compensação nem cortes radicais; se faltam registros, diga isso. ' +
       'Responda somente com um objeto JSON: {"nivel":"bom|ok|atencao","resumo":"até 2 frases","pontos":["até 3 observações curtas"],"ajuste":"uma ação principal para a próxima semana"}.';
@@ -3445,12 +3459,28 @@ window.MOVES = (function () {
     var imp = 'Segunda a sexta: saldo ' + fx(r.saldoUteis) + ' kcal' + (r.nUteis < 5 ? ' (' + r.nUteis + ' dias registrados)' : '') + '. Fim de semana: ' + (r.nFds ? 'saldo ' + fx(r.saldoFds) + ' kcal' : 'ainda sem registro') + '.';
     if (r.devolveu) imp += ' O fim de semana devolveu ' + r.devolveu + '% do déficit dos dias úteis.';
     box.appendChild(h('p', { text: imp }));
+    // De onde veio o gasto e quanto isso deve virar na balança
+    var gl = h('div', { class: 'fech-gasto' });
+    var lin = function (rot, val, nota) { gl.appendChild(h('div', { class: 'fg-lin' }, h('span', { text: rot }), h('strong', { text: val }))); if (nota) gl.appendChild(h('p', { class: 'tip', text: nota })); };
+    gl.appendChild(h('h3', { text: 'Gasto da semana e perda esperada' }));
+    lin('Metabolismo basal', nInt(r.gTmb) + ' kcal');
+    lin('Rotina e passos', nInt(r.gRot) + ' kcal');
+    lin('Exercício', nInt(r.gEx) + ' kcal', r.gRel ? 'O relógio marcou ' + nInt(r.gRel) + ' kcal nos treinos; o app desconta o que você gastaria parado e conta 70%, porque relógios costumam exagerar.' : 'Sem treinos com calorias registradas nesses dias.');
+    if (Math.abs(r.gAj) >= 50) lin('Ajuste pelo seu histórico', (r.gAj > 0 ? '+' : '−') + nInt(Math.abs(r.gAj)) + ' kcal');
+    lin('Gasto total', nInt(r.gasto) + ' kcal');
+    lin('Comido', nInt(r.comeu) + ' kcal');
+    lin(r.saldo < 0 ? 'Déficit' : 'Excesso', nInt(Math.abs(r.saldo)) + ' kcal');
+    gl.appendChild(h('p', { class: 'fg-res', text: r.saldo < 0
+      ? 'Perda esperada: cerca de ' + kg1(-r.kgGordura) + ' kg de gordura (déficit ÷ 7.700). Os treinos responderam por ' + nInt(r.gEx) + ' kcal, ou ' + kg1(r.gEx / 7700) + ' kg' + (r.semTreino < 0 ? '; sem eles, o déficit seria de ' + nInt(-r.semTreino) + ' kcal (' + kg1(-r.semTreino / 7700) + ' kg).' : '; sem eles, a semana não teria déficit.')
+      : 'Ganho esperado: cerca de ' + kg1(r.kgGordura) + ' kg. Os treinos seguraram ' + nInt(r.gEx) + ' kcal.' }));
+    gl.appendChild(h('p', { class: 'tip', text: 'A balança pode mostrar outro número por causa de água, sal e intestino; a tendência de algumas semanas é que confirma.' }));
+    box.appendChild(gl);
     // Tabela
     var tb = h('tbody');
     r.dias.forEach(function (t) {
       var c = t.n && !t.fut;
       var tr = h('tr', { class: t.i >= 5 ? 'fds' : '' },
-        h('th', { scope: 'row', text: DSEMF[t.i] + ' ' + ddmm(t.d) }),
+        h('th', { scope: 'row', text: DSEMF[t.i] + ' ' + Number(t.d.slice(8)) }),
         h('td', { text: c ? nInt(t.k) : '–', class: c && t.k > t.meta ? 'acima' : '' }),
         h('td', { text: t.fut ? '–' : nInt(t.gasto) }),
         h('td', { text: c ? fx(t.saldo) : '–', class: c ? (t.saldo > 0 ? 'acima' : 'abaixo') : '' }));
@@ -3468,19 +3498,24 @@ window.MOVES = (function () {
     // Gráfico: barras de saldo por dia e saldo acumulado
     var gb = h('div', { class: 'g-sep' }); box.appendChild(gb);
     grafico(gb, {
-      id: 'fech', titulo: 'Saldo dia a dia', sub: 'Barras: saldo do dia. Linha: saldo acumulado da semana',
+      id: 'fech', titulo: 'Comido e gasto por dia', sub: 'O gasto separa metabolismo e rotina do exercício. Toque num dia para ver o saldo',
       dados: function () {
-        var acc = 0, ok = r.dias.filter(function (t) { return t.n && !t.fut; }).length;
-        if (!ok) return { vazio: 'Sem dias registrados.' };
+        if (!r.dias.some(function (t) { return t.n && !t.fut; })) return { vazio: 'Sem dias registrados.' };
         var ac = cor('accent'), stc = cor('stop');
+        var ok = function (t) { return t.n && !t.fut; };
         return {
           type: 'bar',
           data: { labels: r.dias.map(function (t) { return DSEMF[t.i]; }), datasets: [
-            { type: 'bar', label: 'Saldo do dia', data: r.dias.map(function (t) { return t.n && !t.fut ? Math.round(t.saldo) : null; }), backgroundColor: r.dias.map(function (t) { return t.saldo > 0 ? stc : ac; }), borderRadius: 5, order: 2 },
-            { type: 'line', label: 'Acumulado', data: r.dias.map(function (t) { if (!(t.n && !t.fut)) return null; acc += t.saldo; return Math.round(acc); }), borderColor: cor('fg'), backgroundColor: cor('fg'), borderWidth: 2.5, pointRadius: 3, spanGaps: true, tension: 0.2, order: 1 }
+            { label: 'Comido', stack: 'c', data: r.dias.map(function (t) { return ok(t) ? Math.round(t.k) : null; }), backgroundColor: r.dias.map(function (t) { return t.k > t.gasto ? stc : ac; }), borderRadius: 5 },
+            { label: 'Metabolismo e rotina', stack: 'g', data: r.dias.map(function (t) { return t.fut ? null : Math.round(t.gasto - t.ex); }), backgroundColor: alfa(cor('far'), 0.55), borderRadius: 0 },
+            { label: 'Exercício', stack: 'g', data: r.dias.map(function (t) { return t.fut || !t.ex ? null : Math.round(t.ex); }), backgroundColor: cor('hi'), borderRadius: 5 }
           ] },
-          options: { scales: { y: { ticks: { callback: function (v) { return (v > 0 ? '+' : '') + fmtN0(v, 0); } } } } },
-          dicas: { title: function (its) { var t = its.length ? r.dias[its[0].dataIndex] : null; return t ? dsem(t.d) + ', ' + br(t.d) : ''; }, label: function (it) { return ' ' + it.dataset.label + ': ' + (it.raw > 0 ? '+' : '') + nInt(it.raw) + ' kcal'; } }
+          options: { scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true, ticks: { callback: function (v) { return fmtN0(v / 1000, 1) + ' mil'; } } } } },
+          dicas: {
+            title: function (its) { var t = its.length ? r.dias[its[0].dataIndex] : null; return t ? dsem(t.d) + ', ' + br(t.d) : ''; },
+            label: function (it) { return ' ' + it.dataset.label + ': ' + nInt(it.raw) + ' kcal'; },
+            footer: function (its) { var t = its.length ? r.dias[its[0].dataIndex] : null; if (!t || !ok(t)) return ''; return 'Gasto total ' + nInt(t.gasto) + ' · saldo ' + (t.saldo > 0 ? '+' : '−') + nInt(Math.abs(t.saldo)); }
+          }
         };
       }
     });
