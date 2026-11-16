@@ -36,6 +36,17 @@ function escolhe(tipo, temFoto) {
 // Ferramenta única e obrigatória: a resposta chega como objeto JSON já validado pela API.
 const FERRAMENTA = { name: 'responder', description: 'Devolve a resposta no formato JSON pedido no texto.', input_schema: { type: 'object', additionalProperties: true } };
 
+// Às vezes o modelo devolve listas e objetos da ferramenta como texto JSON: converte de volta.
+function desembrulha(o) {
+  if (!o || typeof o !== 'object') return o;
+  console.log('ia resposta', Object.keys(o).map((k) => k + ':' + (Array.isArray(o[k]) ? 'lista' : typeof o[k])).join(' '));
+  for (const k of Object.keys(o)) {
+    const v = o[k];
+    if (typeof v === 'string' && /^\s*[\[{]/.test(v)) { try { o[k] = JSON.parse(v); } catch (e) { /* mantém o texto */ } }
+  }
+  return o;
+}
+
 function extraiJson(txt) {
   const t = String(txt || '').trim().replace(/^```(?:json)?/i, '').replace(/```$/, '').trim();
   try { return JSON.parse(t); } catch (e) {}
@@ -92,7 +103,7 @@ export default rota(async (req, res) => {
   const msgs = [{ role: 'user', content: conteudo }];
   let r1 = await chama(msgs), resultado;
   if (r1.parou === 'max_tokens') console.error('Resposta cortada no limite', tipo, esc.max);
-  if (r1.objeto) return responde(res, 200, { resultado: r1.objeto, uso: r1.uso });
+  if (r1.objeto) return responde(res, 200, { resultado: desembrulha(r1.objeto), uso: r1.uso });
   try { resultado = extraiJson(r1.texto); } catch (e) {
     // Sem objeto válido (resposta cortada ou fora do formato): pede uma vez uma versão mais enxuta.
     console.error('Resposta sem JSON', tipo, r1.parou, e.message);
@@ -100,7 +111,7 @@ export default rota(async (req, res) => {
       { role: 'assistant', content: r1.texto || 'Vou responder.' },
       { role: 'user', content: 'A resposta não veio completa. Responda de novo, mais enxuta, chamando a ferramenta responder com o objeto JSON pedido.' }
     ]));
-    if (r2.objeto) return responde(res, 200, { resultado: r2.objeto, uso: r2.uso });
+    if (r2.objeto) return responde(res, 200, { resultado: desembrulha(r2.objeto), uso: r2.uso });
     resultado = extraiJson(r2.texto); r1 = r2;
   }
   responde(res, 200, { resultado, uso: r1.uso });
