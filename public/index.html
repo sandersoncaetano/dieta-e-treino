@@ -2644,10 +2644,13 @@ window.MOVES = (function () {
     }).then(function (r) {
       var lista = r && r.payload && r.payload.activities;
       if (!Array.isArray(lista)) throw { code: 'formato' };
-      var n = 0;
+      var n = 0, vistos = {};
       lista.forEach(function (a) {
         var s = a.summary || {}, d = String(a.start_local || '').slice(0, 10);
         if (!a.id || !d) return;
+        // Atividade de poucos segundos é toque acidental no relógio: não entra.
+        if ((s.moving_time || 0) < 60 && (s.distance || 0) < 200) return;
+        vistos[String(a.id)] = 1;
         var doc = { data: d, tipo: a.sport_type || '', nome: a.name || '', kcal: Math.round(s.total_calories || 0), min: Math.round((s.moving_time || 0) / 60), seg: Math.round(s.moving_time || 0), km: Math.round((s.distance || 0) / 10) / 100 };
         var w = a.weather || {};
         if (a.start_local) doc.ini = String(a.start_local).slice(0, 19);
@@ -2660,6 +2663,11 @@ window.MOVES = (function () {
         var igual = atual && Object.keys(doc).every(function (k) { return atual[k] === doc[k]; });
         if (!igual) { Store.set('strava', String(a.id), Object.assign({}, atual || {}, doc)); n++; }
       });
+      // Apagada no Strava (ou acidental): sai daqui também, dentro do período que o Strava devolveu por completo.
+      if (lista.length > 0 && lista.length < 100) {
+        var de = Store.day(ini), st = Store.all('strava');
+        Object.keys(st).forEach(function (k) { if (!vistos[k] && st[k].data >= de) { Store.del('strava', k); if (Store.get('analises', k)) Store.del('analises', k); n++; } });
+      }
       var fila = lista.filter(function (a) {
         var d = a.id && Store.get('strava', String(a.id));
         return d && (d.perfV || 0) < 2 && (d.min || 0) >= 10;
@@ -3669,22 +3677,28 @@ window.MOVES = (function () {
     if (r.saldoUteis < 0 && r.saldoFds > 0) r.devolveu = Math.round(r.saldoFds / -r.saldoUteis * 100);
     return r;
   }
+  // Números e nível montados pelo app; a IA escreve só o resumo e o ajuste.
+  function fechLocal(r) {
+    var pm = protMeta(r.dom), nivel;
+    if (r.nReg < 4) nivel = 'ok';
+    else if (r.saldo >= 0) nivel = 'atencao';
+    else if (r.prot < pm.min * 0.9 || (r.devolveu || 0) > 60) nivel = 'ok';
+    else nivel = 'bom';
+    var sn = function (v) { return (v > 0 ? '+' : '') + nInt(v); };
+    var pontos = [
+      'Saldo de ' + sn(r.saldo) + ' kcal em ' + r.nReg + (r.nReg === 1 ? ' dia registrado' : ' dias registrados') + ', cerca de ' + kg1(Math.abs(r.kgGordura)) + ' kg de gordura ' + (r.saldo < 0 ? 'a menos' : 'a mais') + '.',
+      'Dias úteis: ' + sn(r.saldoUteis) + ' kcal; fim de semana: ' + sn(r.saldoFds) + ' kcal' + (r.devolveu ? ' (devolveu ' + r.devolveu + '% do déficit dos dias úteis).' : '.'),
+      'Exercício: ' + nInt(r.gEx) + ' kcal considerados; sem os treinos, o saldo seria ' + sn(r.semTreino) + '. Proteína média de ' + nInt(r.prot) + ' g/dia (meta ' + protTxt(r.dom) + ').'
+    ];
+    return { nivel: nivel, pontos: pontos };
+  }
   function fechPrompt(r) {
-    var linhas = r.dias.filter(function (t) { return !t.fut; }).map(function (t) {
-      return '- ' + DSEMF[t.i] + ' ' + br(t.d) + ': ' + (t.n ? nInt(t.k) + ' kcal comidas (meta ' + nInt(t.meta) + '), ' + nInt(t.p) + ' g proteína' : 'sem refeições registradas') +
-        ', gasto estimado ' + nInt(t.gasto) + ' kcal' + (t.ex ? ' (exercício ' + nInt(t.ex) + ' kcal considerados; relógio marcou ' + nInt(t.rel) + ')' : '') + (t.n ? ', saldo ' + (t.saldo > 0 ? '+' : '') + nInt(t.saldo) : '') +
-        (t.ativ.length ? '; atividades: ' + t.ativ.map(function (a) { return a.t; }).join(', ') : '; sem treino');
-    }).join('\n');
-    var cp = compPontos(), pes = cp.slice(-3).map(function (p) { return br(p.d) + ' ' + kg1(p.p) + ' kg (gordura ' + kg1(p.g) + ' kg, magra ' + kg1(p.m) + ' kg)'; }).join('; ');
-    return 'Feche a semana de ' + br(r.seg) + ' a ' + br(r.dom) + ' de um homem que quer emagrecer preservando músculo. ' +
-      'Metas: 2.000 kcal de segunda a sexta, 2.800 no sábado e no domingo, 15.600 kcal na semana; ' + protTxt(r.dom) + ' g de proteína por dia. ' +
-      'Saldo = comido menos gasto estimado (negativo é déficit).\n' + linhas + '\n' +
-      'Totais dos dias registrados (' + r.nReg + '): comeu ' + nInt(r.comeu) + ' kcal, gasto ' + nInt(r.gasto) + ', saldo ' + nInt(r.saldo) + ' kcal (cerca de ' + kg1(Math.abs(r.kgGordura)) + ' kg de gordura ' + (r.saldo < 0 ? 'perdida' : 'ganha') + '). ' +
-      'Saldo de segunda a sexta: ' + nInt(r.saldoUteis) + ' kcal; sábado e domingo: ' + nInt(r.saldoFds) + ' kcal' + (r.devolveu ? ' (o fim de semana devolveu ' + r.devolveu + '% do déficit dos dias úteis)' : '') + '. ' +
-      'Gasto da semana: metabolismo basal ' + nInt(r.gTmb) + ', rotina e passos ' + nInt(r.gRot) + ', exercício ' + nInt(r.gEx) + ' kcal considerados (o relógio marcou ' + nInt(r.gRel) + '; o app desconta o metabolismo do período e usa 70%)' + (Math.abs(r.gAj) >= 50 ? ', ajuste pelo histórico ' + nInt(r.gAj) : '') + '. Sem os treinos, o saldo seria ' + nInt(r.semTreino) + ' kcal. Comente quanto os treinos contribuíram para a perda esperada. ' +
-      'Proteína média: ' + nInt(r.prot) + ' g/dia.' + (pes ? ' Pesagens recentes: ' + pes + '.' : '') + '\n' +
-      'Regras: diga com números quanto o fim de semana pesou no resultado; trate exceções sociais como normais quando a semana segue no caminho e alerte só se virarem padrão; não sugira jejum, compensação nem cortes radicais; se faltam registros, diga isso. ' +
-      'Responda somente com um objeto JSON: {"nivel":"bom|ok|atencao","resumo":"até 2 frases","pontos":["até 3 observações curtas"],"ajuste":"uma ação principal para a próxima semana"}.';
+    var L = fechLocal(r);
+    return 'Feche a semana de ' + br(r.seg) + ' a ' + br(r.dom) + ' de um homem que quer emagrecer preservando músculo (metas: 2.000 kcal nos dias úteis, 2.800 no fim de semana, ' + protTxt(r.dom) + ' g de proteína por dia). ' +
+      'Números já calculados pelo app: ' + L.pontos.join(' ') + ' Comeu ' + nInt(r.comeu) + ' de 15.600 kcal. Avaliação do app: ' + L.nivel + '. ' +
+      'Escreva só: um resumo de até 2 frases curtas que interprete esses números (sem repeti-los todos) e uma ação principal para a próxima semana. ' +
+      'Trate exceções sociais do fim de semana como normais se a semana segue no caminho; não sugira jejum, compensação nem cortes radicais; se faltam registros, diga isso. ' +
+      'Responda com JSON: {"resumo":"texto","ajuste":"texto"}';
   }
   function fechaSemana(seg) {
     if (fechBusy) return;
@@ -3695,9 +3709,10 @@ window.MOVES = (function () {
       if (!sample) throw new Error('indisponivel');
       return sample.json(fechPrompt(r), { modelTier: 'default', cache: false });
     }).then(function (x) {
+      var L = fechLocal(r);
       Store.set('fechamentos', seg, {
-        seg: seg, nivel: ['bom', 'ok', 'atencao'].indexOf(x.nivel) > -1 ? x.nivel : 'ok',
-        resumo: String(x.resumo || ''), pontos: Array.isArray(x.pontos) ? x.pontos.slice(0, 3).map(String) : [], ajuste: String(x.ajuste || ''),
+        seg: seg, nivel: L.nivel,
+        resumo: String(x.resumo || ''), pontos: L.pontos, ajuste: String(x.ajuste || ''),
         comeu: Math.round(r.comeu), saldo: Math.round(r.saldo), nReg: r.nReg, criado: new Date().toISOString()
       });
     }).catch(function (e) {
@@ -5123,33 +5138,27 @@ window.MOVES = (function () {
   function sinalCm(x) { x = Math.round(x * 10) / 10; return (x > 0 ? '+' : x < 0 ? '−' : '') + fmtN(Math.abs(x), 1) + ' cm'; }
   /* Análise da semana: quando chega a pesagem, a IA junta tudo e sugere um ajuste */
   var semBusy = false, semMsg = '', semTentou = {};
+  function semLocal(dPes) {
+    var b = balDados(), aj = balAjuste(b, balSemanas(b)).kcal, t = compTendencia(), pm = protMeta(dPes);
+    var n = 0, k = 0, pr = 0, tr = 0, sal = 0;
+    for (var i = 6; i >= 0; i--) { var d = addDias(dPes, -i), x = diaInfo(d, b, aj); if (x.n) { n++; k += x.k; pr += x.p; sal += x.saldo; } tr += atividadesDe(d).length; }
+    var pontos = [];
+    if (t.nivel) pontos.push('Tendência das pesagens: gordura ' + sinalKg(t.dg) + ', massa magra ' + sinalKg(t.dm) + ', peso ' + sinalKg(t.dp) + '.');
+    else pontos.push('Ainda há ' + (t.n || 0) + ' pesagens; a tendência da composição precisa de pelo menos 4.');
+    pontos.push(n ? 'Nos 7 dias: ' + n + ' com refeições, média de ' + nInt(k / n) + ' kcal e ' + nInt(pr / n) + ' g de proteína por dia (meta ' + pm.min + ' a ' + pm.max + ').' : 'Nenhuma refeição registrada nos 7 dias antes da pesagem.');
+    var ms = Object.keys(Store.all('medidas')).sort().filter(function (x) { return x <= dPes; });
+    var m1 = ms.length ? Store.get('medidas', ms[ms.length - 1]) : null, m0 = ms.length > 1 ? Store.get('medidas', ms[ms.length - 2]) : null;
+    pontos.push((m1 && m0 && m1.cintura && m0.cintura ? 'Cintura ' + cm1(m1.cintura) + ' (' + sinalCm(m1.cintura - m0.cintura) + ' desde ' + br(ms[ms.length - 2]) + '). ' : '') + tr + (tr === 1 ? ' atividade' : ' atividades') + ' na semana' + (n ? ', saldo estimado de ' + (sal > 0 ? '+' : '') + nInt(sal) + ' kcal.' : '.'));
+    var nivel = t.nivel || (n >= 4 && sal < 0 && pr / n >= pm.min * 0.9 ? 'bom' : 'ok');
+    return { nivel: nivel, pontos: pontos, tmsg: t.msg || '' };
+  }
   function semPrompt(dPes) {
-    var b = balDados(), aj = balAjuste(b, balSemanas(b)).kcal;
-    var pts = compPontos().filter(function (p) { return p.d <= dPes; }).slice(-6);
-    var comp = Store.all('composicao') || {};
-    var pes = pts.map(function (p) {
-      var c = comp[p.d] || {};
-      return '- ' + br(p.d) + ': ' + kg1(p.p) + ' kg, gordura ' + kg1(c.gordura_pct) + '% (' + kg1(p.g) + ' kg), massa magra ' + kg1(p.m) + ' kg' + (c.agua_kg ? ', água ' + kg1(c.agua_kg) + ' kg' : '');
-    }).join('\n');
-    var t = compTendencia();
-    var med = Object.keys(Store.all('medidas')).sort().filter(function (k) { return k <= dPes; }).slice(-3).map(function (k) {
-      var m = Store.get('medidas', k); return '- ' + br(k) + ': ' + MED.filter(function (x) { return m[x[0]]; }).map(function (x) { return x[0] + ' ' + m[x[0]] + ' cm'; }).join(', ');
-    }).join('\n');
-    var dias = [];
-    for (var i = 6; i >= 0; i--) {
-      var d = addDias(dPes, -i), x = diaInfo(d, b, aj), sd = Store.get('saude_dia', d) || {};
-      var at = atividadesDe(d).map(function (a) { return a.t + (a.p ? ' (' + a.p.replace(/^ · /, '') + ')' : ''); }).join('; ');
-      dias.push('- ' + SEMANA[weekday(d)] + ' ' + br(d) + ': ' + (x.n ? nInt(x.k) + ' kcal comidas, ' + nInt(x.p) + ' g proteína' : 'sem refeições registradas') +
-        ', gasto estimado ' + nInt(x.gasto) + ' kcal' + (sd.passos ? ', ' + nInt(sd.passos) + ' passos' : '') + (at ? ', atividades: ' + at : ', sem treino'));
-    }
-    return 'Analise a semana de um homem de ' + BAL.altura + ' cm que quer emagrecer preservando músculo, com musculação, cardio e pilates. ' +
-      'Metas: ' + PESO_META + ' kg; 2.000 kcal nos dias úteis e 2.800 no fim de semana; ' + protTxt(dPes) + ' g de proteína por dia (2,3 a 2,6 g por kg de massa magra). ' +
-      'Dados da balança de bioimpedância (oscila até 1 kg com água; julgue pela tendência, não por uma pesagem):\n' + pes + '\n' +
-      (t.nivel ? 'Tendência (média das 3 últimas pesagens contra as anteriores): gordura ' + kg1(t.dg) + ' kg, massa magra ' + kg1(t.dm) + ' kg, peso ' + kg1(t.dp) + ' kg.\n' : 'Ainda há menos de 4 pesagens; não tire conclusões firmes sobre a composição.\n') +
-      (med ? 'Medidas com fita:\n' + med + '\n' : '') +
-      'Os 7 dias até a pesagem de ' + br(dPes) + ':\n' + dias.join('\n') + '\n' +
-      'Regras: seja direto e específico com os números acima; não invente dados que não estão aqui; não sugira jejum nem cortes radicais; se faltam registros, diga isso em vez de supor. ' +
-      'Responda somente com um objeto JSON: {"nivel":"bom|ok|atencao","resumo":"até 2 frases","pontos":["até 3 observações curtas"],"ajuste":"uma ação principal para a próxima semana"}.';
+    var L = semLocal(dPes);
+    return 'Analise a semana de um homem de ' + BAL.altura + ' cm que quer emagrecer preservando músculo (meta ' + PESO_META + ' kg). ' +
+      'Números já calculados pelo app para a pesagem de ' + br(dPes) + ': ' + L.pontos.join(' ') + (L.tmsg ? ' Leitura do app: ' + L.tmsg : '') + ' ' +
+      'Bioimpedância oscila até 1 kg com água; julgue pela tendência. ' +
+      'Escreva só: um resumo de até 2 frases curtas que interprete esses números e uma ação principal para a próxima semana. Não invente dados, não sugira jejum nem cortes radicais; se faltam registros, diga isso. ' +
+      'Responda com JSON: {"resumo":"texto","ajuste":"texto"}';
   }
   function analisaSemana(dPes, auto) {
     if (semBusy) return;
@@ -5164,8 +5173,8 @@ window.MOVES = (function () {
       return sample.json(semPrompt(dPes), { modelTier: 'default', cache: false });
     }).then(function (r) {
       Store.set('semanas', dPes, {
-        data: dPes, nivel: ['bom', 'ok', 'atencao'].indexOf(r.nivel) > -1 ? r.nivel : 'ok',
-        resumo: String(r.resumo || ''), pontos: Array.isArray(r.pontos) ? r.pontos.slice(0, 3).map(String) : [],
+        data: dPes, nivel: semLocal(dPes).nivel,
+        resumo: String(r.resumo || ''), pontos: semLocal(dPes).pontos,
         ajuste: String(r.ajuste || ''), criado: new Date().toISOString()
       });
     }).catch(function (e) {

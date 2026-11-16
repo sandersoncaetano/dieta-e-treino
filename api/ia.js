@@ -24,8 +24,8 @@ const POR_TIPO = {
   receita: { leve: false, max: 2500 },
   dia: { leve: true, max: 900 },
   atividade: { leve: false, max: 1000 },
-  semana: { leve: true, max: 1800 },
-  fechamento: { leve: true, max: 2200 },
+  semana: { leve: true, max: 500 },
+  fechamento: { leve: true, max: 500 },
   treinador: { leve: false, max: 2500 },
   outro: { leve: false, max: 2000 }
 };
