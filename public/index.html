@@ -619,7 +619,8 @@ footer .col { display: grid; gap: 10px; }
       <p class="tip">Para ditar, toque no campo e use o microfone do teclado.</p>
       <div id="food-rec"></div>
       <div class="photo-row">
-        <div class="pick-wrap"><button type="button" class="howbtn" tabindex="-1">Adicionar foto</button><input type="file" accept="image/*" id="food-file" class="file" aria-label="Escolher foto da refeição"></div>
+        <div class="pick-wrap"><button type="button" class="howbtn" tabindex="-1">Tirar foto</button><input type="file" accept="image/*" capture="environment" id="food-cam" class="file" aria-label="Tirar foto da refeição com a câmera"></div>
+        <div class="pick-wrap"><button type="button" class="howbtn" tabindex="-1">Da galeria</button><input type="file" accept="image/*" id="food-file" class="file" aria-label="Escolher foto da refeição na galeria"></div>
         <button type="button" class="howbtn" id="food-bar">Código de barras</button>
         <span class="tip" id="food-name"></span>
       </div>
@@ -5936,8 +5937,10 @@ window.MOVES = (function () {
     relEl.addEventListener('blur', function () { setTimeout(function () { if (document.activeElement !== relEl) sugEl.hidden = true; }, 200); });
     var file = $('food-file'), name = $('food-name'), prev = $('food-prev');
     var foodUrl = '', foodLendo = false, foodErro = '', foodVez = 0;
-    file.addEventListener('change', function () {
-      var f = file.files && file.files[0];
+    var cam = $('food-cam');
+    cam.addEventListener('change', function () { var f = cam.files && cam.files[0]; cam.value = ''; aoEscolher(f); });
+    file.addEventListener('change', function () { aoEscolher(file.files && file.files[0]); });
+    function aoEscolher(f) {
       foodFile = null; foodErro = ''; prev.hidden = true;
       if (foodUrl) { URL.revokeObjectURL(foodUrl); foodUrl = ''; }
       if (!f) { name.textContent = ''; return; }
@@ -5959,7 +5962,7 @@ window.MOVES = (function () {
         foodLendo = false; foodErro = 'leitura: ' + (e && (e.message || e.name) || 'erro') + ', ' + info;
         name.textContent = 'Não consegui ler esta foto (' + info + '). Escolha outra.';
       });
-    });
+    }
     /* Prévia antes de calcular: o que já é conhecido, o que vai para a IA e o que está sem quantidade */
     var preExclui = {}, preT = null, semQtdOk = false;
     function semQtd(cal) {
