@@ -5549,11 +5549,11 @@ window.MOVES = (function () {
     halteres: { curto: 'Halteres', nome: 'Kit de halteres ajustável 20 a 30 kg com barra conectora', preco: 'R$ 220 a 330',
       porque: 'Dá carga para stiff, búlgaro, afundo, subida no banco e fazendeiro. Com a barra conectora vira uma barra curta.',
       checar: ['Peso total e quanto fica por mão (20 kg ≈ 10 kg por mão)', 'Anilhas de ferro ou revestidas, com furo padrão', 'Presilha de rosca firme (evite kettlebell swing com ele)'],
-      busca: 'https://www.magazineluiza.com.br/busca/kit+halteres+anilhas+barra+conectora/' },
+      busca: 'kit halteres anilhas barra conectora' },
     elasticos: { curto: 'Elásticos', nome: 'Kit de elásticos extensores com alças e âncora de porta', preco: 'R$ 25 a 60',
       porque: 'Faz o papel da polia em casa: Pallof press, face pull e rotação externa.',
       checar: ['Vários níveis de resistência', 'Âncora de porta incluída', 'Mosquetões de metal'],
-      busca: 'https://www.magazineluiza.com.br/busca/kit+elastico+extensor+ancora+porta/' },
+      busca: 'kit elastico extensor ancora porta' },
     banco: { curto: 'Banco ou sofá', nome: 'Banco ou sofá firme (já tem em casa)', preco: 'Sem compra',
       porque: 'Apoio do pé no búlgaro e degrau da subida. Precisa ser estável e ter mais ou menos a altura do joelho.', checar: [] }
   };
@@ -5613,7 +5613,9 @@ window.MOVES = (function () {
         h('p', { text: p.porque }),
         ul ? h('p', { class: 'pl-meta', text: 'Na hora de comprar, confira:' }) : null, ul,
         h('p', { class: 'pl-meta', text: 'Usado em ' + usa.length + ' exercícios:' }), chips,
-        p.busca ? h('div', { class: 'pl-links' }, h('a', { class: 'yt', target: '_blank', rel: 'noopener', text: 'Procurar no Magalu', href: p.busca })) : null));
+        p.busca ? h('div', { class: 'pl-links' }, h('a', { class: 'yt', target: '_blank', rel: 'noopener', text: 'Mercado Livre', href: 'https://lista.mercadolivre.com.br/' + encodeURIComponent(p.busca.replace(/ /g, '-')) }),
+          h('a', { class: 'yt', target: '_blank', rel: 'noopener', text: 'Shopee', href: 'https://shopee.com.br/search?keyword=' + encodeURIComponent(p.busca) }),
+          h('a', { class: 'yt', target: '_blank', rel: 'noopener', text: 'Amazon', href: 'https://www.amazon.com.br/s?k=' + encodeURIComponent(p.busca) })) : null));
     });
   }
 
