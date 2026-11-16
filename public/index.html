@@ -4,6 +4,24 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#1a5fd0">
+<script>
+/* Tema escolhido (claro, escuro ou automático pelo aparelho), aplicado antes de desenhar a página. */
+(function () {
+  function aplica(t) {
+    var r = document.documentElement;
+    if (t === 'claro') r.setAttribute('data-theme', 'light'); else if (t === 'escuro') r.setAttribute('data-theme', 'dark'); else r.removeAttribute('data-theme');
+    var esc = t === 'escuro' || (t !== 'claro' && window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches);
+    var m = document.querySelector('meta[name="theme-color"]'); if (m) m.setAttribute('content', esc ? '#0f1726' : '#1a5fd0');
+  }
+  var t = 'auto'; try { t = localStorage.getItem('dt-tema') || 'auto'; } catch (e) {}
+  aplica(t);
+  window.dtTema = {
+    atual: function () { try { return localStorage.getItem('dt-tema') || 'auto'; } catch (e) { return 'auto'; } },
+    muda: function (v) { try { localStorage.setItem('dt-tema', v); } catch (e) {} aplica(v); window.dispatchEvent(new Event('dt-tema')); }
+  };
+  if (window.matchMedia) try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function () { aplica(window.dtTema.atual()); window.dispatchEvent(new Event('dt-tema')); }); } catch (e) {}
+})();
+</script>
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" href="/icons/icon-192.png">
 <link rel="apple-touch-icon" href="/icons/icon-192.png">
@@ -23,6 +41,25 @@
   --display: "Bricolage Grotesque", "Trebuchet MS", system-ui, sans-serif;
   --body: "Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
   color-scheme: light;
+}
+/* Tema escuro: escolhido no menu Conta, ou automático quando o aparelho está no escuro */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0f1726; --surface: #16213a; --mat: #1f2d48; --line: #2e4062;
+  --fg: #e8eef9; --muted: #a6b5cd;
+  --fig: #a9c6f5; --far: #6684b3; --hi: #ff7d3f; --hi-far: #b85a2c;
+  --accent: #5c9bff; --on-accent: #0b1424;
+  --stop: #ff6b5f; --stop-bg: #3b1f22;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #0f1726; --surface: #16213a; --mat: #1f2d48; --line: #2e4062;
+    --fg: #e8eef9; --muted: #a6b5cd;
+    --fig: #a9c6f5; --far: #6684b3; --hi: #ff7d3f; --hi-far: #b85a2c;
+    --accent: #5c9bff; --on-accent: #0b1424;
+    --stop: #ff6b5f; --stop-bg: #3b1f22;
+  }
 }
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
@@ -49,6 +86,10 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 .conta-menu summary::-webkit-details-marker { display: none; }
 .conta-menu summary svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; }
 .conta-menu[open] summary { border-color: var(--accent); background: var(--mat); }
+.pl-tema { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; padding: 6px 4px 2px; border-top: 1px solid var(--line); }
+.pl-tema span { grid-column: 1 / -1; font-size: .85rem; color: var(--muted); font-weight: 700; }
+.conta-menu .conta-pop .pl-tema button { min-height: 40px; padding: 4px; font-size: .85rem; border-radius: 8px; border: 2px solid var(--line); background: var(--bg); color: var(--fg); font-weight: 700; }
+.conta-menu .conta-pop .pl-tema button[aria-pressed="true"] { border-color: var(--accent); background: var(--accent); color: var(--on-accent); }
 .conta-menu .conta-pop { position: absolute; right: 0; top: calc(100% + 6px); z-index: 50; display: grid; gap: 6px; min-width: 230px; background: var(--bg); border: 2px solid var(--line); border-radius: 12px; padding: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.15); }
 .conta-menu .conta-pop button { font: inherit; font-weight: 700; text-align: left; padding: 10px 12px; border-radius: 10px; border: 0; background: var(--surface); color: var(--fg); }
 .rec-top[aria-current="page"] { border-color: var(--accent); background: var(--mat); }
@@ -75,11 +116,11 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 main { padding-block: 20px 72px; }
 .view { display: grid; gap: 22px; }
 .nav { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg); border-block: 1px solid var(--line); }
-.nav .col { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
+.nav .col { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); }
 .nav button { display: grid; justify-items: center; align-content: center; gap: 2px; height: 58px; min-width: 0; padding: 0; background: none; border: 0; border-bottom: 3px solid transparent; font-weight: 700; color: var(--muted); }
-.nav svg { width: 25px; height: 25px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
-.nav span { font-size: .6rem; line-height: 1; white-space: nowrap; letter-spacing: -.01em; }
-@media (max-width: 380px) { .nav span { font-size: .54rem; } .nav svg { width: 23px; height: 23px; } }
+.nav svg { width: 27px; height: 27px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+.nav span { font-size: .8rem; line-height: 1; white-space: nowrap; }
+@media (max-width: 360px) { .nav span { font-size: .72rem; } }
 .nav button[aria-current="page"] { color: var(--fg); border-bottom-color: var(--accent); }
 .notice { background: var(--stop-bg); border-radius: 10px; padding: 10px 14px; font-size: .95rem; }
 .lede { color: var(--muted); }
@@ -189,6 +230,7 @@ input[type="date"] { height: 46px; }
 .big-saldo.sup { color: var(--stop); }
 .chart { width: 100%; height: auto; display: block; }
 .seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; padding: 4px; margin: 4px 0 14px; background: var(--mat); border-radius: 12px; }
+.seg-treino { margin: 12px 0 0; }
 .seg button { min-height: 44px; border: 0; border-radius: 9px; background: transparent; font-weight: 700; color: var(--muted); }
 .seg button[aria-selected="true"] { background: var(--bg); color: var(--accent); box-shadow: 0 1px 3px rgba(20,35,56,.15); }
 .g-dica { margin: 0 0 10px; }
@@ -219,9 +261,9 @@ input[type="date"] { height: 46px; }
 .stats.d-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 12px; margin-top: 10px; }
 .stats.d-stats .stat b { font-size: 1.45rem; white-space: nowrap; }
 .d-pr { font-weight: 700; margin-top: 10px; }
-.corpo-wrap { display: grid; justify-items: center; margin: 4px 0 8px; }
+.corpo-wrap { display: grid; justify-items: center; margin: 4px 0 8px; background: #101b2e; border-radius: 16px; padding: 14px 8px 6px; }
 svg.corpo { width: 100%; max-width: 420px; height: auto; }
-svg.corpo text { font-size: 9px; fill: var(--muted); font-weight: 700; }
+svg.corpo text { font-size: 9px; font-weight: 700; }
 svg.corpo .musc { cursor: pointer; transition: fill .15s; -webkit-tap-highlight-color: transparent; }
 svg.corpo .musc:hover { filter: brightness(.95); }
 .corpo-info { margin-top: 6px; }
@@ -407,15 +449,16 @@ footer .col { display: grid; gap: 10px; }
 </div></header>
 
 <nav class="nav gut" aria-label="Seções"><div class="col">
-  <button type="button" id="t-academia" aria-label="Academia"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9v6M6.5 6v12M17.5 6v12M21 9v6M6.5 12h11"/></svg><span>Academia</span></button>
-  <button type="button" id="t-cardio" aria-label="Cardio"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.5S3.5 15.5 3.5 9.2A4.7 4.7 0 0 1 12 6.5a4.7 4.7 0 0 1 8.5 2.7c0 6.3-8.5 11.3-8.5 11.3z"/><path d="M6.5 12.5h3l1.5-3 2 5 1.5-2h3"/></svg><span>Cardio</span></button>
+  <button type="button" id="t-treino" aria-label="Treino"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9v6M6.5 6v12M17.5 6v12M21 9v6M6.5 12h11"/></svg><span>Treino</span></button>
   <button type="button" id="t-refeicoes" aria-label="Refeições"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="5"/><path d="M2.5 3v5.5a1.7 1.7 0 0 0 3.4 0V3M4.2 3v18"/><path d="M21 21V3c-1.8 1.2-2.7 4.5-2.7 8.5H21"/></svg><span>Refeições</span></button>
-  <button type="button" id="t-lombar" aria-label="Pilates"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6.5" cy="5.5" r="2.3"/><path d="M3 20.5h18M10.5 17 6.5 10l6.5-2.5M10.5 17l8-7"/></svg><span>Pilates</span></button>
   <button type="button" id="t-peso" aria-label="Peso e medidas"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="11" r="7.5"/><circle cx="9" cy="11" r="2.2"/><path d="M9 18.5h13.5v-4.5h-7"/><path d="M13.5 18.5v-2M17 18.5v-2.6M20.5 18.5v-2"/></svg><span>Medidas</span></button>
   <button type="button" id="t-historico" aria-label="Histórico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 3h9a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1h-9"/><path d="M15 8h2.5M15 12h2.5M15 16h2.5"/><circle cx="8.5" cy="12" r="5.5"/><path d="M8.5 9v3l2 1.2"/></svg><span>Histórico</span></button>
   <button type="button" id="t-desempenho" aria-label="Evolução"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 20.5h18"/><path d="M5 17l4.5-5 3.5 3 6-7"/><path d="M15.5 8H19v3.5"/></svg><span>Evolução</span></button>
 </div></nav>
 
+<div class="gut" id="treino-seg-box" hidden><div class="col"><div class="seg seg-treino" role="tablist" aria-label="Tipo de treino">
+  <button type="button" role="tab" id="ts-academia">Academia</button><button type="button" role="tab" id="ts-cardio">Cardio</button><button type="button" role="tab" id="ts-lombar">Pilates</button>
+</div></div></div>
 <div class="week gut" id="week"><div class="col" id="week-box"></div></div>
 
 <main class="gut"><div class="col">
@@ -3706,59 +3749,75 @@ window.MOVES = (function () {
   }
   function espelho(pts) { return pts.map(function (p) { return [100 - p[0], p[1]]; }); }
   var CORPO_LADO = [[46, 25], [44, 31], [36, 33], [29, 36], [25.5, 41], [24, 50], [22.5, 62], [19.5, 76], [17, 90], [15, 98], [16, 104], [19.5, 103], [21.5, 95], [25.5, 79], [28.5, 65], [30.5, 55], [32, 64], [34.5, 80], [33.5, 92], [31.5, 104], [31, 128], [33.5, 150], [33, 162], [33.5, 186], [36, 205], [34.5, 212], [44.5, 214], [44, 205], [46.5, 180], [47, 158], [48, 130], [50, 113]];
-  var MUSC_FRENTE = {
-    ombros: [[[33.5, 34.5], [28, 37.5], [25.5, 44], [27, 50], [31, 47], [35.5, 39]]],
-    peito: [[[37.5, 37.5], [49.2, 37.5], [49.2, 50], [43.5, 53], [37, 50.5], [34, 44]]],
-    biceps: [[[27.5, 49.5], [31, 49], [31.5, 57], [29.5, 64], [26.5, 62], [25.5, 55]]],
-    antebraco: [[[24.5, 66], [28.5, 66], [26.5, 79], [22.5, 92], [19.5, 91.5], [20.5, 80]]],
-    obliquos: [[[36, 53], [42.5, 56], [43.2, 77], [40, 88], [35.5, 80], [35, 64]]],
-    quadriceps: [[[33, 104], [40, 99.5], [47.5, 112], [47, 139], [43.5, 152], [37.5, 153], [33.5, 141], [32.2, 120]]],
-    adutores: [[[44.5, 108], [49.5, 113.5], [48.3, 128], [46, 125]]],
-    panturrilhas: [[[34.5, 162], [38.5, 160], [38, 182], [35.5, 190], [33.8, 178]]]
-  };
-  var MUSC_COSTAS = {
-    trapezio: [[[50, 26], [56, 30], [64, 34.5], [57, 41], [52.5, 57], [50, 62], [47.5, 57], [43, 41], [36, 34.5], [44, 30]]],
-    ombros: [[[33.5, 34.5], [28, 37.5], [25.5, 44], [27, 50], [31, 47], [35.5, 39]]],
-    triceps: [[[26.5, 45], [30.5, 46.5], [31.5, 57], [29.5, 64], [26.3, 62], [24.8, 53]]],
-    antebraco: [[[24.5, 66], [28.5, 66], [26.5, 79], [22.5, 92], [19.5, 91.5], [20.5, 80]]],
-    dorsais: [[[35, 43], [44, 45.5], [48.5, 61], [47, 75], [40.5, 80], [34.5, 68], [31.5, 55]]],
-    lombar: [[[45, 74], [55, 74], [56.5, 89], [50, 94], [43.5, 89]]],
-    gluteos: [[[34, 96], [47.5, 94], [49.6, 101], [49, 116], [40.5, 120], [33.5, 112], [32.3, 102]]],
-    posteriores: [[[34, 122.5], [42, 121], [47.2, 126], [46.3, 149], [41.5, 156], [36.5, 154], [33.3, 138]]],
-    panturrilhas: [[[34, 160], [41, 157.5], [45.5, 163], [44.5, 180], [40.5, 192], [36.3, 190], [33.3, 176]]]
-  };
-  var CENTRO = { trapezio: 1, lombar: 1 };
+  // Músculos (lado esquerdo do desenho; o direito é espelhado). Várias formas por grupo dão o aspecto anatômico.
+  // Grupo null: só desenho, sem dados.
+  var MUSC_FRENTE = [
+    ['ombros', [[33.5, 34.5], [28, 37.5], [25.3, 44], [26.5, 50.5], [30.5, 48], [34.5, 41]]],
+    ['peito', [[37.5, 37], [49.3, 37], [49.3, 42.5], [42, 43.5], [35, 41.5]]],
+    ['peito', [[35.5, 42.5], [42, 44], [49.3, 43.5], [49.3, 50], [43.5, 53], [37.5, 51], [34.5, 46.5]]],
+    ['obliquos', [[35.2, 52], [38.5, 53.5], [38.8, 56.5], [35.5, 56]]],
+    ['obliquos', [[35.3, 57.5], [38.8, 59], [39, 62], [35.8, 61.5]]],
+    ['obliquos', [[38, 63.5], [42.6, 60], [43.3, 77], [40.2, 88], [36, 80.5], [35.8, 70]]],
+    ['biceps', [[27.3, 50], [31, 49.5], [31.8, 57], [29.8, 64], [26.8, 62.5], [25.6, 55.5]]],
+    ['antebraco', [[25, 65.5], [28.8, 65.5], [27.6, 72], [24.5, 80], [22, 79]]],
+    ['antebraco', [[22.5, 81], [25, 80], [23.5, 90], [20.5, 92], [19.8, 88]]],
+    ['quadriceps', [[33, 104], [37.5, 102], [38.5, 118], [37.5, 138], [35, 148], [32.6, 132], [32, 116]]],
+    ['quadriceps', [[38.5, 101], [43.5, 103], [44.5, 120], [42.5, 140], [39.5, 141], [38.2, 120]]],
+    ['quadriceps', [[43.5, 128], [46.8, 133], [46.5, 146], [43.5, 152], [40.5, 149], [41.5, 139]]],
+    ['adutores', [[44, 106], [49.6, 113], [48.5, 128], [45.6, 124], [44.5, 114]]],
+    [null, [[34.3, 160], [38, 159], [38.5, 175], [36.5, 192], [34.5, 184]]],
+    ['panturrilhas', [[44, 162], [46.6, 166], [46, 182], [44, 186], [43, 172]]]
+  ];
+  var MUSC_COSTAS = [
+    ['trapezio', [[50, 26], [56, 30], [64, 34.5], [57, 41], [52.5, 57], [50, 62], [47.5, 57], [43, 41], [36, 34.5], [44, 30]], true],
+    ['ombros', [[33.5, 34.5], [28, 37.5], [25.3, 44], [26.5, 50.5], [30.5, 48], [34.5, 41]]],
+    ['ombros', [[36, 40.5], [43, 42], [44.5, 48], [39, 50], [34.5, 46]]],
+    ['dorsais', [[33.8, 50.5], [44, 52], [48.4, 62], [47, 75], [40.5, 80], [34.5, 69], [31.8, 58]]],
+    ['triceps', [[26.6, 45], [29.4, 46], [29.6, 58], [27.6, 63], [25.4, 58], [24.8, 51]]],
+    ['triceps', [[29.8, 47], [32, 49], [31.6, 57], [29.9, 58.5]]],
+    ['antebraco', [[24.5, 66], [28.5, 66], [26.5, 79], [22.5, 92], [19.5, 91.5], [20.5, 80]]],
+    ['lombar', [[45, 72], [49.3, 72], [49.3, 92], [45.8, 90], [44.3, 80]]],
+    ['gluteos', [[33, 92], [42, 90], [45, 95], [37, 98], [32.4, 98]]],
+    ['gluteos', [[34, 98.5], [47.6, 96], [49.6, 102], [49, 116], [40.5, 120], [33.5, 112], [32.5, 103]]],
+    ['posteriores', [[33.5, 122], [39.5, 121], [40.5, 140], [38.5, 154], [35, 150], [33, 136]]],
+    ['posteriores', [[40.5, 121.5], [46.6, 124], [46.4, 146], [42.5, 156], [40.2, 151], [41.4, 138]]],
+    ['panturrilhas', [[33.8, 160], [38.8, 157.5], [39.6, 170], [38, 184], [34.6, 180], [33.2, 170]]],
+    ['panturrilhas', [[39.6, 158], [45.2, 161], [45.4, 175], [42.5, 188], [39.8, 184], [40.2, 170]]]
+  ];
+  var CORPO_COR = { fundo: '#101b2e', pele: '#1c2a43', borda: '#3a5279', base: '#2a3c5c', texto: '#9fb3d1', sel: '#ffffff' };
   function corpoSVG(dados, alvo) {
     var semanal = function (g) { return dados.m[g] / dados.semanas; };
-    var hc = cor('hi');
-    function tinta(g) { var v = semanal(g); if (v <= 0) return 'var(--mat)'; return alfa(hc, Math.min(1, 0.28 + 0.72 * v / (dados.escala || 12))); }
+    var C = CORPO_COR;
     var svg = sv('svg', { viewBox: '0 0 236 238', class: 'corpo', role: 'img', 'aria-label': 'Mapa muscular: frente e costas. Toque num músculo para ver os exercícios.' });
-    function figura(ox, musc, frente) {
+    var defs = sv('defs', {}, svg), gr = sv('radialGradient', { id: 'calor', cx: '50%', cy: '45%', r: '65%' }, defs);
+    sv('stop', { offset: '0%', 'stop-color': '#ffc08f' }, gr); sv('stop', { offset: '55%', 'stop-color': '#ff7a2f' }, gr); sv('stop', { offset: '100%', 'stop-color': '#d9480f' }, gr);
+    function pinta(el, g) {
+      var v = g ? semanal(g) : 0, t = Math.min(1, v / (dados.escala || 12));
+      el.setAttribute('fill', v > 0 ? 'url(#calor)' : C.base);
+      if (v > 0) el.setAttribute('fill-opacity', String(Math.round((0.35 + 0.65 * t) * 100) / 100));
+      el.setAttribute('stroke', g && alvo === g ? C.sel : C.borda);
+      el.setAttribute('stroke-width', g && alvo === g ? 1.4 : 0.5);
+      if (g) {
+        el.setAttribute('class', 'musc'); el.setAttribute('data-g', g);
+        sv('title', { text: MUSC[g] + ': ' + fmtN0(v, 1) + ' séries' + (dados.semanas === 1 ? '' : ' por semana') }, el);
+      }
+      return el;
+    }
+    function figura(ox, lista, frente) {
       var g = sv('g', { transform: 'translate(' + ox + ',4)' }, svg);
-      var lado = CORPO_LADO, contorno = lado.concat(espelho(lado).reverse().slice(1, -1));
-      sv('path', { d: suave(contorno), fill: 'var(--surface)', stroke: 'var(--line)', 'stroke-width': 1.3, 'stroke-linejoin': 'round' }, g);
-      sv('ellipse', { cx: 50, cy: 14, rx: 8.5, ry: 10.5, fill: 'var(--surface)', stroke: 'var(--line)', 'stroke-width': 1.3 }, g);
-      Object.keys(musc).forEach(function (grupo) {
-        musc[grupo].forEach(function (pts) {
-          var formas = CENTRO[grupo] ? [pts] : [pts, espelho(pts)];
-          formas.forEach(function (q) {
-            var el = sv('path', { d: suave(q), fill: tinta(grupo), stroke: alvo === grupo ? cor('fg') : 'var(--line)', 'stroke-width': alvo === grupo ? 1.6 : 0.6, class: 'musc', 'data-g': grupo, tabindex: '-1' }, g);
-            sv('title', { text: MUSC[grupo] + ': ' + fmtN0(semanal(grupo), 1) + ' séries' + (dados.semanas === 1 ? '' : ' por semana') }, el);
-          });
-        });
+      var contorno = CORPO_LADO.concat(espelho(CORPO_LADO).reverse().slice(1, -1));
+      sv('path', { d: suave(contorno), fill: C.pele, stroke: C.borda, 'stroke-width': 1.1, 'stroke-linejoin': 'round' }, g);
+      sv('ellipse', { cx: 50, cy: 14, rx: 8.5, ry: 10.5, fill: C.pele, stroke: C.borda, 'stroke-width': 1.1 }, g);
+      lista.forEach(function (m) {
+        (m[2] ? [m[1]] : [m[1], espelho(m[1])]).forEach(function (q) { pinta(sv('path', { d: suave(q) }, g), m[0]); });
       });
       if (frente) {
-        // Abdômen em blocos ("tanquinho") e linha alba
         [[44.2, 54.5], [44.2, 62.5], [44.4, 70.5]].forEach(function (p, i) {
-          [p[0], 100 - p[0] - 5.4].forEach(function (x) {
-            var el = sv('rect', { x: x, y: p[1], width: 5.4, height: i === 2 ? 8.5 : 7.2, rx: 2, fill: tinta('abdomen'), stroke: alvo === 'abdomen' ? cor('fg') : 'var(--line)', 'stroke-width': alvo === 'abdomen' ? 1.4 : 0.6, class: 'musc', 'data-g': 'abdomen' }, g);
-            sv('title', { text: MUSC.abdomen + ': ' + fmtN0(semanal('abdomen'), 1) + ' séries' }, el);
-          });
+          [p[0], 100 - p[0] - 5.4].forEach(function (x) { pinta(sv('rect', { x: x, y: p[1], width: 5.4, height: i === 2 ? 8.5 : 7.2, rx: 2 }, g), 'abdomen'); });
         });
-        var ab = sv('path', { d: suave([[44.6, 80.5], [55.4, 80.5], [54, 90], [50, 95], [46, 90]]), fill: tinta('abdomen'), stroke: alvo === 'abdomen' ? cor('fg') : 'var(--line)', 'stroke-width': alvo === 'abdomen' ? 1.4 : 0.6, class: 'musc', 'data-g': 'abdomen' }, g);
-        sv('title', { text: MUSC.abdomen }, ab);
+        pinta(sv('path', { d: suave([[44.6, 80.5], [55.4, 80.5], [54, 90], [50, 95], [46, 90]]) }, g), 'abdomen');
       }
-      sv('text', { x: 50, y: 230, 'text-anchor': 'middle', text: frente ? 'Frente' : 'Costas' }, g);
+      sv('text', { x: 50, y: 230, 'text-anchor': 'middle', fill: C.texto, text: frente ? 'Frente' : 'Costas' }, g);
     }
     figura(8, MUSC_FRENTE, true);
     figura(128, MUSC_COSTAS, false);
@@ -3801,7 +3860,7 @@ window.MOVES = (function () {
     var dd = mapaDados(mapaPer), tot = Object.keys(dd.m).reduce(function (a, k) { return a + dd.m[k]; }, 0);
     if (!tot) { box.appendChild(h('p', { class: 'g-vazio', text: 'Sem séries de musculação ou pilates registradas no app nesse período.' })); return; }
     box.appendChild(mapaInterativo(dd, 'séries por semana'));
-    box.appendChild(legenda([['Mais séries', cor('hi')], ['Poucas', alfa(cor('hi'), 0.35)], ['Nenhuma', 'var(--mat)']]));
+    box.appendChild(legenda([['Mais séries', '#ff7a2f'], ['Poucas', 'rgba(255,122,47,.4)'], ['Nenhuma', '#2a3c5c']]));
     var porSem = function (g) { return dd.m[g] / dd.semanas; };
     // Ranking e equilíbrio
     var ord = Object.keys(MUSC).sort(function (a, b) { return porSem(b) - porSem(a); });
@@ -3882,6 +3941,25 @@ window.MOVES = (function () {
     var volta = h('button', { type: 'button', class: 'howbtn d-volta', text: '← Atividades' });
     volta.addEventListener('click', function () { fechaAtividade(false); });
     box.appendChild(volta);
+    // Musculação: o mapa do corpo vem primeiro, com os exercícios do app no mesmo dia
+    if (a.tipo === 'WeightTraining') {
+      var tr = treinosOk().filter(function (r) { return r.v.data === a.data; })[0];
+      var gw = h('section', { class: 'panel' }, h('h2', { text: 'Músculos trabalhados em ' + br(a.data) }));
+      if (tr) {
+        var it = tr.v.itens || {}, ul3 = h('ul');
+        Object.keys(it).forEach(function (k) { if (it[k].series > 0) ul3.appendChild(h('li', { text: (it[k].nome || k) + ': ' + it[k].series + ' séries' + (it[k].kg ? ' com ' + kg1(it[k].kg) + ' kg' : '') })); });
+        var dd = { m: {}, ex: {}, semanas: 1 };
+        Object.keys(MUSC).forEach(function (g) { dd.m[g] = 0; dd.ex[g] = {}; });
+        Object.keys(it).forEach(function (k) { var mp = EX_MUSC[k]; if (mp && it[k].series) Object.keys(mp).forEach(function (g) { dd.m[g] += it[k].series * mp[g]; dd.ex[g][it[k].nome || k] = (dd.ex[g][it[k].nome || k] || 0) + it[k].series; }); });
+        // Numa sessão, 6 séries já é muito para um grupo: escala própria.
+        dd.escala = 6;
+        gw.appendChild(mapaInterativo(dd, 'séries nesta sessão (contando parcialmente os músculos auxiliares)'));
+        gw.appendChild(h('h3', { text: 'Exercícios' }));
+        gw.appendChild(ul3);
+        gw.appendChild(h('p', { class: 'tip', text: 'Músculos trabalhados nesta sessão, pelas séries marcadas no app (o relógio costuma errar nisso).' }));
+      } else gw.appendChild(h('p', { class: 'g-vazio', text: 'Nenhum treino registrado no app em ' + br(a.data) + ', então não dá para mostrar os músculos trabalhados.' }));
+      box.appendChild(gw);
+    }
     var cab = h('section', { class: 'panel' });
     cab.appendChild(h('p', { class: 'g-sub', text: tipoPt(a.tipo) + ' · ' + dsem(a.data) + ', ' + br(a.data) + (a.ini ? ' às ' + a.ini.slice(11, 16) : '') + (det && det.dispositivo ? ' · ' + det.dispositivo : '') }));
     cab.appendChild(h('h2', { text: a.nome || tipoPt(a.tipo) }));
@@ -3992,6 +4070,9 @@ window.MOVES = (function () {
           } });
       }
       // Melhores marcas (corrida)
+      // Só distâncias métricas (o Strava também manda milhas), com nomes em português.
+      var NOME_MARCA = { '400m': '400 m', '1K': '1 km', '5K': '5 km', '10K': '10 km', '15K': '15 km', '20K': '20 km', '30K': '30 km', '50K': '50 km', 'Half-Marathon': 'Meia maratona', 'Marathon': 'Maratona' };
+      if (det.melhores) det.melhores = det.melhores.filter(function (mm) { return !/mile/i.test(mm.nome); }).map(function (mm) { return { nome: NOME_MARCA[mm.nome] || mm.nome, seg: mm.seg, pr: mm.pr }; });
       if (det.melhores && det.melhores.length) {
         var gm = h('section', { class: 'panel' }, h('h2', { text: 'Melhores marcas nesta corrida' }));
         var tbm = h('tbody'); det.melhores.forEach(function (mm) { tbm.appendChild(h('tr', {}, h('th', { scope: 'row', text: mm.nome }), h('td', { text: durTxt(mm.seg) }), h('td', { text: mm.pr ? (mm.pr === 1 ? '🏅 recorde' : mm.pr + 'º melhor') : '' }))); });
@@ -4014,24 +4095,6 @@ window.MOVES = (function () {
         } });
       var melhor = par.filter(function (x2) { return corrida ? vel(x2) > vel(a) : vel(x2) < vel(a); }).length;
       gp.appendChild(h('p', { class: 'tip', text: 'Esta foi ' + (melhor === 0 ? 'a mais rápida' : melhor === par.length ? 'a mais lenta' : 'mais rápida que ' + melhor + ' de ' + par.length) + ' entre ' + (par.length + 1) + ' atividades parecidas.' + (a.fc ? ' Compare também a FC: mesmo ritmo com FC menor é sinal de condicionamento.' : '') }));
-    }
-    // Musculação: exercícios do app no mesmo dia
-    if (a.tipo === 'WeightTraining') {
-      var tr = treinosOk().filter(function (r) { return r.v.data === a.data; })[0];
-      var gw = h('section', { class: 'panel' }, h('h2', { text: 'Treino registrado no app' }));
-      if (tr) {
-        var it = tr.v.itens || {}, ul3 = h('ul');
-        Object.keys(it).forEach(function (k) { if (it[k].series > 0) ul3.appendChild(h('li', { text: (it[k].nome || k) + ': ' + it[k].series + ' séries' + (it[k].kg ? ' com ' + kg1(it[k].kg) + ' kg' : '') })); });
-        gw.appendChild(ul3);
-        var dd = { m: {}, ex: {}, semanas: 1 };
-        Object.keys(MUSC).forEach(function (g) { dd.m[g] = 0; dd.ex[g] = {}; });
-        Object.keys(it).forEach(function (k) { var mp = EX_MUSC[k]; if (mp && it[k].series) Object.keys(mp).forEach(function (g) { dd.m[g] += it[k].series * mp[g]; dd.ex[g][it[k].nome || k] = (dd.ex[g][it[k].nome || k] || 0) + it[k].series; }); });
-        // Numa sessão, 6 séries já é muito para um grupo: escala própria.
-        dd.escala = 6;
-        gw.appendChild(mapaInterativo(dd, 'séries nesta sessão (contando parcialmente os músculos auxiliares)'));
-        gw.appendChild(h('p', { class: 'tip', text: 'Músculos trabalhados nesta sessão, pelas séries marcadas no app (o relógio costuma errar nisso).' }));
-      } else gw.appendChild(h('p', { class: 'g-vazio', text: 'Nenhum treino registrado no app em ' + br(a.data) + ', então não dá para mostrar os músculos trabalhados.' }));
-      box.appendChild(gw);
     }
   }
   function renderDesempenho() {
@@ -5354,18 +5417,28 @@ window.MOVES = (function () {
   function show() {
     var v = (location.hash || '').slice(1);
     if (VIEWS.indexOf(v) < 0) v = 'academia';
-    VIEWS.forEach(function (n) {
-      $('v-' + n).hidden = n !== v;
-      $('t-' + n).setAttribute('aria-current', n === v ? 'page' : 'false');
+    var TREINO = ['academia', 'cardio', 'lombar'], noTreino = TREINO.indexOf(v) >= 0;
+    VIEWS.forEach(function (n) { $('v-' + n).hidden = n !== v; });
+    ['treino', 'refeicoes', 'peso', 'historico', 'desempenho'].forEach(function (t) {
+      var b = $('t-' + t); if (b) b.setAttribute('aria-current', (t === 'treino' ? noTreino : t === v) ? 'page' : 'false');
     });
+    $('treino-seg-box').hidden = !noTreino;
+    TREINO.forEach(function (t) { $('ts-' + t).setAttribute('aria-selected', String(t === v)); });
+    if (noTreino) { try { localStorage.setItem('dt-treino-ultimo', v); } catch (e) {} }
     $('week').hidden = v === 'cardio' || v === 'historico' || v === 'receitas' || v === 'desempenho';
     if (v === 'receitas') renderRec();
     if (v === 'desempenho') renderDesempenho();
   }
-  VIEWS.forEach(function (n) {
-    $('t-' + n).addEventListener('click', function () { location.hash = n; show(); window.scrollTo(0, 0); });
+  function vai(n) { location.hash = n; show(); window.scrollTo(0, 0); }
+  ['refeicoes', 'peso', 'historico', 'desempenho'].forEach(function (n) { $('t-' + n).addEventListener('click', function () { vai(n); }); });
+  $('t-treino').addEventListener('click', function () {
+    var u = 'academia'; try { u = localStorage.getItem('dt-treino-ultimo') || 'academia'; } catch (e) {}
+    vai(['academia', 'cardio', 'lombar'].indexOf(u) >= 0 ? u : 'academia');
   });
+  ['academia', 'cardio', 'lombar'].forEach(function (n) { $('ts-' + n).addEventListener('click', function () { location.hash = n; show(); }); });
   window.addEventListener('hashchange', show);
+  // Troca de tema: redesenha o que usa cores lidas na hora (gráficos e mapa).
+  window.addEventListener('dt-tema', function () { gAnimou = {}; renderHist(); renderDesempenho(); renderSaude(); });
 
   $('hoje').textContent = DIA[new Date().getDay()];
   renderWeek();
