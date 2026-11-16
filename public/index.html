@@ -243,7 +243,20 @@ input[type="date"] { height: 46px; }
 .big-saldo.sup { color: var(--stop); }
 .chart { width: 100%; height: auto; display: block; }
 .seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; padding: 4px; margin: 4px 0 14px; background: var(--mat); border-radius: 12px; }
-.seg-treino { margin: 12px 0 0; }
+.seg-treino { margin: 12px 0 0; grid-template-columns: repeat(4, 1fr); }
+.pl-tit { font-size: 1.05rem; margin: 18px 0 8px; }
+.pl-card { border: 1px solid var(--line); border-radius: 14px; padding: 12px; margin: 0 0 10px; background: var(--card, transparent); scroll-margin-top: 80px; }
+.pl-card.pisca { outline: 2px solid var(--accent); }
+.pl-card h3 { margin: 0; font-size: 1rem; }
+.pl-meta { color: var(--muted); font-size: .85rem; margin: 2px 0 8px; }
+.pl-dose { font-weight: 700; margin: 6px 0; }
+.pl-ani { max-width: 340px; margin: 4px auto; }
+.pl-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 2px; }
+.pl-chip { border: 1px solid var(--line); border-radius: 999px; padding: 4px 10px; font-size: .85rem; background: none; color: inherit; font: inherit; font-size: .85rem; cursor: pointer; }
+button.pl-chip { color: var(--accent); font-weight: 700; }
+.pl-card ul { margin: 6px 0; padding-left: 18px; }
+.pl-preco { font-weight: 700; }
+.pl-links { display: flex; flex-wrap: wrap; gap: 12px; }
 .seg button { min-height: 44px; border: 0; border-radius: 9px; background: transparent; font-weight: 700; color: var(--muted); }
 .seg button[aria-selected="true"] { background: var(--bg); color: var(--accent); box-shadow: 0 1px 3px rgba(20,35,56,.15); }
 .g-dica { margin: 0 0 10px; }
@@ -477,7 +490,7 @@ footer .col { display: grid; gap: 10px; }
 </div></nav>
 
 <div class="gut" id="treino-seg-box" hidden><div class="col"><div class="seg seg-treino" role="tablist" aria-label="Tipo de treino">
-  <button type="button" role="tab" id="ts-academia">Academia</button><button type="button" role="tab" id="ts-cardio">Cardio</button><button type="button" role="tab" id="ts-lombar">Pilates</button>
+  <button type="button" role="tab" id="ts-academia">Academia</button><button type="button" role="tab" id="ts-cardio">Cardio</button><button type="button" role="tab" id="ts-lombar">Pilates</button><button type="button" role="tab" id="ts-planos">Planos</button>
 </div></div></div>
 <div class="week gut" id="week"><div class="col" id="week-box"></div></div>
 
@@ -564,6 +577,18 @@ footer .col { display: grid; gap: 10px; }
     <h2>Refeições do dia</h2>
     <div class="mini" id="food-list"></div>
     <div id="food-day"></div>
+  </section>
+
+  <section class="view" id="v-planos" hidden>
+    <p class="lede">Próximos passos: exercícios que ainda faltam na rotina e o que comprar para fazê-los em casa. Por enquanto é só planejamento, nada aqui entra na ficha.</p>
+    <h2 class="pl-tit">Exercícios</h2>
+    <div id="plano-ex"></div>
+    <h2 class="pl-tit">Compras</h2>
+    <div id="plano-prod"></div>
+    <section class="stop">
+      <strong>Antes de começar</strong>
+      <p>Comece com carga leve e foco na execução. Pelo histórico de lombar, valide stiff e extensão 45° com quem acompanha você, e pare se sentir dor descendo pela perna ou formigamento.</p>
+    </section>
   </section>
 
   <section class="view" id="v-lombar" hidden>
@@ -1384,6 +1409,49 @@ window.MOVES = (function () {
     A:join(FSTAND, arms({ e:[186,-34], w:[206,8] }), { e2:[272,-36], w2:[276,4] }),
     B:join(FSTAND, arms({ e:[148,-76], w:[100,-72] }), { e2:[272,-36], w2:[276,4] }),
     how:'Em pé, de lado para a polia baixa, segure o puxador com a mão mais distante. Levante o braço para o lado até a altura do ombro, sem dar impulso, e desça devagar.', q:'elevação lateral na polia baixa unilateral como fazer' };
+  // Exercícios planejados (seção Planos): ainda fora da ficha.
+  var CASA_ALTO = [['r', 60, 92, 90, 12], ['r', 98, 104, 14, 47]];
+  M.stiff = { vb:ST, db:true, hi:['th', 'torso'], labelA:'Em pé, halteres à frente das coxas', labelB:'Quadril para trás, costas retas',
+    A:join(SIDE, { e:[204,-28], w:[206,10] }),
+    B:{ n:[300,-30], s:[268,-22], m:[232,-4], h:[180,22], k:[196,84], a:[200,143], t:[220,147], e:[268,18], w:[270,58] },
+    how:'Em pé, joelhos levemente dobrados, um halter em cada mão. Leve o quadril para trás descendo os halteres rente às pernas, com a coluna reta, até sentir o posterior da coxa alongar. Volte empurrando o quadril para a frente.', q:'stiff com halteres como fazer' };
+  M.bulgaro = { vb:ST, props:CASA_ALTO, db:true, hi:['th', 'sh'], labelA:'Pé de trás apoiado no banco', labelB:'Desce com o joelho da frente estável',
+    A:{ n:[206,-104], s:[200,-72], m:[200,-28], h:[200,16], k:[236,80], a:[240,143], t:[260,147], k2:[166,66], a2:[120,86], t2:[104,90], e:[204,-30], w:[206,8] },
+    B:{ n:[206,-60], s:[200,-28], m:[200,16], h:[200,60], k:[256,92], a:[240,143], t:[260,147], k2:[160,118], a2:[120,90], t2:[104,90], e:[204,14], w:[206,52] },
+    how:'De costas para um banco ou sofá firme, com o peito do pé de trás apoiado nele. Desça dobrando a perna da frente até a coxa ficar quase paralela ao chão e suba empurrando pelo calcanhar da frente.', q:'agachamento búlgaro com halteres como fazer' };
+  M.afundo = { vb:ST, db:true, hi:['th', 'sh'], labelA:'Passo à frente', labelB:'Desce os dois joelhos',
+    A:{ n:[206,-104], s:[200,-72], m:[200,-28], h:[200,16], k:[236,80], a:[240,143], t:[260,147], k2:[178,80], a2:[150,140], t2:[134,147], e:[204,-30], w:[206,8] },
+    B:{ n:[206,-62], s:[200,-30], m:[200,14], h:[200,60], k:[254,92], a:[240,143], t:[260,147], k2:[170,124], a2:[140,138], t2:[126,147], e:[204,12], w:[206,50] },
+    how:'Em pé, dê um passo à frente e desça até os dois joelhos dobrarem perto de 90 graus, com o tronco reto. Volte e troque a perna.', q:'afundo com halteres como fazer' };
+  M.pallof = { vb:ST, props:[['r',30,-80,10,231]], cable:[[35,-30,'w']], hi:['torso'], labelA:'Mãos junto ao peito', labelB:'Estende e segura sem girar',
+    A:join(SIDE, { e:[214,-34], w:[232,-46] }), B:join(SIDE, { e:[256,-44], w:[296,-46] }),
+    how:'De lado para o ponto onde o elástico está preso, na altura do peito. Segure o elástico junto ao peito e estenda os braços à frente sem deixar o tronco girar. Segure 2 segundos e volte.', q:'pallof press elástico como fazer' };
+  M.dead_bug = { vb:LIE, props:[['r',30,96,330,5]], hi:['th', 'ua'], labelA:'Braços e pernas para cima', labelB:'Estende braço e perna opostos',
+    A:{ n:[62,84], s:[94,86], m:[140,88], h:[184,88], k:[184,40], a:[236,40], t:[244,24], e:[94,40], w:[96,0] },
+    B:{ n:[62,84], s:[94,86], m:[140,88], h:[184,88], k:[232,74], a:[282,80], t:[298,72], e:[64,72], w:[28,78] },
+    how:'Deitado de costas, braços para cima e joelhos dobrados a 90 graus. Mantendo a lombar colada no chão, estenda devagar um braço para trás e a perna oposta à frente. Volte e troque o lado.', q:'dead bug exercício como fazer' };
+  M.face_pull = { vb:ST, props:[['r',420,-122,10,273]], cable:[[425,-64,'w']], hi:['ua', 'fa'], labelA:'Braços estendidos à frente', labelB:'Puxa até o rosto, cotovelos altos',
+    A:join(SIDE, { e:[250,-62], w:[296,-66] }), B:join(SIDE, { e:[176,-64], w:[214,-84] }),
+    how:'Elástico ou corda presos à frente, na altura do rosto. Puxe em direção ao rosto abrindo os cotovelos para os lados e para trás, apertando as escápulas.', q:'face pull elástico como fazer' };
+  M.rotacao_externa = { vb:ST, front:true, props:[['r',-30,-60,10,211]], cable:[[-25,-30,'w']], hi:['fa'], labelA:'Antebraço à frente do corpo', labelB:'Gira para fora, cotovelo colado',
+    A:join(FSTAND, { e:[196,-28], w:[232,-28], e2:[264,-28], w2:[266,10] }), B:join(FSTAND, { e:[196,-28], w:[158,-30], e2:[264,-28], w2:[266,10] }),
+    how:'Em pé, cotovelo dobrado a 90 graus e colado ao corpo, segurando o elástico preso ao lado. Gire o antebraço para fora sem afastar o cotovelo e volte devagar.', q:'rotação externa de ombro elástico como fazer' };
+  M.tibial = { vb:ST, props:[['r',118,-125,10,276]], hi:['sh', 'ft'], labelA:'Costas na parede', labelB:'Sobe a ponta dos pés',
+    A:{ n:[152,-100], s:[146,-70], m:[150,-25], h:[154,18], k:[188,82], a:[214,143], t:[236,147], e:[148,-26], w:[156,10] },
+    B:{ n:[152,-100], s:[146,-70], m:[150,-25], h:[154,18], k:[188,82], a:[214,143], t:[232,124], e:[148,-26], w:[156,10] },
+    how:'Encostado na parede, com os pés um passo à frente. Levante a ponta dos pés o máximo que puder, mantendo os calcanhares no chão, e desça devagar.', q:'elevação tibial na parede como fazer' };
+  M.fazendeiro = { vb:ST, db:true, hi:['ua', 'torso'], labelA:'Passos curtos', labelB:'Tronco firme',
+    A:{ n:[206,-102], s:[200,-70], m:[200,-25], h:[200,20], k:[218,82], a:[226,143], t:[246,147], k2:[190,84], a2:[172,140], t2:[188,147], e:[204,-28], w:[206,10] },
+    B:{ n:[206,-102], s:[200,-70], m:[200,-25], h:[200,20], k:[190,84], a:[172,140], t:[188,147], k2:[218,82], a2:[226,143], t2:[246,147], e:[204,-28], w:[206,10] },
+    how:'Segure um halter pesado em cada mão, braços estendidos ao lado do corpo. Caminhe em passos curtos, com o tronco ereto e o abdômen firme, por 30 a 40 metros.', q:'caminhada do fazendeiro farmer walk como fazer' };
+  M.subida_banco = { vb:'-50 -165 560 320', props:[['r',206,112,96,10], ['r',247,122,14,29]], db:true, hi:['th', 'sh'], labelA:'Um pé em cima do banco', labelB:'Sobe empurrando pelo pé de cima',
+    A:{ n:[200,-96], s:[196,-64], m:[198,-20], h:[200,26], k:[238,62], a:[236,108], t:[256,110], k2:[198,86], a2:[194,143], t2:[214,147], e:[200,-18], w:[202,20] },
+    B:{ n:[230,-142], s:[226,-110], m:[228,-66], h:[230,-22], k:[236,44], a:[236,108], t:[256,110], k2:[226,46], a2:[218,100], t2:[234,104], e:[230,-68], w:[232,-30] },
+    how:'De frente para um banco ou degrau firme, na altura do joelho. Apoie um pé inteiro em cima e suba empurrando por ele, sem dar impulso com a perna de baixo. Desça devagar.', q:'subida no banco step up com halteres como fazer' };
+  M.extensao_45 = { vb:ST, props:[['l',226,14,262,50,14], ['l',312,122,338,96,8], ['l',262,50,300,151,8], ['l',300,151,326,110,6]], hi:['torso'], labelA:'Desce com a coluna neutra', labelB:'Sobe até alinhar o corpo',
+    A:{ n:[196,140], s:[200,108], m:[210,59], h:[220,10], k:[270,60], a:[320,110], t:[336,96], e:[214,100], w:[206,80] },
+    B:{ n:[124,-86], s:[149,-61], m:[185,-25], h:[220,10], k:[270,60], a:[320,110], t:[336,96], e:[160,-40], w:[150,-60] },
+    how:'No banco de extensão a 45°, com o quadril logo acima do apoio. Desça o tronco com a coluna reta e suba contraindo glúteos até o corpo ficar em linha reta, sem passar desse ponto.', q:'extensão lombar banco 45 graus como fazer' };
   Object.keys(M).forEach(function (k) {
     var m = M[k];
     if (!m.id) { m.id = k; }
@@ -5476,12 +5544,85 @@ window.MOVES = (function () {
     });
   }
 
+  /* Planos: exercícios e compras planejados (só consulta, sem registro) */
+  var PLANO_PROD = {
+    halteres: { curto: 'Halteres', nome: 'Kit de halteres ajustável 20 a 30 kg com barra conectora', preco: 'R$ 220 a 330',
+      porque: 'Dá carga para stiff, búlgaro, afundo, subida no banco e fazendeiro. Com a barra conectora vira uma barra curta.',
+      checar: ['Peso total e quanto fica por mão (20 kg ≈ 10 kg por mão)', 'Anilhas de ferro ou revestidas, com furo padrão', 'Presilha de rosca firme (evite kettlebell swing com ele)'],
+      busca: 'https://www.magazineluiza.com.br/busca/kit+halteres+anilhas+barra+conectora/' },
+    elasticos: { curto: 'Elásticos', nome: 'Kit de elásticos extensores com alças e âncora de porta', preco: 'R$ 25 a 60',
+      porque: 'Faz o papel da polia em casa: Pallof press, face pull e rotação externa.',
+      checar: ['Vários níveis de resistência', 'Âncora de porta incluída', 'Mosquetões de metal'],
+      busca: 'https://www.magazineluiza.com.br/busca/kit+elastico+extensor+ancora+porta/' },
+    banco: { curto: 'Banco ou sofá', nome: 'Banco ou sofá firme (já tem em casa)', preco: 'Sem compra',
+      porque: 'Apoio do pé no búlgaro e degrau da subida. Precisa ser estável e ter mais ou menos a altura do joelho.', checar: [] }
+  };
+  var PLANO_EX = [
+    { id: 'stiff', nome: 'Stiff com halteres', padrao: 'Dobradiça de quadril', onde: 'Casa ou academia', musc: 'Posteriores da coxa, glúteos e lombar', dose: '3 × 10, leve', prod: ['halteres'], cuidado: 'Coluna reta o tempo todo; desça só até onde mantiver a postura.' },
+    { id: 'extensao_45', nome: 'Extensão no banco 45°', padrao: 'Dobradiça de quadril', onde: 'Academia', musc: 'Lombar e glúteos', dose: '2 × 12', prod: [], cuidado: 'Suba só até alinhar o corpo, sem arquear para trás.' },
+    { id: 'bulgaro', nome: 'Agachamento búlgaro', padrao: 'Unilateral', onde: 'Casa', musc: 'Quadríceps e glúteos', dose: '3 × 8 a 10 por perna', prod: ['halteres', 'banco'], cuidado: 'Comece sem peso até achar o equilíbrio.' },
+    { id: 'afundo', nome: 'Afundo', padrao: 'Unilateral', onde: 'Casa', musc: 'Quadríceps, glúteos e glúteo médio', dose: '3 × 10 por perna', prod: ['halteres'] },
+    { id: 'subida_banco', nome: 'Subida no banco', padrao: 'Unilateral', onde: 'Casa', musc: 'Quadríceps e glúteos', dose: '3 × 10 por perna', prod: ['halteres', 'banco'] },
+    { id: 'pallof', nome: 'Pallof press', padrao: 'Core', onde: 'Casa (elástico) ou academia (polia)', musc: 'Abdômen e oblíquos (antirrotação)', dose: '3 × 10 por lado', prod: ['elasticos'] },
+    { id: 'dead_bug', nome: 'Dead bug', padrao: 'Core', onde: 'Casa, no colchonete', musc: 'Abdômen profundo', dose: '3 × 8 por lado', prod: [], cuidado: 'Lombar colada no chão; se ela descolar, encurte o movimento.' },
+    { id: 'fazendeiro', nome: 'Caminhada do fazendeiro', padrao: 'Carregar peso', onde: 'Casa ou academia', musc: 'Pegada, trapézio e core', dose: '3 × 30 a 40 m', prod: ['halteres'] },
+    { id: 'face_pull', nome: 'Face pull', padrao: 'Saúde do ombro', onde: 'Casa (elástico) ou academia (polia)', musc: 'Deltoide posterior e manguito', dose: '3 × 15', prod: ['elasticos'] },
+    { id: 'rotacao_externa', nome: 'Rotação externa de ombro', padrao: 'Saúde do ombro', onde: 'Casa (elástico) ou academia (polia)', musc: 'Manguito rotador', dose: '2 × 15 por lado', prod: ['elasticos'] },
+    { id: 'tibial', nome: 'Elevação tibial na parede', padrao: 'Prevenção para corrida', onde: 'Casa', musc: 'Tibial anterior (canela)', dose: '2 × 15 a 20', prod: [] }
+  ];
+  function planoVai(id) {
+    var el = $(id); if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    el.classList.add('pisca'); setTimeout(function () { el.classList.remove('pisca'); }, 1600);
+  }
+  var planoFeito = false;
+  function renderPlanos() {
+    if (planoFeito) return; planoFeito = true;
+    var bx = $('plano-ex'), bp = $('plano-prod');
+    var vis = 'IntersectionObserver' in window ? new IntersectionObserver(function (es) {
+      es.forEach(function (e) { if (e.isIntersecting && !e.target.firstChild) { window.Fig.mount(e.target._mv, e.target); vis.unobserve(e.target); } });
+    }, { rootMargin: '200px' }) : null;
+    PLANO_EX.forEach(function (x) {
+      var mv = window.MOVES[x.id]; if (mv) mv.name = x.nome;
+      var ani = h('div', { class: 'howto pl-ani' });
+      if (mv) { ani._mv = mv; if (vis) vis.observe(ani); else window.Fig.mount(mv, ani); }
+      var chips = h('div', { class: 'pl-chips' });
+      if (!x.prod.length) chips.appendChild(h('span', { class: 'pl-chip', text: 'Sem equipamento para comprar' }));
+      x.prod.forEach(function (k) {
+        chips.appendChild(h('button', { type: 'button', class: 'pl-chip', text: (k === 'banco' ? '🛋 ' : '🛒 ') + PLANO_PROD[k].curto, on: { click: function () { planoVai('pl-p-' + k); } } }));
+      });
+      bx.appendChild(h('article', { class: 'pl-card', id: 'pl-e-' + x.id },
+        h('h3', { text: x.nome }),
+        h('p', { class: 'pl-meta', text: x.padrao + ' · ' + x.onde }),
+        ani,
+        h('p', { class: 'pl-dose', text: 'Sugestão: ' + x.dose }),
+        h('p', { text: 'Trabalha: ' + x.musc + '.' }),
+        mv ? h('details', { class: 'mais' }, h('summary', { text: 'Como fazer' }), h('p', { text: mv.how }), x.cuidado ? h('p', { class: 'tip', text: x.cuidado }) : null) : null,
+        chips,
+        mv ? h('a', { class: 'yt', target: '_blank', rel: 'noopener', text: 'Ver vídeos no YouTube', href: 'https://www.youtube.com/results?search_query=' + encodeURIComponent(mv.q) }) : null));
+    });
+    Object.keys(PLANO_PROD).forEach(function (k) {
+      var p = PLANO_PROD[k], usa = PLANO_EX.filter(function (x) { return x.prod.indexOf(k) >= 0; });
+      var chips = h('div', { class: 'pl-chips' });
+      usa.forEach(function (x) { chips.appendChild(h('button', { type: 'button', class: 'pl-chip', text: x.nome, on: { click: function () { planoVai('pl-e-' + x.id); } } })); });
+      var ul = p.checar.length ? h('ul') : null;
+      p.checar.forEach(function (c) { ul.appendChild(h('li', { text: c })); });
+      bp.appendChild(h('article', { class: 'pl-card', id: 'pl-p-' + k },
+        h('h3', { text: p.nome }),
+        h('p', { class: 'pl-meta' }, h('span', { class: 'pl-preco', text: p.preco }), p.busca ? document.createTextNode(' · preço de referência, confira antes') : null),
+        h('p', { text: p.porque }),
+        ul ? h('p', { class: 'pl-meta', text: 'Na hora de comprar, confira:' }) : null, ul,
+        h('p', { class: 'pl-meta', text: 'Usado em ' + usa.length + ' exercícios:' }), chips,
+        p.busca ? h('div', { class: 'pl-links' }, h('a', { class: 'yt', target: '_blank', rel: 'noopener', text: 'Procurar no Magalu', href: p.busca })) : null));
+    });
+  }
+
   /* Abas */
-  var VIEWS = ['academia', 'cardio', 'refeicoes', 'lombar', 'peso', 'historico', 'desempenho', 'receitas'];
+  var VIEWS = ['academia', 'cardio', 'refeicoes', 'lombar', 'planos', 'peso', 'historico', 'desempenho', 'receitas'];
   function show() {
     var v = (location.hash || '').slice(1);
     if (VIEWS.indexOf(v) < 0) v = 'academia';
-    var TREINO = ['academia', 'cardio', 'lombar'], noTreino = TREINO.indexOf(v) >= 0;
+    var TREINO = ['academia', 'cardio', 'lombar', 'planos'], noTreino = TREINO.indexOf(v) >= 0;
     VIEWS.forEach(function (n) { $('v-' + n).hidden = n !== v; });
     ['treino', 'refeicoes', 'peso', 'historico', 'desempenho'].forEach(function (t) {
       var b = $('t-' + t); if (b) b.setAttribute('aria-current', (t === 'treino' ? noTreino : t === v) ? 'page' : 'false');
@@ -5489,17 +5630,18 @@ window.MOVES = (function () {
     $('treino-seg-box').hidden = !noTreino;
     TREINO.forEach(function (t) { $('ts-' + t).setAttribute('aria-selected', String(t === v)); });
     if (noTreino) { try { localStorage.setItem('dt-treino-ultimo', v); } catch (e) {} }
-    $('week').hidden = v === 'cardio' || v === 'historico' || v === 'receitas' || v === 'desempenho';
+    $('week').hidden = v === 'cardio' || v === 'historico' || v === 'receitas' || v === 'desempenho' || v === 'planos';
     if (v === 'receitas') renderRec();
     if (v === 'desempenho') renderDesempenho();
+    if (v === 'planos') renderPlanos();
   }
   function vai(n) { location.hash = n; show(); window.scrollTo(0, 0); }
   ['refeicoes', 'peso', 'historico', 'desempenho'].forEach(function (n) { $('t-' + n).addEventListener('click', function () { vai(n); }); });
   $('t-treino').addEventListener('click', function () {
     var u = 'academia'; try { u = localStorage.getItem('dt-treino-ultimo') || 'academia'; } catch (e) {}
-    vai(['academia', 'cardio', 'lombar'].indexOf(u) >= 0 ? u : 'academia');
+    vai(['academia', 'cardio', 'lombar', 'planos'].indexOf(u) >= 0 ? u : 'academia');
   });
-  ['academia', 'cardio', 'lombar'].forEach(function (n) { $('ts-' + n).addEventListener('click', function () { location.hash = n; show(); }); });
+  ['academia', 'cardio', 'lombar', 'planos'].forEach(function (n) { $('ts-' + n).addEventListener('click', function () { location.hash = n; show(); }); });
   window.addEventListener('hashchange', show);
   // Troca de tema: redesenha o que usa cores lidas na hora (gráficos e mapa).
   window.addEventListener('dt-tema', function () { gAnimou = {}; renderHist(); renderDesempenho(); renderSaude(); });
