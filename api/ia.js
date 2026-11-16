@@ -2,7 +2,7 @@
 // Recebe { prompt, imagens: [{ tipo, base64 }] } e devolve { resultado } com o JSON pedido no prompt.
 import { env, responde, corpo, usuario, banco, rota } from './_lib.js';
 
-export const config = { maxDuration: 60 };
+export const config = { maxDuration: 120 };
 
 function tipoDe(p) {
   if (p.includes('calculando uma receita')) return 'receita';
@@ -10,6 +10,7 @@ function tipoDe(p) {
   if (p.includes('Analise a atividade atual')) return 'atividade';
   if (p.includes('Analise a semana')) return 'semana';
   if (p.includes('Feche a semana')) return 'fechamento';
+  if (p.includes('treinador de corrida')) return 'treinador';
   if (p.includes('estimando uma refeição')) return 'refeicao';
   return 'outro';
 }
@@ -43,7 +44,7 @@ export default rota(async (req, res) => {
     },
     body: JSON.stringify({
       model: process.env.ANTHROPIC_MODEL || 'claude-sonnet-5-5',
-      max_tokens: 2000,
+      max_tokens: 6000,
       messages: [{ role: 'user', content: conteudo }]
     })
   });

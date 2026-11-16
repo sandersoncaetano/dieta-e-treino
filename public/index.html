@@ -243,6 +243,32 @@ input[type="date"] { height: 46px; }
 .big-saldo.sup { color: var(--stop); }
 .chart { width: 100%; height: auto; display: block; }
 .seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; padding: 4px; margin: 4px 0 14px; background: var(--mat); border-radius: 12px; }
+.tr-box { display: grid; gap: 12px; margin: 0 0 18px; }
+.tr-head { border-radius: 14px; padding: 14px; background: color-mix(in srgb, var(--accent) 14%, var(--surface)); display: grid; gap: 4px; }
+.tr-head h2 { margin: 0; font-size: 1.1rem; }
+.tr-head .tr-sub { color: var(--muted); font-size: .9rem; }
+.tr-cont { font-size: 1.6rem; font-weight: 800; color: var(--accent); }
+.tr-kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.tr-kpis div { background: var(--mat); border-radius: 10px; padding: 8px; display: grid; gap: 2px; text-align: center; }
+.tr-kpis b { font-size: 1.15rem; white-space: nowrap; }
+.tr-kpis span { font-size: .78rem; color: var(--muted); line-height: 1.2; }
+.tr-prox { border: 2px solid var(--accent); border-radius: 14px; padding: 12px; display: grid; gap: 4px; }
+.tr-prox small { color: var(--accent); font-weight: 800; text-transform: uppercase; letter-spacing: .04em; font-size: .75rem; }
+.tr-sem { border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; }
+.tr-sem summary { font-weight: 800; cursor: pointer; }
+.tr-sem summary span { font-weight: 400; color: var(--muted); font-size: .88rem; }
+.tr-ses { display: grid; grid-template-columns: 54px 1fr; gap: 8px; padding: 8px 0; border-top: 1px solid var(--line); }
+.tr-ses:first-of-type { border-top: 0; }
+.tr-dia { font-weight: 800; font-size: .85rem; line-height: 1.2; }
+.tr-dia span { display: block; font-weight: 400; color: var(--muted); }
+.tr-ses p { margin: 2px 0 0; font-size: .9rem; }
+.tr-ses .tr-alvo { color: var(--accent); font-weight: 700; font-size: .85rem; }
+.tr-ses.feito { opacity: .65; }
+.tr-ses.hoje { background: var(--mat); border-radius: 8px; padding: 8px 6px; }
+.tr-tag { display: inline-block; border-radius: 999px; padding: 1px 8px; font-size: .75rem; font-weight: 800; background: var(--mat); margin-left: 4px; vertical-align: 1px; }
+.tr-tag.intenso { background: var(--stop-bg); }
+.tr-meta { display: grid; gap: 8px; }
+.tr-acoes { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .seg-treino { margin: 12px 0 0; grid-template-columns: repeat(4, 1fr); }
 .pl-tit { font-size: 1.05rem; margin: 18px 0 8px; }
 .pl-card { border: 1px solid var(--line); border-radius: 14px; padding: 12px; margin: 0 0 10px; background: var(--card, transparent); scroll-margin-top: 80px; }
@@ -512,6 +538,7 @@ footer .col { display: grid; gap: 10px; }
   </section>
 
   <section class="view" id="v-cardio" hidden>
+    <div id="treinador" class="tr-box"></div>
     <div class="limit">
       <strong>Corrida leve</strong>
       <p>Esforço de 4 a 5, com fôlego para falar frases completas, e até cerca de 150 bpm.</p>
@@ -693,7 +720,7 @@ footer .col { display: grid; gap: 10px; }
 
 <script>
 var Store = (function () {
-  var COLLS = ['treinos', 'cardio', 'lombar', 'cargas', 'imagens', 'refeicoes', 'descansos', 'dias', 'peso', 'strava', 'receitas', 'analises', 'medidas', 'composicao', 'saude_dia', 'semanas', 'fechamentos'];
+  var COLLS = ['treinos', 'cardio', 'lombar', 'cargas', 'imagens', 'refeicoes', 'descansos', 'dias', 'peso', 'strava', 'receitas', 'analises', 'medidas', 'composicao', 'saude_dia', 'semanas', 'fechamentos', 'treinador'];
   var KEY = 'caderno-treino';
   var cache = {}; COLLS.forEach(function (c) { cache[c] = {}; });
   var subs = [], db = null, mode = 'loading';
@@ -2380,6 +2407,7 @@ window.MOVES = (function () {
       .sort(function (a, b) { return a.v.data < b.v.data ? 1 : a.v.data > b.v.data ? -1 : 0; });
   }
   function renderCardio() {
+    renderTreinador();
     var ul = $('c-list'); ul.textContent = '';
     var rows = cardioTudo();
     if (!rows.length) ul.appendChild(h('li', { class: 'empty', text: 'Seus registros de corrida e bike aparecem aqui.' }));
@@ -2664,7 +2692,7 @@ window.MOVES = (function () {
       });
     }).catch(function (e) {
       if (!quieto) stravaMsg = e && e.code === 'sem_mcp' ? 'A leitura do Strava não está disponível nesta tela.' : stravaErro(e);
-    }).then(function () { stravaBusy = false; renderHist(); renderCardio(); anaPendentes(); });
+    }).then(function () { stravaBusy = false; renderHist(); renderCardio(); anaPendentes(); if (trPlano()) trAtualiza(true); });
   }
   function renderBalanco() {
     var box = $('balanco'); box.textContent = '';
@@ -5542,6 +5570,177 @@ window.MOVES = (function () {
         renderFood(); calcMeal(id);
       });
     });
+  }
+
+  /* Treinador de corrida: meta de prova, análise das corridas e plano semanal pela IA */
+  var TR_META0 = { nome: 'Corrida de rua 5 km', prova: '2026-12-13', km: 5, pace: 390, liberado: false };
+  var trBusy = false, trMsg = '', trTentou = {}, trEdita = false;
+  function trMeta() { return Object.assign({}, TR_META0, Store.get('treinador', 'meta') || {}); }
+  function trPlano() { return Store.get('treinador', 'plano'); }
+  function trCorridas() {
+    return cardioTudo().filter(function (r) { return r.v.tipo === 'corrida' && r.v.distancia_km >= 1 && r.v.segundos > 0; })
+      .map(function (r) {
+        var st = r.v.strava ? Store.get('strava', r.id) : null;
+        return { id: r.id, data: r.v.data, km: r.v.distancia_km, seg: r.v.segundos, pace: Math.round(r.v.segundos / r.v.distancia_km), fc: r.v.fc_media || null, fcmax: r.v.fc_max || null,
+          fckm: r.v.fc_km || [], pkm: st && st.pkm || [], esforco: r.v.esforco || null, nota: r.v.nota || '' };
+      }).sort(function (a, b) { return a.data < b.data ? -1 : a.data > b.data ? 1 : 0; });
+  }
+  function trPaceTxt(seg) { return clock(seg) + '/km'; }
+  function trDiasAte(d) { var a = Store.day(); return Math.round((diaNum(d) - diaNum(a))); }
+  function trPrompt() {
+    var m = trMeta(), hoje = Store.day(), rs = trCorridas().filter(function (r) { return r.data >= addDias(hoje, -60); });
+    var bikes = cardioTudo().filter(function (r) { return r.v.tipo === 'bike' && r.v.data >= addDias(hoje, -28); })
+      .map(function (r) { return { data: r.v.data, km: r.v.distancia_km, min: Math.round(r.v.segundos / 60), fc: r.v.fc_media }; });
+    var gym = treinosOk().filter(function (r) { return r.v.data >= addDias(hoje, -14); }).map(function (r) { return r.v.data; });
+    var ant = trPlano(), antSes = [];
+    if (ant && ant.semanas) ant.semanas.forEach(function (w) { (w.sessoes || []).forEach(function (x) { if (x.data >= addDias(hoje, -14) && x.data <= hoje) antSes.push(x); }); });
+    return [
+      'Você é o treinador de corrida do Sanderson. Hoje é ' + hoje + ' (' + dsem(hoje) + ').',
+      'Meta: prova "' + m.nome + '" de ' + m.km + ' km em ' + m.prova + ' (' + dsem(m.prova) + '), terminando com pace médio de ' + trPaceTxt(m.pace) + ' (' + clock(m.pace * m.km) + ' no total).',
+      'Perfil: homem adulto emagrecendo (cerca de 10 kg de gordura a perder), voltou a correr em 03/11/2026 depois de um tempo parado. Tem histórico de dor lombar (faz pilates duas vezes por semana). Faz musculação cerca de 5 vezes por semana no fim da tarde e pedala aos sábados. Corre de manhã nos dias úteis, cerca de 30 minutos, antes do trabalho em casa.',
+      m.liberado
+        ? 'O médico liberou treinos intensos (intervalados e ritmo de prova).'
+        : 'IMPORTANTE: o médico liberou apenas corridas leves (esforço moderado, cerca de até 150 bpm). Até ele liberar mais, NÃO prescreva intervalados nem tiros acima disso; use corridas leves, progressão de volume, educativos e acelerações curtas e controladas (strides de 15 a 20 s) só se fizer sentido. Diga com clareza, em "alertas", que bater ' + trPaceTxt(m.pace) + ' na prova provavelmente exige esforço acima do liberado e que ele deve confirmar com o médico.',
+      'Corridas dos últimos 60 dias (pace em segundos por km; pkm = pace de cada km; fckm = FC média de cada km): ' + JSON.stringify(rs),
+      'Pedaladas das últimas 4 semanas: ' + JSON.stringify(bikes),
+      'Dias com musculação nos últimos 14 dias: ' + JSON.stringify(gym),
+      antSes.length ? 'Sessões que você planejou para os últimos 14 dias (compare com o que foi feito): ' + JSON.stringify(antSes) : 'Ainda não havia plano anterior.',
+      'Tarefas: 1) Analise a corrida mais recente e a tendência (pace, FC, deriva cardíaca, regularidade dos parciais) em relação à meta e ao que foi planejado. 2) Estime o tempo que ele faria hoje nos ' + m.km + ' km em esforço de prova, se houver base. 3) Monte o plano de amanhã até o dia da prova, organizado por semanas de segunda a domingo, com 3 a 4 corridas por semana nos dias úteis de manhã (sábado é dia de bike; pode haver corrida no domingo), progressão de no máximo cerca de 10% de volume por semana, e uma semana final mais leve antes da prova. Inclua a prova como última sessão. Seja realista: se a meta parecer difícil para o prazo, diga e sugira uma meta intermediária, mas mantenha o plano voltado à meta.',
+      'Use português do Brasil, frases curtas e diretas. Paces no formato m:ss.',
+      'Responda com JSON: {"nivel":"bom|ok|atencao","analise":"2 a 4 frases sobre a última corrida e a tendência","estimativa_seg":número ou null,"chance":"alta|media|baixa","resumo":"1 frase sobre onde ele está em relação à meta","alertas":["até 3 textos"],"semanas":[{"inicio":"AAAA-MM-DD (segunda)","titulo":"curto","foco":"1 frase","sessoes":[{"data":"AAAA-MM-DD","tipo":"leve|longo|progressivo|ritmo|intervalado|regenerativo|prova","titulo":"curto","descricao":"como fazer, incluindo aquecimento e desaquecimento quando houver","km":número,"pace":"m:ss ou faixa m:ss-m:ss","fc_max":número ou null}]}]}'
+    ].join('\n\n');
+  }
+  function trAtualiza(auto) {
+    if (trBusy) return;
+    var rs = trCorridas(), ult = rs.length ? rs[rs.length - 1].id : '';
+    if (auto) { if (!ult || trTentou[ult]) return; var p0 = trPlano(); if (p0 && (p0.ultima === ult || (p0.pendente && Date.now() - new Date(p0.criado).getTime() < 120000))) return; }
+    trTentou[ult] = 1; trBusy = true; trMsg = '';
+    renderTreinador();
+    Store.sample().then(function (sample) {
+      if (!sample) throw new Error('indisponivel');
+      return sample.json(trPrompt(), { modelTier: 'default', cache: false });
+    }).then(function (r) {
+      var sem = (Array.isArray(r.semanas) ? r.semanas : []).slice(0, 8).map(function (w) {
+        return { inicio: String(w.inicio || ''), titulo: String(w.titulo || ''), foco: String(w.foco || ''),
+          sessoes: (Array.isArray(w.sessoes) ? w.sessoes : []).slice(0, 7).map(function (x) {
+            return { data: String(x.data || ''), tipo: String(x.tipo || 'leve'), titulo: String(x.titulo || ''), descricao: String(x.descricao || ''), km: Number(x.km) || null, pace: String(x.pace || ''), fc_max: Number(x.fc_max) || null };
+          }) };
+      });
+      if (!sem.length) throw new Error('vazio');
+      Store.set('treinador', 'plano', { nivel: ['bom', 'ok', 'atencao'].indexOf(r.nivel) > -1 ? r.nivel : 'ok', analise: String(r.analise || ''), resumo: String(r.resumo || ''),
+        estimativa_seg: Number(r.estimativa_seg) || null, chance: String(r.chance || ''), alertas: (Array.isArray(r.alertas) ? r.alertas : []).slice(0, 3).map(String),
+        semanas: sem, ultima: ult, meta: trMeta(), criado: new Date().toISOString() });
+    }).catch(function (e) {
+      trMsg = e && e.message === 'indisponivel' ? 'O treinador automático não está disponível aqui.' : 'Não consegui montar o plano agora. Tente de novo.';
+    }).then(function () { trBusy = false; renderTreinador(); });
+  }
+  var TR_INTENSO = { ritmo: 1, intervalado: 1, prova: 1, progressivo: 1 };
+  function trSessao(x, feitoDia, hoje) {
+    var cls = 'tr-ses' + (feitoDia[x.data] ? ' feito' : '') + (x.data === hoje ? ' hoje' : '');
+    var alvo = [x.km ? fmtN(x.km, 1) + ' km' : '', x.pace ? x.pace + '/km' : '', x.fc_max ? 'FC até ' + x.fc_max : ''].filter(Boolean).join(' · ');
+    return h('div', { class: cls },
+      h('div', { class: 'tr-dia', text: ddmm(x.data) }, h('span', { text: (feitoDia[x.data] ? '✓ ' : '') + dsem(x.data).slice(0, 3) })),
+      h('div', {}, h('b', { text: x.titulo || x.tipo }), h('span', { class: 'tr-tag' + (TR_INTENSO[x.tipo] ? ' intenso' : ''), text: x.tipo }),
+        alvo ? h('p', { class: 'tr-alvo', text: alvo }) : null, x.descricao ? h('p', { text: x.descricao }) : null));
+  }
+  function trGraf(box, m) {
+    var g = h('div', { class: 'gcard' }); box.appendChild(g);
+    grafico(g, {
+      id: 'treinador', titulo: 'Pace das corridas', sub: 'Mais baixo é mais rápido; a linha tracejada é a meta',
+      dados: function () {
+        var rs = trCorridas().filter(function (r) { return r.data >= addDias(Store.day(), -90); });
+        if (!rs.length) return { vazio: 'As corridas aparecem aqui assim que chegarem do Strava ou forem registradas.' };
+        var x0 = diaNum(rs[0].data), x1 = Math.max(diaNum(m.prova), diaNum(rs[rs.length - 1].data));
+        return {
+          type: 'line', xDias: true,
+          data: { datasets: [
+            { label: 'Pace', data: rs.map(function (r) { return { x: diaNum(r.data), y: r.pace, r: r }; }), borderColor: cor('accent'), backgroundColor: cor('accent'), borderWidth: 3, pointRadius: 4, pointHoverRadius: 6, tension: 0.25 },
+            { label: 'Meta', data: [{ x: x0, y: m.pace }, { x: x1, y: m.pace }], borderColor: cor('fg'), borderDash: [6, 5], borderWidth: 2, pointRadius: 0, pointHoverRadius: 0 }
+          ] },
+          options: { scales: { y: { reverse: true, ticks: { callback: function (v) { return clock(v); } } } } },
+          dicas: { label: function (it) { var r = it.raw.r; return r ? [' ' + trPaceTxt(r.pace), ' ' + fmtN(r.km, 1) + ' km' + (r.fc ? ' · FC ' + r.fc : '')] : ' Meta ' + trPaceTxt(m.pace); } }
+        };
+      }
+    });
+  }
+  function renderTreinador() {
+    var box = $('treinador'); if (!box) return;
+    box.textContent = '';
+    var m = trMeta(), hoje = Store.day(), falta = trDiasAte(m.prova), rs = trCorridas(), p = trPlano();
+    var head = h('div', { class: 'tr-head' },
+      h('h2', { text: 'Treinador · ' + m.nome }),
+      h('span', { class: 'tr-sub', text: dsem(m.prova) + ', ' + br(m.prova) + ' · meta ' + trPaceTxt(m.pace) + ' (' + clock(m.pace * m.km) + ')' }),
+      h('span', { class: 'tr-cont', text: falta > 1 ? 'Faltam ' + falta + ' dias' : falta === 1 ? 'É amanhã!' : falta === 0 ? 'É hoje! Boa prova!' : 'Prova concluída' }));
+    box.appendChild(head);
+    var rec = rs.filter(function (r) { return r.data >= addDias(hoje, -21); }).slice(-3);
+    var paceAtual = rec.length ? Math.round(rec.reduce(function (a, r) { return a + r.seg; }, 0) / rec.reduce(function (a, r) { return a + r.km; }, 0)) : null;
+    var k = h('div', { class: 'tr-kpis' });
+    function kpi(v, t) { k.appendChild(h('div', {}, h('b', { text: v }), h('span', { text: t }))); }
+    kpi(paceAtual ? clock(paceAtual) : '—', 'pace médio nas últimas ' + (rec.length || 3) + ' corridas');
+    kpi(paceAtual ? (paceAtual > m.pace ? '−' + (paceAtual - m.pace) + ' s' : '✓') : '—', paceAtual && paceAtual > m.pace ? 'a tirar por km até a meta' : 'já no pace da meta');
+    kpi(p && p.estimativa_seg ? clock(p.estimativa_seg) : '—', 'estimativa da IA para os ' + m.km + ' km hoje');
+    box.appendChild(k);
+    if (!m.liberado) box.appendChild(h('p', { class: 'tip', text: 'O plano está só com corridas leves, como o médico liberou. Quando ele liberar treinos mais fortes, marque em "Editar meta" e atualize o plano.' }));
+
+    // Próxima sessão
+    var feitoDia = {}; rs.forEach(function (r) { feitoDia[r.data] = 1; });
+    var todas = []; if (p && p.semanas) p.semanas.forEach(function (w) { (w.sessoes || []).forEach(function (x) { todas.push(x); }); });
+    var prox = todas.filter(function (x) { return x.data > hoje || (x.data === hoje && !feitoDia[hoje]); })[0];
+    if (prox) {
+      var pb = h('div', { class: 'tr-prox' }, h('small', { text: prox.data === hoje ? 'Treino de hoje' : 'Próximo treino · ' + dsem(prox.data) + ', ' + br(prox.data) }));
+      var ps = trSessao(prox, feitoDia, ''); ps.style.borderTop = '0'; ps.style.padding = '0'; ps.querySelector('.tr-dia').remove(); ps.style.gridTemplateColumns = '1fr';
+      pb.appendChild(ps); box.appendChild(pb);
+    }
+    // Análise
+    if (p && p.analise) {
+      var NV = { bom: 'No caminho certo', ok: 'Dá para chegar com ajustes', atencao: 'Atenção' };
+      var v = h('div', { class: 'verdict ' + p.nivel }, h('b', { text: (NV[p.nivel] || NV.ok) + (p.chance ? ' · chance ' + ({ alta: 'alta', media: 'média', baixa: 'baixa' }[p.chance] || p.chance) : '') }), h('p', { text: p.analise }));
+      if (p.resumo) v.appendChild(h('p', { text: p.resumo }));
+      if (p.alertas && p.alertas.length) { var ul = h('ul'); p.alertas.forEach(function (x) { ul.appendChild(h('li', { text: x })); }); v.appendChild(ul); }
+      var cr = new Date(p.criado); v.appendChild(h('p', { class: 'tip', text: 'Atualizado em ' + cr.toLocaleDateString('pt-BR') + ' às ' + cr.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) }));
+      box.appendChild(v);
+    }
+    trGraf(box, m);
+    // Plano por semana
+    if (p && p.semanas) {
+      p.semanas.forEach(function (w) {
+        var fim = addDias(w.inicio, 6), atual = hoje >= w.inicio && hoje <= fim;
+        if (fim < hoje) return;
+        var d = h('details', { class: 'tr-sem' }, h('summary', {}, document.createTextNode((w.titulo || 'Semana') + ' '), h('span', { text: br(w.inicio).slice(0, 5) + ' a ' + br(fim).slice(0, 5) })));
+        if (atual || w === p.semanas[0]) d.open = true;
+        if (w.foco) d.appendChild(h('p', { class: 'tip', text: w.foco }));
+        (w.sessoes || []).forEach(function (x) { d.appendChild(trSessao(x, feitoDia, hoje)); });
+        box.appendChild(d);
+      });
+    }
+    // Ações
+    var ac = h('div', { class: 'tr-acoes' });
+    var bt = h('button', { type: 'button', class: 'howbtn', id: 'tr-go', text: trBusy ? 'Montando o plano...' : p ? 'Atualizar plano' : 'Montar meu plano' });
+    if (trBusy) bt.disabled = true;
+    bt.addEventListener('click', function () { trAtualiza(false); });
+    var be = h('button', { type: 'button', class: 'link', id: 'tr-editar', text: trEdita ? 'Fechar' : 'Editar meta' });
+    be.addEventListener('click', function () { trEdita = !trEdita; renderTreinador(); });
+    ac.appendChild(bt); ac.appendChild(be); box.appendChild(ac);
+    if (trMsg) box.appendChild(h('p', { class: 'tip', 'aria-live': 'polite', text: trMsg }));
+    if (!p && !trBusy) box.appendChild(h('p', { class: 'tip', text: 'Depois de montado, o plano se atualiza sozinho a cada corrida nova que chegar do Strava.' }));
+    if (trEdita) {
+      var fN = h('input', { id: 'tr-nome', value: m.nome }), fD = h('input', { id: 'tr-data', type: 'date', value: m.prova });
+      var fK = h('input', { id: 'tr-km', type: 'number', step: 'any', min: '1', value: m.km }), fP = h('input', { id: 'tr-pace', value: clock(m.pace), placeholder: '6:30' });
+      var fL = h('input', { id: 'tr-lib', type: 'checkbox' }); fL.checked = !!m.liberado;
+      var sv2 = h('button', { type: 'button', class: 'go', id: 'tr-salvar', text: 'Salvar meta' });
+      sv2.addEventListener('click', function () {
+        var pp = String(fP.value).split(':'), pace = Number(pp[0]) * 60 + Number(pp[1] || 0);
+        if (!fD.value || !(Number(fK.value) > 0) || !(pace > 120)) { trMsg = 'Confira a data, a distância e o pace (ex.: 6:30).'; renderTreinador(); return; }
+        Store.set('treinador', 'meta', { nome: fN.value.trim() || 'Prova', prova: fD.value, km: Number(fK.value), pace: pace, liberado: fL.checked });
+        trEdita = false; trMsg = 'Meta salva. Toque em Atualizar plano para refazer o planejamento.'; renderTreinador();
+      });
+      box.appendChild(h('div', { class: 'finish tr-meta' },
+        h('div', { class: 'field' }, h('label', { for: 'tr-nome', text: 'Prova' }), fN),
+        h('div', { class: 'two' }, h('div', { class: 'field' }, h('label', { for: 'tr-data', text: 'Data' }), fD), h('div', { class: 'field' }, h('label', { for: 'tr-km', text: 'Distância (km)' }), fK)),
+        h('div', { class: 'field' }, h('label', { for: 'tr-pace', text: 'Pace alvo (min:seg por km)' }), fP),
+        h('label', { class: 'field' }, fL, document.createTextNode(' O médico liberou treinos mais intensos')),
+        sv2));
+    }
   }
 
   /* Planos: exercícios e compras planejados (só consulta, sem registro) */

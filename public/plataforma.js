@@ -340,7 +340,7 @@
       var tot = soma(rows), med = tot.usd / diasUso;
       h += '<p style="margin:12px 0 0">Em ' + diasUso + (diasUso === 1 ? ' dia' : ' dias') + ' de uso, a média é de <strong>' + dinheiro(med) + ' por dia</strong>, o que daria cerca de <strong>' + dinheiro(med * 30) + ' por mês</strong>.</p>';
       if (diasUso < 7) h += '<p style="margin:6px 0 0;' + sub + '">Com poucos dias de uso, a média ainda oscila: os primeiros dias tiveram testes e análises de histórico que não se repetem todo dia.</p>';
-      var nomes = { refeicao: 'Refeições', dia: 'Fechar o dia', receita: 'Receitas', atividade: 'Análise de atividades', semana: 'Análise da pesagem', fechamento: 'Fechamento da semana', outro: 'Outros' };
+      var nomes = { refeicao: 'Refeições', dia: 'Fechar o dia', receita: 'Receitas', atividade: 'Análise de atividades', semana: 'Análise da pesagem', fechamento: 'Fechamento da semana', treinador: 'Treinador de corrida', outro: 'Outros' };
       var tipos = {};
       rows.forEach(function (x) { (tipos[x.tipo] = tipos[x.tipo] || []).push(x); });
       h += '<h3 style="margin:16px 0 2px;font-size:1.1rem">Por tipo, desde o início</h3>';
