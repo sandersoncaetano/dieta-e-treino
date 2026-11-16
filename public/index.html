@@ -222,7 +222,9 @@ input[type="date"] { height: 46px; }
 .corpo-wrap { display: grid; justify-items: center; margin: 4px 0 8px; }
 svg.corpo { width: 100%; max-width: 420px; height: auto; }
 svg.corpo text { font-size: 9px; fill: var(--muted); font-weight: 700; }
-svg.corpo .musc { cursor: pointer; }
+svg.corpo .musc { cursor: pointer; transition: fill .15s; -webkit-tap-highlight-color: transparent; }
+svg.corpo .musc:hover { filter: brightness(.95); }
+.corpo-info { margin-top: 6px; }
 tr.sel th, tr.sel td { color: var(--accent); font-weight: 800; }
 .a-item h3 { font-size: 1.15rem; margin-bottom: 4px; }
 .fech-tab th, .fech-tab td { padding: 8px 6px; }
@@ -3693,53 +3695,97 @@ window.MOVES = (function () {
     var semApp = stravaLista().filter(function (a) { return a.tipo === 'WeightTraining' && a.data >= d0 && a.data <= hoje && !diasApp[a.data]; }).map(function (a) { return a.data; });
     return { m: m, ex: ex, semApp: semApp, semanas: dias / 7 };
   }
+  // Desenho anatômico: contornos suaves (Catmull-Rom) e músculos espelhados dos dois lados.
+  function suave(pts) {
+    var n = pts.length, f = function (v) { return Math.round(v * 10) / 10; }, d = 'M' + f(pts[0][0]) + ' ' + f(pts[0][1]);
+    for (var i = 0; i < n; i++) {
+      var p0 = pts[(i - 1 + n) % n], p1 = pts[i], p2 = pts[(i + 1) % n], p3 = pts[(i + 2) % n];
+      d += 'C' + f(p1[0] + (p2[0] - p0[0]) / 6) + ' ' + f(p1[1] + (p2[1] - p0[1]) / 6) + ' ' + f(p2[0] - (p3[0] - p1[0]) / 6) + ' ' + f(p2[1] - (p3[1] - p1[1]) / 6) + ' ' + f(p2[0]) + ' ' + f(p2[1]);
+    }
+    return d + 'Z';
+  }
+  function espelho(pts) { return pts.map(function (p) { return [100 - p[0], p[1]]; }); }
+  var CORPO_LADO = [[46, 25], [44, 31], [36, 33], [29, 36], [25.5, 41], [24, 50], [22.5, 62], [19.5, 76], [17, 90], [15, 98], [16, 104], [19.5, 103], [21.5, 95], [25.5, 79], [28.5, 65], [30.5, 55], [32, 64], [34.5, 80], [33.5, 92], [31.5, 104], [31, 128], [33.5, 150], [33, 162], [33.5, 186], [36, 205], [34.5, 212], [44.5, 214], [44, 205], [46.5, 180], [47, 158], [48, 130], [50, 113]];
+  var MUSC_FRENTE = {
+    ombros: [[[33.5, 34.5], [28, 37.5], [25.5, 44], [27, 50], [31, 47], [35.5, 39]]],
+    peito: [[[37.5, 37.5], [49.2, 37.5], [49.2, 50], [43.5, 53], [37, 50.5], [34, 44]]],
+    biceps: [[[27.5, 49.5], [31, 49], [31.5, 57], [29.5, 64], [26.5, 62], [25.5, 55]]],
+    antebraco: [[[24.5, 66], [28.5, 66], [26.5, 79], [22.5, 92], [19.5, 91.5], [20.5, 80]]],
+    obliquos: [[[36, 53], [42.5, 56], [43.2, 77], [40, 88], [35.5, 80], [35, 64]]],
+    quadriceps: [[[33, 104], [40, 99.5], [47.5, 112], [47, 139], [43.5, 152], [37.5, 153], [33.5, 141], [32.2, 120]]],
+    adutores: [[[44.5, 108], [49.5, 113.5], [48.3, 128], [46, 125]]],
+    panturrilhas: [[[34.5, 162], [38.5, 160], [38, 182], [35.5, 190], [33.8, 178]]]
+  };
+  var MUSC_COSTAS = {
+    trapezio: [[[50, 26], [56, 30], [64, 34.5], [57, 41], [52.5, 57], [50, 62], [47.5, 57], [43, 41], [36, 34.5], [44, 30]]],
+    ombros: [[[33.5, 34.5], [28, 37.5], [25.5, 44], [27, 50], [31, 47], [35.5, 39]]],
+    triceps: [[[26.5, 45], [30.5, 46.5], [31.5, 57], [29.5, 64], [26.3, 62], [24.8, 53]]],
+    antebraco: [[[24.5, 66], [28.5, 66], [26.5, 79], [22.5, 92], [19.5, 91.5], [20.5, 80]]],
+    dorsais: [[[35, 43], [44, 45.5], [48.5, 61], [47, 75], [40.5, 80], [34.5, 68], [31.5, 55]]],
+    lombar: [[[45, 74], [55, 74], [56.5, 89], [50, 94], [43.5, 89]]],
+    gluteos: [[[34, 96], [47.5, 94], [49.6, 101], [49, 116], [40.5, 120], [33.5, 112], [32.3, 102]]],
+    posteriores: [[[34, 122.5], [42, 121], [47.2, 126], [46.3, 149], [41.5, 156], [36.5, 154], [33.3, 138]]],
+    panturrilhas: [[[34, 160], [41, 157.5], [45.5, 163], [44.5, 180], [40.5, 192], [36.3, 190], [33.3, 176]]]
+  };
+  var CENTRO = { trapezio: 1, lombar: 1 };
   function corpoSVG(dados, alvo) {
     var semanal = function (g) { return dados.m[g] / dados.semanas; };
     var hc = cor('hi');
-    function tinta(g) { var v = semanal(g); if (v <= 0) return 'var(--mat)'; return alfa(hc, Math.min(1, 0.25 + 0.75 * v / 12)); }
-    var svg = sv('svg', { viewBox: '0 0 220 230', class: 'corpo', role: 'img', 'aria-label': 'Mapa muscular: frente e costas' });
-    function silhueta(ox) {
-      var g = sv('g', { transform: 'translate(' + ox + ',0)', fill: 'var(--surface)', stroke: 'var(--line)', 'stroke-width': 1.2 }, svg);
-      sv('circle', { cx: 50, cy: 14, r: 9 }, g);
-      sv('rect', { x: 45, y: 22, width: 10, height: 8, rx: 3 }, g);
-      sv('path', { d: 'M24 36 Q50 28 76 36 L72 66 L66 92 L68 106 L32 106 L34 92 L28 66 Z' }, g);
-      sv('rect', { x: 15, y: 36, width: 11, height: 66, rx: 5.5, transform: 'rotate(6 20 36)' }, g);
-      sv('rect', { x: 74, y: 36, width: 11, height: 66, rx: 5.5, transform: 'rotate(-6 80 36)' }, g);
-      sv('rect', { x: 33, y: 102, width: 16, height: 98, rx: 7 }, g);
-      sv('rect', { x: 51, y: 102, width: 16, height: 98, rx: 7 }, g);
-      return g;
+    function tinta(g) { var v = semanal(g); if (v <= 0) return 'var(--mat)'; return alfa(hc, Math.min(1, 0.28 + 0.72 * v / (dados.escala || 12))); }
+    var svg = sv('svg', { viewBox: '0 0 236 238', class: 'corpo', role: 'img', 'aria-label': 'Mapa muscular: frente e costas. Toque num músculo para ver os exercícios.' });
+    function figura(ox, musc, frente) {
+      var g = sv('g', { transform: 'translate(' + ox + ',4)' }, svg);
+      var lado = CORPO_LADO, contorno = lado.concat(espelho(lado).reverse().slice(1, -1));
+      sv('path', { d: suave(contorno), fill: 'var(--surface)', stroke: 'var(--line)', 'stroke-width': 1.3, 'stroke-linejoin': 'round' }, g);
+      sv('ellipse', { cx: 50, cy: 14, rx: 8.5, ry: 10.5, fill: 'var(--surface)', stroke: 'var(--line)', 'stroke-width': 1.3 }, g);
+      Object.keys(musc).forEach(function (grupo) {
+        musc[grupo].forEach(function (pts) {
+          var formas = CENTRO[grupo] ? [pts] : [pts, espelho(pts)];
+          formas.forEach(function (q) {
+            var el = sv('path', { d: suave(q), fill: tinta(grupo), stroke: alvo === grupo ? cor('fg') : 'var(--line)', 'stroke-width': alvo === grupo ? 1.6 : 0.6, class: 'musc', 'data-g': grupo, tabindex: '-1' }, g);
+            sv('title', { text: MUSC[grupo] + ': ' + fmtN0(semanal(grupo), 1) + ' séries' + (dados.semanas === 1 ? '' : ' por semana') }, el);
+          });
+        });
+      });
+      if (frente) {
+        // Abdômen em blocos ("tanquinho") e linha alba
+        [[44.2, 54.5], [44.2, 62.5], [44.4, 70.5]].forEach(function (p, i) {
+          [p[0], 100 - p[0] - 5.4].forEach(function (x) {
+            var el = sv('rect', { x: x, y: p[1], width: 5.4, height: i === 2 ? 8.5 : 7.2, rx: 2, fill: tinta('abdomen'), stroke: alvo === 'abdomen' ? cor('fg') : 'var(--line)', 'stroke-width': alvo === 'abdomen' ? 1.4 : 0.6, class: 'musc', 'data-g': 'abdomen' }, g);
+            sv('title', { text: MUSC.abdomen + ': ' + fmtN0(semanal('abdomen'), 1) + ' séries' }, el);
+          });
+        });
+        var ab = sv('path', { d: suave([[44.6, 80.5], [55.4, 80.5], [54, 90], [50, 95], [46, 90]]), fill: tinta('abdomen'), stroke: alvo === 'abdomen' ? cor('fg') : 'var(--line)', 'stroke-width': alvo === 'abdomen' ? 1.4 : 0.6, class: 'musc', 'data-g': 'abdomen' }, g);
+        sv('title', { text: MUSC.abdomen }, ab);
+      }
+      sv('text', { x: 50, y: 230, 'text-anchor': 'middle', text: frente ? 'Frente' : 'Costas' }, g);
     }
-    function regiao(g, grupo, el) {
-      el.setAttribute('fill', tinta(grupo)); el.setAttribute('stroke', alvo === grupo ? cor('fg') : 'none'); el.setAttribute('stroke-width', alvo === grupo ? 1.6 : 0);
-      el.setAttribute('class', 'musc'); el.setAttribute('data-g', grupo);
-      var t = document.createElementNS(SVG, 'title'); t.textContent = MUSC[grupo] + ': ' + fmtN0(semanal(grupo), 1) + ' séries por semana'; el.appendChild(t);
-      g.appendChild(el);
-    }
-    function E(cx, cy, rx, ry, rot) { var e = document.createElementNS(SVG, 'ellipse'); e.setAttribute('cx', cx); e.setAttribute('cy', cy); e.setAttribute('rx', rx); e.setAttribute('ry', ry); if (rot) e.setAttribute('transform', 'rotate(' + rot + ' ' + cx + ' ' + cy + ')'); return e; }
-    function R(x, y, w, h2, r) { var e = document.createElementNS(SVG, 'rect'); e.setAttribute('x', x); e.setAttribute('y', y); e.setAttribute('width', w); e.setAttribute('height', h2); e.setAttribute('rx', r); return e; }
-    function P(d) { var e = document.createElementNS(SVG, 'path'); e.setAttribute('d', d); return e; }
-    var f = silhueta(5), b = silhueta(115);
-    // Frente
-    [[30, 40, 7, 6], [70, 40, 7, 6]].forEach(function (a) { regiao(f, 'ombros', E(a[0], a[1], a[2], a[3])); });
-    regiao(f, 'peito', E(41, 50, 9, 7)); regiao(f, 'peito', E(59, 50, 9, 7));
-    regiao(f, 'biceps', E(25, 60, 4.5, 9, 6)); regiao(f, 'biceps', E(75, 60, 4.5, 9, -6));
-    regiao(f, 'antebraco', E(22, 84, 4, 11, 6)); regiao(f, 'antebraco', E(78, 84, 4, 11, -6));
-    regiao(f, 'abdomen', R(44, 59, 12, 32, 4));
-    regiao(f, 'obliquos', E(37.5, 76, 3.8, 11)); regiao(f, 'obliquos', E(62.5, 76, 3.8, 11));
-    regiao(f, 'quadriceps', E(41, 128, 7, 21)); regiao(f, 'quadriceps', E(59, 128, 7, 21));
-    regiao(f, 'adutores', E(47.5, 113, 2.4, 9)); regiao(f, 'adutores', E(52.5, 113, 2.4, 9));
-    // Costas
-    regiao(b, 'trapezio', P('M50 28 L63 37 L57 58 L43 58 L37 37 Z'));
-    regiao(b, 'ombros', E(30, 40, 7, 6)); regiao(b, 'ombros', E(70, 40, 7, 6));
-    regiao(b, 'triceps', E(25, 60, 4.5, 9, 6)); regiao(b, 'triceps', E(75, 60, 4.5, 9, -6));
-    regiao(b, 'dorsais', E(39, 66, 7, 12, -8)); regiao(b, 'dorsais', E(61, 66, 7, 12, 8));
-    regiao(b, 'lombar', R(44, 76, 12, 15, 4));
-    regiao(b, 'gluteos', E(43, 101, 8, 8)); regiao(b, 'gluteos', E(57, 101, 8, 8));
-    regiao(b, 'posteriores', E(41, 131, 6.5, 18)); regiao(b, 'posteriores', E(59, 131, 6.5, 18));
-    regiao(b, 'panturrilhas', E(41, 170, 5, 12)); regiao(b, 'panturrilhas', E(59, 170, 5, 12));
-    sv('text', { x: 55, y: 222, 'text-anchor': 'middle', text: 'Frente' }, svg);
-    sv('text', { x: 165, y: 222, 'text-anchor': 'middle', text: 'Costas' }, svg);
+    figura(8, MUSC_FRENTE, true);
+    figura(128, MUSC_COSTAS, false);
     return svg;
+  }
+  // Toque num músculo: mostra os exercícios e as séries abaixo do desenho.
+  function mapaInterativo(dados, rotSeries) {
+    var wrap = h('div', { class: 'corpo-wrap' }), info = h('div', { class: 'corpo-info', 'aria-live': 'polite' }), alvo = null;
+    function desenha() {
+      wrap.textContent = '';
+      var svg = corpoSVG(dados, alvo);
+      svg.addEventListener('click', function (e) {
+        var t = e.target.closest ? e.target.closest('[data-g]') : e.target, g = t && t.getAttribute && t.getAttribute('data-g');
+        alvo = g && g !== alvo ? g : null; desenha();
+      });
+      wrap.appendChild(svg);
+      info.textContent = '';
+      if (alvo) {
+        var ex = dados.ex[alvo] || {}, lst = Object.keys(ex).sort(function (a, b) { return ex[b] - ex[a]; });
+        var bx = h('div', { class: 'verdict ok' }, h('b', { text: MUSC[alvo] + ': ' + fmtN0(dados.m[alvo] / dados.semanas, 1) + ' ' + rotSeries }));
+        if (lst.length) { var ul = h('ul'); lst.forEach(function (n) { ul.appendChild(h('li', { text: n + ': ' + fmtN0(ex[n], 0) + (ex[n] === 1 ? ' série' : ' séries') })); }); bx.appendChild(ul); }
+        else bx.appendChild(h('p', { text: 'Nenhum exercício para este músculo no período.' }));
+        info.appendChild(bx);
+      } else info.appendChild(h('p', { class: 'tip', text: 'Toque num músculo para ver os exercícios e as séries.' }));
+    }
+    desenha();
+    return h('div', {}, wrap, info);
   }
   function renderMapa() {
     var box = $('d-mapa'); if (!box) return;
@@ -3754,22 +3800,13 @@ window.MOVES = (function () {
     box.appendChild(chips);
     var dd = mapaDados(mapaPer), tot = Object.keys(dd.m).reduce(function (a, k) { return a + dd.m[k]; }, 0);
     if (!tot) { box.appendChild(h('p', { class: 'g-vazio', text: 'Sem séries de musculação ou pilates registradas no app nesse período.' })); return; }
-    var svg = corpoSVG(dd, mapaReg);
-    svg.addEventListener('click', function (e) { var g = e.target.getAttribute && e.target.getAttribute('data-g'); if (g) { mapaReg = mapaReg === g ? null : g; renderMapa(); } });
-    box.appendChild(h('div', { class: 'corpo-wrap' }, svg));
+    box.appendChild(mapaInterativo(dd, 'séries por semana'));
     box.appendChild(legenda([['Mais séries', cor('hi')], ['Poucas', alfa(cor('hi'), 0.35)], ['Nenhuma', 'var(--mat)']]));
     var porSem = function (g) { return dd.m[g] / dd.semanas; };
-    if (mapaReg) {
-      var lst = Object.keys(dd.ex[mapaReg]).sort(function (a, b) { return dd.ex[mapaReg][b] - dd.ex[mapaReg][a]; });
-      var bx = h('div', { class: 'verdict ok' }, h('b', { text: MUSC[mapaReg] + ': ' + fmtN0(porSem(mapaReg), 1) + ' séries por semana' }));
-      if (lst.length) { var ul = h('ul'); lst.forEach(function (n) { ul.appendChild(h('li', { text: n + ': ' + fmtN0(dd.ex[mapaReg][n], 0) + ' séries' })); }); bx.appendChild(ul); }
-      else bx.appendChild(h('p', { text: 'Nenhum exercício para este grupo no período.' }));
-      box.appendChild(bx);
-    } else box.appendChild(h('p', { class: 'tip', text: 'Toque num músculo para ver os exercícios e as séries.' }));
     // Ranking e equilíbrio
     var ord = Object.keys(MUSC).sort(function (a, b) { return porSem(b) - porSem(a); });
     var tb = h('tbody');
-    ord.forEach(function (g) { var v = porSem(g); tb.appendChild(h('tr', { class: mapaReg === g ? 'sel' : '' }, h('th', { scope: 'row', text: MUSC[g] }), h('td', { text: v ? fmtN0(v, 1) : '–' }))); });
+    ord.forEach(function (g) { var v = porSem(g); tb.appendChild(h('tr', {}, h('th', { scope: 'row', text: MUSC[g] }), h('td', { text: v ? fmtN0(v, 1) : '–' }))); });
     box.appendChild(h('details', { class: 'mais' }, h('summary', { text: 'Séries por semana em cada grupo' }), h('div', { class: 'table-wrap' }, h('table', {}, h('thead', {}, h('tr', {}, h('th', { scope: 'col', text: 'Grupo' }), h('th', { scope: 'col', text: 'Séries/sem.' }))), tb))));
     var obs = [];
     var q = porSem('quadriceps'), pst = porSem('posteriores') + porSem('gluteos') * 0.5;
@@ -3986,11 +4023,12 @@ window.MOVES = (function () {
         var it = tr.v.itens || {}, ul3 = h('ul');
         Object.keys(it).forEach(function (k) { if (it[k].series > 0) ul3.appendChild(h('li', { text: (it[k].nome || k) + ': ' + it[k].series + ' séries' + (it[k].kg ? ' com ' + kg1(it[k].kg) + ' kg' : '') })); });
         gw.appendChild(ul3);
-        var dd = { m: {}, ex: {}, semanas: 1 / 7 * 7 };
+        var dd = { m: {}, ex: {}, semanas: 1 };
         Object.keys(MUSC).forEach(function (g) { dd.m[g] = 0; dd.ex[g] = {}; });
-        Object.keys(it).forEach(function (k) { var mp = EX_MUSC[k]; if (mp && it[k].series) Object.keys(mp).forEach(function (g) { dd.m[g] += it[k].series * mp[g] * 2; }); });
-        dd.semanas = 1;
-        gw.appendChild(h('div', { class: 'corpo-wrap' }, corpoSVG(dd, null)));
+        Object.keys(it).forEach(function (k) { var mp = EX_MUSC[k]; if (mp && it[k].series) Object.keys(mp).forEach(function (g) { dd.m[g] += it[k].series * mp[g]; dd.ex[g][it[k].nome || k] = (dd.ex[g][it[k].nome || k] || 0) + it[k].series; }); });
+        // Numa sessão, 6 séries já é muito para um grupo: escala própria.
+        dd.escala = 6;
+        gw.appendChild(mapaInterativo(dd, 'séries nesta sessão (contando parcialmente os músculos auxiliares)'));
         gw.appendChild(h('p', { class: 'tip', text: 'Músculos trabalhados nesta sessão, pelas séries marcadas no app (o relógio costuma errar nisso).' }));
       } else gw.appendChild(h('p', { class: 'g-vazio', text: 'Nenhum treino registrado no app em ' + br(a.data) + ', então não dá para mostrar os músculos trabalhados.' }));
       box.appendChild(gw);
