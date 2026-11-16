@@ -5580,7 +5580,7 @@ window.MOVES = (function () {
   var TR_DIAS0 = { 1: 'livre', 2: 'livre', 3: 'leve_opc', 4: 'forte', 5: 'livre', 6: 'nao', 0: 'nao' };
   var TR_DIA_OP = [['livre', 'O treinador decide'], ['leve', 'Só leve'], ['leve_opc', 'Opcional, bem leve'], ['forte', 'Pode ser forte'], ['nao', 'Não corro']];
   var TR_DIA_NOME = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'];
-  var TR_META0 = { nome: 'Corrida de rua 5 km', prova: '2026-12-13', km: 5, pace: 390, liberado: false, dias: TR_DIAS0, nota_dias: 'Na quarta vai para o trabalho presencial depois da corrida: nada que faça suar muito.' };
+  var TR_META0 = { nome: 'Corrida de rua 5 km', prova: '2026-12-13', km: 5, pace: 390, liberado: false, dias: TR_DIAS0, perna: 3, nota_dias: 'Na quarta vai para o trabalho presencial depois da corrida: nada que faça suar muito.' };
   var trBusy = false, trMsg = '', trTentou = {}, trEdita = false;
   function trMeta() { var m = Object.assign({}, TR_META0, Store.get('treinador', 'meta') || {}); m.dias = Object.assign({}, TR_DIAS0, m.dias || {}); return m; }
   function trPlano() { return Store.get('treinador', 'plano'); }
@@ -5605,6 +5605,7 @@ window.MOVES = (function () {
       'Você é o treinador de corrida do Sanderson. Hoje é ' + hoje + ' (' + dsem(hoje) + ').',
       'Meta: prova "' + m.nome + '" de ' + m.km + ' km em ' + m.prova + ' (' + dsem(m.prova) + '), terminando com pace médio de ' + trPaceTxt(m.pace) + ' (' + clock(m.pace * m.km) + ' no total).',
       'Disponibilidade por dia da semana (respeite à risca): ' + [1, 2, 3, 4, 5, 6, 0].map(function (d) { return TR_DIA_NOME[d] + ': ' + ({ livre: 'pode correr, você decide o tipo de treino', leve: 'só corrida leve', leve_opc: 'treino OPCIONAL e bem leve, curto, sem suar muito (marque opcional=true)', forte: 'dia preferido para o treino mais forte da semana, dentro do que o médico liberou', nao: 'não corre' })[m.dias[d]]; }).join('; ') + '. Faça de 3 a 5 corridas por semana, contando a opcional.' + (m.nota_dias ? ' Observação dele: ' + m.nota_dias : ''),
+      (m.perna !== '' && m.perna != null ? 'Treino de PERNA na academia: ' + TR_DIA_NOME[m.perna] + ' no fim da tarde (pesado para as pernas). Leve isso em conta: no dia seguinte de manhã as pernas estarão cansadas; se esse for o dia do treino forte, ajuste o tipo e a intensidade e explique a escolha, ou sugira trocar.' : '') ,
       'Perfil: homem adulto emagrecendo (cerca de 10 kg de gordura a perder), voltou a correr em 03/11/2026 depois de um tempo parado. Tem histórico de dor lombar (faz pilates duas vezes por semana). Faz musculação cerca de 5 vezes por semana no fim da tarde e pedala aos sábados. Corre de manhã nos dias úteis, cerca de 30 minutos, antes do trabalho em casa.',
       m.liberado
         ? 'O médico liberou treinos intensos (intervalados e ritmo de prova).'
@@ -5743,12 +5744,14 @@ window.MOVES = (function () {
         gDias.appendChild(h('label', { for: 'tr-dia-' + d, text: TR_DIA_NOME[d].replace(/^./, function (c) { return c.toUpperCase(); }) })); gDias.appendChild(sel);
       });
       var fObs = h('textarea', { id: 'tr-obs', rows: '2' }); fObs.value = m.nota_dias || '';
+      var fPer = h('select', { id: 'tr-perna' });
+      [[ '', 'Não informar' ]].concat([1, 2, 3, 4, 5, 6, 0].map(function (d) { return [String(d), TR_DIA_NOME[d]]; })).forEach(function (o) { var op = h('option', { value: o[0], text: o[1] }); if (String(m.perna) === o[0]) op.selected = true; fPer.appendChild(op); });
       var sv2 = h('button', { type: 'button', class: 'go', id: 'tr-salvar', text: 'Salvar meta' });
       sv2.addEventListener('click', function () {
         var pp = String(fP.value).split(':'), pace = Number(pp[0]) * 60 + Number(pp[1] || 0);
         if (!fD.value || !(Number(fK.value) > 0) || !(pace > 120)) { trMsg = 'Confira a data, a distância e o pace (ex.: 6:30).'; renderTreinador(); return; }
         var dias = {}; Object.keys(selDias).forEach(function (d) { dias[d] = selDias[d].value; });
-        Store.set('treinador', 'meta', { nome: fN.value.trim() || 'Prova', prova: fD.value, km: Number(fK.value), pace: pace, liberado: fL.checked, dias: dias, nota_dias: fObs.value.trim() });
+        Store.set('treinador', 'meta', { nome: fN.value.trim() || 'Prova', prova: fD.value, km: Number(fK.value), pace: pace, liberado: fL.checked, dias: dias, perna: fPer.value === '' ? '' : Number(fPer.value), nota_dias: fObs.value.trim() });
         trEdita = false; trMsg = ''; trAtualiza(false);
       });
       box.appendChild(h('div', { class: 'finish tr-meta' },
@@ -5757,6 +5760,7 @@ window.MOVES = (function () {
         h('div', { class: 'field' }, h('label', { for: 'tr-pace', text: 'Pace alvo (min:seg por km)' }), fP),
         h('label', { class: 'tr-chk' }, fL, document.createTextNode('O médico liberou treinos mais intensos')),
         h('div', { class: 'field' }, h('span', { text: 'Dias de corrida' }), gDias),
+        h('div', { class: 'field' }, h('label', { for: 'tr-perna', text: 'Dia do treino de perna na academia' }), fPer),
         h('div', { class: 'field' }, h('label', { for: 'tr-obs', text: 'Observações para o treinador' }), fObs),
         sv2));
     }
