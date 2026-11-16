@@ -5,12 +5,12 @@ import { env, responde, corpo, usuario, banco, rota } from './_lib.js';
 export const config = { maxDuration: 120 };
 
 function tipoDe(p) {
+  if (p.includes('treinador de corrida')) return 'treinador';
   if (p.includes('calculando uma receita')) return 'receita';
   if (p.includes('fechamento do dia')) return 'dia';
   if (p.includes('Analise a atividade atual')) return 'atividade';
   if (p.includes('Analise a semana')) return 'semana';
   if (p.includes('Feche a semana')) return 'fechamento';
-  if (p.includes('treinador de corrida')) return 'treinador';
   if (p.includes('estimando uma refeição')) return 'refeicao';
   return 'outro';
 }
