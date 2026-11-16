@@ -134,6 +134,19 @@ main { padding-block: 20px 72px; }
 .lift h3 { font-size: 1.2rem; }
 .lift-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; column-gap: 12px; row-gap: 2px; }
 .lift { gap: 8px; padding: 12px 14px; }
+/* Compacto: o exercício inteiro cabe na tela do celular */
+.how-sobre { position: relative; }
+.how-sobre .fig-modo { position: absolute; bottom: 6px; right: 6px; z-index: 2; display: flex; gap: 4px; }
+.how-sobre .fig-modo .dur { height: 32px; padding: 0 10px; font-size: .85rem; background: var(--bg); opacity: .92; }
+.how-sobre .fig-modo .dur[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); border-color: var(--accent); opacity: 1; }
+.lift .photo img { max-height: min(27vh, 240px); }
+.lift .stepper input[type="number"] { height: 42px; }
+.lift .stepper button { height: 42px; }
+.lift .rest-step button { height: 36px; }
+.lift .field > span, .lift .field > label { font-size: .85rem; }
+.lift .tip { font-size: .88rem; }
+.lift .skip-row { column-gap: 14px; row-gap: 2px; }
+.lift .skip-row .link { font-size: .92rem; }
 .mais { border-top: 1px solid var(--line); padding-top: 6px; }
 .mais summary { cursor: pointer; font-weight: 700; color: var(--accent); padding: 6px 0; }
 .mais[open] > *:not(summary) { margin-top: 8px; }
@@ -372,6 +385,10 @@ td.neg { color: var(--stop); font-weight: 700; }
 .avoid b { color: var(--stop); }
 
 .sets { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+/* Séries do exercício: todas numa linha, inclusive o "+", dividindo a largura */
+.lift .sets { flex-wrap: nowrap; gap: 6px; }
+.lift .sets .pip { flex: 1 1 0; min-width: 0; max-width: 72px; height: 42px; padding: 0 4px; }
+.lift .sets .pip-add { flex: 0 0 42px; max-width: 42px; }
 .pip { min-width: 52px; height: 46px; padding: 0 10px; border-radius: 8px; border: 2px solid var(--line); background: transparent; font-weight: 700; font-variant-numeric: tabular-nums; }
 .pip-add { border-style: dashed; font-size: 1.3rem; color: var(--accent); }
 .pip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
@@ -2007,7 +2024,9 @@ window.MOVES = (function () {
       }
       gifBtn.addEventListener('click', function () { howMode[mv.id] = 'gif'; mode('gif'); });
       aniBtn.addEventListener('click', function () { howMode[mv.id] = 'ani'; mode('ani'); });
-      how.appendChild(h('div', { class: 'durs', role: 'group', 'aria-label': 'Como ver o exercício' }, gifBtn, aniBtn));
+      // Botões GIF/Animação por cima da imagem, para economizar uma linha.
+      how.classList.add('how-sobre');
+      how.appendChild(h('div', { class: 'durs fig-modo', role: 'group', 'aria-label': 'Como ver o exercício' }, gifBtn, aniBtn));
       how.appendChild(box); how.appendChild(ani);
       mode(howMode[mv.id] || (Store.get('imagens', mv.id) ? 'gif' : 'ani'));
       maisBox.appendChild(h('p', { text: mv.how }));
