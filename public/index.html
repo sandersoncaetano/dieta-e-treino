@@ -960,26 +960,26 @@ var Store = (function () {
   ];
 
   var CARE = [
-    { id:'posterior', name:'Posterior de coxa', dose:'Cerca de 30 s por perna', care:true, bilateral:true, timer:[30,40],
+    { id:'posterior', name:'Posterior de coxa', dose:'3 séries de cerca de 30 s por perna', sets:3, min:3, sideNote:'Cada série vale as duas pernas.', care:true, bilateral:true, timer:[30,40],
       labelA:'Segura atrás da coxa', labelB:'Estica até sentir tensão', move:2200, ha:600, hb:2800, hi:['th','sh','ft'],
       A:lying({ k:[172,74], a:[230,78], t:[232,60], k2:[228,141], a2:[290,143], t2:[296,125], e:[128,100], w:[182,102], e2:[126,104], w2:[178,106] }),
       B:lying({ k:[176,74], a:[196,20], t:[178,14], k2:[228,141], a2:[290,143], t2:[296,125], e:[128,100], w:[178,104], e2:[126,104], w2:[174,108] }),
       cues:['Deitado, segure atrás da coxa, não no joelho.'],
       avoid:'pare se sentir formigamento, choque ou dor descendo pela perna.' },
-    { id:'joelhos', name:'Abraçar os joelhos', dose:'Cerca de 30 s', care:true, timer:[30,40],
+    { id:'joelhos', name:'Abraçar os joelhos', dose:'3 séries de cerca de 30 s', sets:3, min:3, care:true, timer:[30,40],
       labelA:'Joelhos dobrados', labelB:'Traz com suavidade', move:2000, ha:700, hb:2800, hi:['th','sh','ft'],
       A:lying({ k:[224,86], a:[252,143], t:[272,146] }),
       B:lying({ h:[168,134], k:[148,76], a:[200,100], t:[212,88], e:[118,100], w:[170,92], e2:[116,104], w2:[168,96] }),
       cues:['Traga os joelhos só até onde a lombar ficar confortável.'],
       avoid:'sem balançar e sem puxar forte.' },
-    { id:'rotacao', name:'Alongamento em rotação', dose:'30 s de cada lado', care:true, bilateral:true, timer:[30,40], tag:'Visto de cima', noFloor:true, alt:true,
+    { id:'rotacao', name:'Alongamento em rotação', dose:'3 séries de 30 s de cada lado', sets:3, min:3, sideNote:'Cada série vale os dois lados.', care:true, bilateral:true, timer:[30,40], tag:'Visto de cima', noFloor:true, alt:true,
       labelA:'De barriga para cima', labelB:'Abre o braço devagar', move:2300, ha:700, hb:2800, hi:['ua2','fa2'],
       solid:['ua2','fa2','th2','sh2','ft2'],
       A:{ n:[60,90], s:[98,90], m:[146,90], h:[194,92], e:[150,124], w:[202,150], k:[208,156], a:[258,104], t:[272,112], k2:[258,92], a2:[320,90], t2:[334,82], e2:[128,58], w2:[168,34] },
       B:{ n:[60,90], s:[98,90], m:[146,90], h:[194,92], e:[150,124], w:[202,150], k:[208,156], a:[258,104], t:[272,112], k2:[258,92], a2:[320,90], t2:[334,82], e2:[98,50], w2:[98,12] },
       cues:['De barriga para cima, cruze o joelho dobrado sobre o corpo e segure com a mão.','Deixe o outro braço esticado e gire só até um ponto confortável.'],
       avoid:'sem empurrar o joelho nem forçar a rotação.' },
-    { id:'descomp', name:'Descompressão', dose:'30 a 40 s', care:true, timer:[30,40], vb:'-50 -125 560 280', post:true,
+    { id:'descomp', name:'Descompressão', dose:'3 séries de 30 a 40 s', sets:3, min:3, care:true, timer:[30,40], vb:'-50 -125 560 280', post:true,
       labelA:'Segura firme', labelB:'Leva o quadril para trás', move:2000, ha:700, hb:2800, hi:['torso'],
       A:{ n:[246,-100], s:[240,-68], m:[234,-25], h:[232,20], e:[278,-46], w:[312,-22], k:[234,82], a:[232,142], t:[250,146] },
       B:{ n:[256,-16], s:[240,22], m:[195,18], h:[150,40], e:[278,0], w:[312,-22], k:[200,90], a:[232,142], t:[250,146] },
@@ -1234,10 +1234,9 @@ var Store = (function () {
       stop(); beep();
       if (x.bilateral && side === 0) { side = 1; note.textContent = 'Troque de lado e inicie de novo.'; return; }
       side = 0;
-      if (x.care) { note.textContent = 'Tempo concluído.'; return; }
       note.textContent = 'Série marcada.';
       setDone(x, (state.done[x.id] || 0) + 1);
-      if (window.Rest) window.Rest.start(40, (state.done[x.id] || 0) >= x.sets ? lombNext(x) : null);
+      if (window.Rest) window.Rest.start(x.care ? 20 : 40, (state.done[x.id] || 0) >= x.sets ? lombNext(x) : null);
     }
     go.addEventListener('click', function () {
       if (tick) { stop(); note.textContent = 'Tempo cancelado.'; return; }
@@ -1265,6 +1264,29 @@ var Store = (function () {
     body.appendChild(a);
   }
 
+  function buildSets(x, body) {
+    var sets = document.createElement('div'); sets.className = 'sets';
+    pipsets[x.id] = [];
+    for (var n = 0; n < x.sets; n++) (function (n) {
+      var b = document.createElement('button');
+      b.type = 'button'; b.className = 'pip'; b.id = 'pip-' + x.id + '-' + n; b.textContent = n + 1;
+      b.setAttribute('aria-label', x.name + ', série ' + (n + 1));
+      b.addEventListener('click', function () {
+        var cur = state.done[x.id] || 0;
+        setDone(x, cur === n + 1 ? n : n + 1);
+        if (cur !== n + 1 && window.Rest) window.Rest.start(x.care ? 20 : 40, n + 1 === x.sets ? lombNext(x) : null);
+      });
+      pipsets[x.id].push(b); sets.appendChild(b);
+    })(n);
+    var small = document.createElement('small');
+    small.textContent = x.sideNote || (x.min < x.sets ? 'Mínimo de ' + x.min + ' séries.' : '');
+    sets.appendChild(small);
+    body.appendChild(sets);
+    var nextBtn = document.createElement('button');
+    nextBtn.type = 'button'; nextBtn.className = 'link next'; nextBtn.id = 'next-' + x.id; nextBtn.textContent = 'Próximo exercício';
+    nextBtn.addEventListener('click', lombNext(x));
+    body.appendChild(nextBtn);
+  }
   var list = document.getElementById('list');
   EX.forEach(function (x, i) {
     var card = document.createElement('article'); card.className = 'ex';
@@ -1288,27 +1310,7 @@ var Store = (function () {
       }; }(x.id, wi, x.name));
       wf.appendChild(wl); wf.appendChild(wi); body.appendChild(wf);
     }
-    var sets = document.createElement('div'); sets.className = 'sets';
-    pipsets[x.id] = [];
-    for (var n = 0; n < x.sets; n++) (function (n) {
-      var b = document.createElement('button');
-      b.type = 'button'; b.className = 'pip'; b.id = 'pip-' + x.id + '-' + n; b.textContent = n + 1;
-      b.setAttribute('aria-label', x.name + ', série ' + (n + 1));
-      b.addEventListener('click', function () {
-        var cur = state.done[x.id] || 0;
-        setDone(x, cur === n + 1 ? n : n + 1);
-        if (cur !== n + 1 && window.Rest) window.Rest.start(40, n + 1 === x.sets ? lombNext(x) : null);
-      });
-      pipsets[x.id].push(b); sets.appendChild(b);
-    })(n);
-    var small = document.createElement('small');
-    small.textContent = x.sideNote || (x.min < x.sets ? 'Mínimo de ' + x.min + ' séries.' : '');
-    sets.appendChild(small);
-    body.appendChild(sets);
-    var nextBtn = document.createElement('button');
-    nextBtn.type = 'button'; nextBtn.className = 'link next'; nextBtn.id = 'next-' + x.id; nextBtn.textContent = 'Próximo exercício';
-    nextBtn.addEventListener('click', lombNext(x));
-    body.appendChild(nextBtn);
+    buildSets(x, body);
     card.appendChild(body);
     list.appendChild(card);
     window.Fig.cards.push({ x: x, card: card });
@@ -1325,6 +1327,7 @@ var Store = (function () {
     body.appendChild(head);
     textBlock(x, body);
     if (x.timer) buildTimer(x, body);
+    buildSets(x, body);
     card.appendChild(body);
     care.appendChild(card);
     window.Fig.cards.push({ x: x, card: card });
@@ -1335,7 +1338,7 @@ var Store = (function () {
     state.done = d && d.done ? d.done : {};
     var pw = document.getElementById('peso-ponte'), pc = Store.get('cargas', 'ponte');
     if (pw && pc && document.activeElement !== pw) pw.value = pc.kg;
-    EX.forEach(renderPips);
+    EX.concat(CARE).forEach(renderPips);
   };
   window.setLombarDay = function (d) { today = d; window.renderLombar(); };
   window.renderLombar();
