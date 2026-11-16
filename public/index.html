@@ -281,6 +281,9 @@ svg.corpo .musc { cursor: pointer; transition: fill .15s; -webkit-tap-highlight-
 svg.corpo .musc:hover { filter: brightness(.95); }
 .corpo-info { margin-top: 6px; }
 tr.sel th, tr.sel td { color: var(--accent); font-weight: 800; }
+.padroes { margin-top: 14px; }
+.padroes tr.falta th, .padroes tr.falta td { color: var(--muted); }
+.padroes tr:not(.falta) th { color: var(--fg); }
 .a-item h3 { font-size: 1.15rem; margin-bottom: 4px; }
 .fech-tab th, .fech-tab td { padding: 8px 6px; }
 table.fech-tab { font-size: .9rem; }
@@ -3803,6 +3806,9 @@ window.MOVES = (function () {
     ['panturrilhas', [[33.8, 160], [38.8, 157.5], [39.6, 170], [38, 184], [34.6, 180], [33.2, 170]]],
     ['panturrilhas', [[39.6, 158], [45.2, 161], [45.4, 175], [42.5, 188], [39.8, 184], [40.2, 170]]]
   ];
+  // Faixa semanal de referência por grupo (séries): grupos grandes 10 a 20, pequenos a partir de 6.
+  var MUSC_ALVO = { peito: 10, dorsais: 10, ombros: 10, biceps: 8, triceps: 8, quadriceps: 10, posteriores: 10, gluteos: 10, panturrilhas: 6, trapezio: 6, abdomen: 6, obliquos: 4, lombar: 4, adutores: 4, antebraco: 4 };
+  function faixaDe(g, v) { var a = MUSC_ALVO[g] || 10; return v <= 0 ? 0 : v < a * 0.4 ? 1 : v < a ? 2 : 3; }
   var CORPO_COR = { fundo: '#101b2e', pele: '#1c2a43', borda: '#3a5279', base: '#2a3c5c', texto: '#9fb3d1', sel: '#ffffff' };
   function corpoSVG(dados, alvo) {
     var semanal = function (g) { return dados.m[g] / dados.semanas; };
@@ -3813,7 +3819,8 @@ window.MOVES = (function () {
     function pinta(el, g) {
       var v = g ? semanal(g) : 0, t = Math.min(1, v / (dados.escala || 12));
       el.setAttribute('fill', v > 0 ? 'url(#calor)' : C.base);
-      if (v > 0) el.setAttribute('fill-opacity', String(Math.round((0.35 + 0.65 * t) * 100) / 100));
+      // No mapa da semana a cor segue a faixa recomendada; numa sessão, a escala própria.
+      if (v > 0) el.setAttribute('fill-opacity', String(dados.faixa ? [0, 0.3, 0.6, 1][faixaDe(g, v)] : Math.round((0.35 + 0.65 * t) * 100) / 100));
       el.setAttribute('stroke', g && alvo === g ? C.sel : C.borda);
       el.setAttribute('stroke-width', g && alvo === g ? 1.4 : 0.5);
       if (g) {
@@ -3865,6 +3872,38 @@ window.MOVES = (function () {
     desenha();
     return h('div', {}, wrap, info);
   }
+  /* Padrões de movimento: o que está sendo treinado e o que falta */
+  var PADROES = [
+    ['Empurrar', ['supino_deitado', 'supino_inclinado', 'voador', 'crucifixo_alta', 'crucifixo_baixa', 'desenvolvimento'], ''],
+    ['Puxar', ['pulley', 'remada_baixa', 'remada_maquina', 'crucifixo_inverso'], ''],
+    ['Agachar (joelho)', ['leg_press', 'leg_press_alto', 'hack', 'extensora'], ''],
+    ['Dobradiça de quadril', ['stiff', 'terra_romeno', 'extensao_45'], 'Stiff, levantamento terra romeno ou extensão no banco 45°. Fortalece posteriores, glúteos e lombar juntos; com histórico de lombar, comece leve e valide a execução.'],
+    ['Unilateral', ['afundo', 'bulgaro', 'subida_banco'], 'Afundo, búlgaro ou subida no banco: equilíbrio, glúteo médio e joelhos; ajuda na corrida e no pedal.'],
+    ['Core', ['prancha', 'lateral', 'birddog', 'dead_bug', 'pallof'], 'Pallof press na polia ou dead bug, para progredir além da prancha.'],
+    ['Carregar peso', ['fazendeiro'], 'Caminhada do fazendeiro com halteres pesados: pegada, trapézio, core e postura.'],
+    ['Saúde do ombro', ['face_pull', 'rotacao_externa'], 'Face pull ou rotação externa na polia, para equilibrar o volume grande de empurrar.']
+  ];
+  function padroesBox(dias) {
+    var hoje = Store.day(), d0 = addDias(hoje, -(dias - 1)), cont = {};
+    treinosOk().forEach(function (r) { if (r.v.data < d0 || r.v.data > hoje) return; var it = r.v.itens || {}; Object.keys(it).forEach(function (k) { cont[k] = (cont[k] || 0) + (it[k].series || 0); }); });
+    var lo = Store.all('lombar');
+    Object.keys(lo).forEach(function (d) { if (d < d0 || d > hoje) return; var x = lo[d].done || {}; Object.keys(x).forEach(function (k) { cont[k] = (cont[k] || 0) + x[k]; }); });
+    var sem = dias / 7, faltam = [];
+    var tb = h('tbody');
+    PADROES.forEach(function (p) {
+      var n = p[1].reduce(function (a, k) { return a + (cont[k] || 0); }, 0) / sem;
+      tb.appendChild(h('tr', { class: n ? '' : 'falta' }, h('th', { scope: 'row', text: (n ? '✓ ' : '✗ ') + p[0] }), h('td', { text: n ? fmtN0(n, 0) + ' séries/sem.' : 'nenhuma' })));
+      if (!n && p[2]) faltam.push(p);
+    });
+    var box = h('div', { class: 'padroes' }, h('h3', { text: 'Padrões de movimento' }), h('div', { class: 'table-wrap' }, h('table', {}, tb)));
+    if (faltam.length) {
+      var ul = h('ul', { class: 'tip' });
+      faltam.forEach(function (p) { ul.appendChild(h('li', {}, h('b', { text: p[0] + ': ' }), document.createTextNode(p[2]))); });
+      box.appendChild(h('p', { class: 'tip', text: 'Ainda não estão na ficha:' }));
+      box.appendChild(ul);
+    }
+    return box;
+  }
   function renderMapa() {
     var box = $('d-mapa'); if (!box) return;
     box.textContent = '';
@@ -3878,8 +3917,9 @@ window.MOVES = (function () {
     box.appendChild(chips);
     var dd = mapaDados(mapaPer), tot = Object.keys(dd.m).reduce(function (a, k) { return a + dd.m[k]; }, 0);
     if (!tot) { box.appendChild(h('p', { class: 'g-vazio', text: 'Sem séries de musculação ou pilates registradas no app nesse período.' })); return; }
+    dd.faixa = true;
     box.appendChild(mapaInterativo(dd, 'séries por semana'));
-    box.appendChild(legenda([['Mais séries', '#ff7a2f'], ['Poucas', 'rgba(255,122,47,.4)'], ['Nenhuma', '#2a3c5c']]));
+    box.appendChild(legenda([['Na faixa recomendada', '#ff7a2f'], ['Abaixo', 'rgba(255,122,47,.6)'], ['Pouco', 'rgba(255,122,47,.3)'], ['Nenhuma', '#2a3c5c']]));
     var porSem = function (g) { return dd.m[g] / dd.semanas; };
     // Ranking e equilíbrio
     var ord = Object.keys(MUSC).sort(function (a, b) { return porSem(b) - porSem(a); });
@@ -3892,9 +3932,14 @@ window.MOVES = (function () {
     var push = porSem('peito') + porSem('ombros') * 0.5, pull = porSem('dorsais') + porSem('trapezio') * 0.5;
     if (push > 6 && pull < push * 0.7) obs.push('Mais empurrar (peito e ombros) que puxar (costas); equilibrar ajuda a postura.');
     var poucos = ord.filter(function (g) { return porSem(g) > 0 && porSem(g) < 4 && ['adutores', 'antebraco', 'obliquos'].indexOf(g) < 0; }).map(function (g) { return MUSC[g]; });
-    if (poucos.length) obs.push('Com menos de 4 séries por semana: ' + poucos.join(', ') + '.');
     if (dd.semApp.length) obs.push('O relógio registrou musculação em ' + dd.semApp.map(br).join(', ') + ' sem treino no app; essas sessões não entram no mapa.');
+    var cima = ['peito', 'dorsais', 'ombros', 'biceps', 'triceps', 'trapezio'].reduce(function (a, g) { return a + porSem(g); }, 0);
+    var baixo = ['quadriceps', 'posteriores', 'gluteos', 'panturrilhas', 'adutores'].reduce(function (a, g) { return a + porSem(g); }, 0);
+    if (cima > 10 && baixo < cima * 0.6) obs.unshift('Parte de cima com ' + fmtN0(cima, 0) + ' séries por semana e pernas com ' + fmtN0(baixo, 0) + '. Para quem pedala, corre e quer gastar mais energia, o ideal é pelo menos equilibrar.');
+    var abaixo = Object.keys(MUSC_ALVO).filter(function (g) { return faixaDe(g, porSem(g)) === 1 || faixaDe(g, porSem(g)) === 2; }).filter(function (g) { return MUSC_ALVO[g] >= 8; }).map(function (g) { return MUSC[g] + ' (' + fmtN0(porSem(g), 0) + ' de ' + MUSC_ALVO[g] + ')'; });
+    if (abaixo.length) obs.push('Abaixo da faixa recomendada: ' + abaixo.join(', ') + '.');
     if (obs.length) { var ul2 = h('ul', { class: 'tip' }); obs.forEach(function (o) { ul2.appendChild(h('li', { text: o })); }); box.appendChild(ul2); }
+    box.appendChild(padroesBox(mapaPer));
     box.appendChild(h('p', { class: 'tip', text: 'Baseado nas séries marcadas no app; exercícios que trabalham mais de um grupo contam parcialmente nos secundários. A referência comum para hipertrofia é de 10 a 20 séries por semana nos grupos principais.' }));
   }
 
