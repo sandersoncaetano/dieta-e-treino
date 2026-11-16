@@ -2356,7 +2356,7 @@ window.MOVES = (function () {
   function anaResumo(sid) {
     var x = Store.get('analises', sid); if (!x || !x.veredito) return null;
     var v = VERED[x.veredito] || VERED.estavel;
-    return h('div', { class: 'verdict ' + v[1] }, h('b', { text: v[0] + ': ' + (x.titulo || '') }), h('p', { text: x.diagnostico }), h('a', { href: '#historico', class: 'link', text: 'Ver análise completa no Histórico', on: { click: function () { histSel = x.data; histMes = x.data.slice(0, 7); } } }));
+    return h('div', { class: 'verdict ' + v[1] }, h('b', { text: x.titulo && x.titulo !== v[0] ? v[0] + ': ' + x.titulo : v[0] }), h('p', { text: x.diagnostico }), h('a', { href: '#historico', class: 'link', text: 'Ver análise completa no Histórico', on: { click: function () { histSel = x.data; histMes = x.data.slice(0, 7); } } }));
   }
   function cardioRow(id, c) {
     var label = TIPOS.filter(function (t) { return t[0] === c.tipo; })[0];
@@ -2696,7 +2696,7 @@ window.MOVES = (function () {
       });
     }).catch(function (e) {
       if (!quieto) stravaMsg = e && e.code === 'sem_mcp' ? 'A leitura do Strava não está disponível nesta tela.' : stravaErro(e);
-    }).then(function () { stravaBusy = false; renderHist(); renderCardio(); anaPendentes(); if (trPlano()) trAtualiza(true); });
+    }).then(function () { stravaBusy = false; renderHist(); renderCardio(); anaPendentes(); trRetorno(); trAtualiza(true); });
   }
   function renderBalanco() {
     var box = $('balanco'); box.textContent = '';
@@ -3260,7 +3260,7 @@ window.MOVES = (function () {
     }
     var ctx = [];
     if (m.temp != null && m.temp >= 28) ctx.push('estava ' + Math.round(m.temp) + ' °C');
-    if (viz.length) ctx.push('houve outra atividade ' + (mesmoDia ? 'no mesmo dia' : 'no dia anterior'));
+    if (viz.length && (ve === 'queda' || ve === 'atencao')) ctx.push('houve outra atividade ' + (mesmoDia ? 'no mesmo dia' : 'no dia anterior'));
     if (ctx.length && (ve === 'queda' || ve === 'atencao' || m.km)) dg.push('Contexto: ' + ctx.join(' e ') + ', o que pode pesar no esforço.');
     var dest = anaInd(m, ant).filter(function (o) { return o.dir; }).slice(0, 3).map(function (o) { return o.rot + ': ' + o.txt + (o.base ? ' (' + o.base + ')' : ''); });
     var sug;
@@ -4229,7 +4229,7 @@ window.MOVES = (function () {
     var x = Store.get('analises', id);
     if (x && x.veredito) {
       var v = VERED[x.veredito] || VERED.estavel;
-      var an = h('section', { class: 'panel' }, h('h2', { text: 'Análise' }), h('div', { class: 'verdict ' + v[1] }, h('b', { text: v[0] + ': ' + (x.titulo || '') }), h('p', { text: x.diagnostico || '' })));
+      var an = h('section', { class: 'panel' }, h('h2', { text: 'Análise' }), h('div', { class: 'verdict ' + v[1] }, h('b', { text: x.titulo && x.titulo !== v[0] ? v[0] + ': ' + x.titulo : v[0] }), h('p', { text: x.diagnostico || '' })));
       if (x.destaques && x.destaques.length) { var ul = h('ul'); x.destaques.forEach(function (d) { ul.appendChild(h('li', { text: d })); }); an.lastChild.appendChild(ul); }
       if (x.sugestao) an.lastChild.appendChild(h('p', {}, h('b', { text: 'Próxima sessão: ' }), document.createTextNode(x.sugestao)));
       box.appendChild(an);
@@ -5690,6 +5690,14 @@ window.MOVES = (function () {
   }
   function trPaceTxt(seg) { return clock(seg) + '/km'; }
   function trDiasAte(d) { var a = Store.day(); return Math.round((diaNum(d) - diaNum(a))); }
+  // Período que o plano detalha: de hoje (ou amanhã, se já correu) até o domingo; se sobrarem menos de 4 dias, vai até o domingo seguinte.
+  function trPeriodo() {
+    var hoje = Store.day(), ja = trCorridas().some(function (r) { return r.data === hoje; });
+    var ini = ja ? addDias(hoje, 1) : hoje, fim = addDias(segDe(ini), 6);
+    if (diaNum(fim) - diaNum(ini) < 3) fim = addDias(fim, 7);
+    var prova = trMeta().prova; if (fim > prova) fim = prova;
+    return { ini: ini, fim: fim };
+  }
   function trPrompt() {
     var m = trMeta(), hoje = Store.day(), rs = trCorridas().filter(function (r) { return r.data >= addDias(hoje, -60); });
     var bikes = cardioTudo().filter(function (r) { return r.v.tipo === 'bike' && r.v.data >= addDias(hoje, -28); })
@@ -5710,22 +5718,30 @@ window.MOVES = (function () {
       'Pedaladas das últimas 4 semanas: ' + JSON.stringify(bikes),
       'Dias com musculação nos últimos 14 dias: ' + JSON.stringify(gym),
       antSes.length ? 'Sessões que você planejou para os últimos 14 dias (compare com o que foi feito): ' + JSON.stringify(antSes) : 'Ainda não havia plano anterior.',
-      'Tarefas: 1) Analise a corrida mais recente e a tendência (pace, FC, deriva cardíaca, regularidade dos parciais) em relação à meta e ao que foi planejado. 2) Estime o tempo que ele faria hoje nos ' + m.km + ' km em esforço de prova, se houver base. 3) Monte o plano de amanhã até o dia da prova, organizado por semanas de segunda a domingo, seguindo a disponibilidade por dia acima (corridas de manhã), progressão de no máximo cerca de 10% de volume por semana, e uma semana final mais leve antes da prova. Inclua a prova como última sessão. Seja realista: se a meta parecer difícil para o prazo, diga e sugira uma meta intermediária, mas mantenha o plano voltado à meta.',
-      'Use português do Brasil, frases curtas e diretas (descrição de cada sessão com no máximo 160 caracteres). Paces no formato m:ss. Não use aspas duplas dentro dos textos.',
-      'Responda com JSON: {"nivel":"bom|ok|atencao","analise":"2 a 4 frases sobre a última corrida e a tendência","estimativa_seg":número ou null,"chance":"alta|media|baixa","resumo":"1 frase sobre onde ele está em relação à meta","alertas":["até 3 textos"],"semanas":[{"inicio":"AAAA-MM-DD (segunda)","titulo":"curto","foco":"1 frase","sessoes":[{"data":"AAAA-MM-DD","tipo":"leve|longo|progressivo|ritmo|intervalado|regenerativo|prova","titulo":"curto","descricao":"como fazer, incluindo aquecimento e desaquecimento quando houver","km":número,"pace":"m:ss ou faixa m:ss-m:ss","fc_max":número ou null,"opcional":true ou false}]}]}'
+      'Tarefas: 1) Analise a semana que passou e a tendência (pace, FC, deriva cardíaca, regularidade dos parciais) em relação à meta e ao que foi planejado. 2) Estime o tempo que ele faria hoje nos ' + m.km + ' km em esforço de prova, se houver base. 3) Detalhe as sessões SÓ de ' + trPeriodo().ini + ' a ' + trPeriodo().fim + ', seguindo a disponibilidade por dia acima (corridas de manhã). ' + (trPeriodo().fim === m.prova ? 'A prova cai nesse período: inclua-a como última sessão. ' : '') + '4) Para cada semana seguinte até a prova, dê só o título e o foco em uma frase (progressão de no máximo cerca de 10% de volume por semana e semana final mais leve). Seja realista: se a meta parecer difícil para o prazo, diga e sugira uma meta intermediária, mas mantenha o plano voltado à meta.',
+      'Use português do Brasil, frases curtas e diretas (descrição de cada sessão com no máximo 140 caracteres; análise com no máximo 3 frases). Paces no formato m:ss. Não use aspas duplas dentro dos textos.',
+      'Responda com JSON: {"nivel":"bom|ok|atencao","analise":"2 a 4 frases sobre a última corrida e a tendência","estimativa_seg":número ou null,"chance":"alta|media|baixa","resumo":"1 frase sobre onde ele está em relação à meta","alertas":["até 3 textos"],"semana":{"titulo":"curto","foco":"1 frase","sessoes":[{"data":"AAAA-MM-DD","tipo":"leve|longo|progressivo|ritmo|intervalado|regenerativo|prova","titulo":"curto","descricao":"como fazer, incluindo aquecimento e desaquecimento quando houver","km":número,"pace":"m:ss ou faixa m:ss-m:ss","fc_max":número ou null,"opcional":true ou false}]},"proximas":[{"inicio":"AAAA-MM-DD (segunda)","titulo":"curto","foco":"1 frase"}]}'
     ].join('\n\n');
   }
   function trAtualiza(auto) {
     if (trBusy) return;
     var rs = trCorridas(), ult = rs.length ? rs[rs.length - 1].id : '';
-    if (auto) { if (!ult || trTentou[ult]) return; var p0 = trPlano(); if (p0 && (p0.ultima === ult || (p0.pendente && Date.now() - new Date(p0.criado).getTime() < 120000))) return; }
-    trTentou[ult] = 1; trBusy = true; trMsg = '';
+    var hj = Store.day();
+    if (auto) {
+      // Plano novo só quando o período detalhado terminou (normalmente na segunda) e antes da prova.
+      var p0 = trPlano(); if (!p0 || trTentou[hj] || hj > trMeta().prova) return;
+      var ate = p0.ate || (p0.semanas && p0.semanas[0] ? addDias(p0.semanas[0].inicio, 6) : hj);
+      if (ate >= hj) return;
+      if (Date.now() - new Date(p0.criado).getTime() < 3600e3) return;
+    }
+    trTentou[hj] = 1; trBusy = true; trMsg = '';
     renderTreinador();
     Store.sample().then(function (sample) {
       if (!sample) throw new Error('indisponivel');
       return sample.json(trPrompt(), { modelTier: 'default', cache: false });
     }).then(function (r) {
-      var sem = (Array.isArray(r.semanas) ? r.semanas : []).slice(0, 8).map(function (w) {
+      var per = trPeriodo(), lista = r.semana ? [Object.assign({ inicio: segDe(per.ini) }, r.semana)].concat(Array.isArray(r.proximas) ? r.proximas : []) : (Array.isArray(r.semanas) ? r.semanas : []);
+      var sem = lista.slice(0, 8).map(function (w) {
         return { inicio: String(w.inicio || ''), titulo: String(w.titulo || ''), foco: String(w.foco || ''),
           sessoes: (Array.isArray(w.sessoes) ? w.sessoes : []).slice(0, 7).map(function (x) {
             return { data: String(x.data || ''), tipo: String(x.tipo || 'leve'), titulo: String(x.titulo || ''), descricao: String(x.descricao || ''), km: Number(x.km) || null, pace: String(x.pace || ''), fc_max: Number(x.fc_max) || null, opcional: x.opcional === true };
@@ -5734,10 +5750,37 @@ window.MOVES = (function () {
       if (!sem.length) throw new Error('vazio');
       Store.set('treinador', 'plano', { nivel: ['bom', 'ok', 'atencao'].indexOf(r.nivel) > -1 ? r.nivel : 'ok', analise: String(r.analise || ''), resumo: String(r.resumo || ''),
         estimativa_seg: Number(r.estimativa_seg) || null, chance: String(r.chance || ''), alertas: (Array.isArray(r.alertas) ? r.alertas : []).slice(0, 3).map(String),
-        semanas: sem, ultima: ult, meta: trMeta(), criado: new Date().toISOString() });
+        semanas: sem, ultima: ult, ate: per.fim, meta: trMeta(), criado: new Date().toISOString() });
     }).catch(function (e) {
       trMsg = e && e.message === 'indisponivel' ? 'O treinador automático não está disponível aqui.' : 'Não consegui montar o plano agora. Tente de novo.';
     }).then(function () { trBusy = false; renderTreinador(); });
+  }
+  // Retorno de cada corrida contra a sessão planejada, calculado no app (sem IA).
+  function trPaceFaixa(t) {
+    var m = String(t || '').match(/(\d+):(\d{2})(?:\s*[-–a]\s*(\d+):(\d{2}))?/); if (!m) return null;
+    var a = +m[1] * 60 + +m[2], b = m[3] ? +m[3] * 60 + +m[4] : a; return [Math.min(a, b), Math.max(a, b)];
+  }
+  function trSessaoDe(d) {
+    var p = trPlano(), x = null; if (!p || !p.semanas) return null;
+    p.semanas.forEach(function (w) { (w.sessoes || []).forEach(function (s) { if (s.data === d) x = s; }); }); return x;
+  }
+  function trRetornoDe(r) {
+    var s = trSessaoDe(r.data), it = [], nivel = 'bom';
+    if (!s) return { nivel: 'ok', titulo: 'Corrida fora do plano', itens: ['Não havia sessão planejada para ' + dsem(r.data) + '. Tudo bem, só não some intensidade extra na semana.'] };
+    var f = trPaceFaixa(s.pace);
+    if (f) {
+      if (r.pace < f[0] - 5) { it.push('Pace ' + clock(r.pace) + '/km, mais rápido que o planejado (' + s.pace + ').' + (TR_INTENSO[s.tipo] ? '' : ' Em treino leve, correr rápido demais atrapalha a recuperação.')); if (!TR_INTENSO[s.tipo]) nivel = 'ok'; }
+      else if (r.pace > f[1] + 5) { it.push('Pace ' + clock(r.pace) + '/km, mais lento que o planejado (' + s.pace + ').'); if (TR_INTENSO[s.tipo]) nivel = 'ok'; }
+      else it.push('Pace ' + clock(r.pace) + '/km, dentro do planejado (' + s.pace + ').');
+    }
+    if (s.km) { var dk = (r.km - s.km) / s.km; it.push(Math.abs(dk) <= .1 ? 'Distância cumprida: ' + fmtN(r.km, 2) + ' km.' : fmtN(r.km, 2) + ' km, ' + (dk > 0 ? 'mais' : 'menos') + ' que os ' + fmtN(s.km, 1) + ' km planejados.'); if (dk < -.2) nivel = 'ok'; }
+    if (s.fc_max && r.fc) { if (r.fc > s.fc_max) { it.push('FC média de ' + r.fc + ' bpm, acima do teto de ' + s.fc_max + '.'); nivel = 'atencao'; } else it.push('FC média de ' + r.fc + ' bpm, dentro do teto de ' + s.fc_max + '.'); }
+    return { nivel: nivel, titulo: (s.titulo || s.tipo) + ': ' + ({ bom: 'como planejado', ok: 'com desvios', atencao: 'acima do combinado' })[nivel], itens: it };
+  }
+  function trRetorno() {
+    var rs = trCorridas(), r = rs[rs.length - 1]; if (!r || !trPlano() || Store.get('treinador', 'ret_' + r.id)) return;
+    Store.set('treinador', 'ret_' + r.id, { data: r.data, criado: new Date().toISOString() });
+    usoLocal('treinador');
   }
   var TR_INTENSO = { ritmo: 1, intervalado: 1, prova: 1, progressivo: 1 };
   function trSessao(x, feitoDia, hoje) {
@@ -5796,6 +5839,13 @@ window.MOVES = (function () {
       var ps = trSessao(prox, feitoDia, ''); ps.style.borderTop = '0'; ps.style.padding = '0'; ps.querySelector('.tr-dia').remove(); ps.style.gridTemplateColumns = '1fr';
       pb.appendChild(ps); box.appendChild(pb);
     }
+    // Retorno da última corrida contra o plano (app)
+    var ultR = rs[rs.length - 1];
+    if (p && ultR && ultR.data >= addDias(hoje, -3)) {
+      var rt = trRetornoDe(ultR), rb = h('div', { class: 'verdict ' + rt.nivel }, h('b', { text: 'Corrida de ' + dsem(ultR.data) + ' · ' + rt.titulo }));
+      var rul = h('ul'); rt.itens.forEach(function (x) { rul.appendChild(h('li', { text: x })); }); rb.appendChild(rul);
+      box.appendChild(rb);
+    }
     // Análise
     if (p && p.analise) {
       var NV = { bom: 'No caminho certo', ok: 'Dá para chegar com ajustes', atencao: 'Atenção' };
@@ -5811,6 +5861,7 @@ window.MOVES = (function () {
       p.semanas.forEach(function (w) {
         var fim = addDias(w.inicio, 6), atual = hoje >= w.inicio && hoje <= fim;
         if (fim < hoje) return;
+        if (!(w.sessoes && w.sessoes.length) && w !== p.semanas[0]) { box.appendChild(h('div', { class: 'tr-sem' }, h('b', { text: (w.titulo || 'Semana') + ' ' }), h('span', { class: 'tip', text: br(w.inicio).slice(0, 5) + ' a ' + br(fim).slice(0, 5) }), w.foco ? h('p', { class: 'tip', text: w.foco }) : null)); return; }
         var d = h('details', { class: 'tr-sem' }, h('summary', {}, document.createTextNode((w.titulo || 'Semana') + ' '), h('span', { text: br(w.inicio).slice(0, 5) + ' a ' + br(fim).slice(0, 5) })));
         if (atual || w === p.semanas[0]) d.open = true;
         if (w.foco) d.appendChild(h('p', { class: 'tip', text: w.foco }));
@@ -5820,14 +5871,14 @@ window.MOVES = (function () {
     }
     // Ações
     var ac = h('div', { class: 'tr-acoes' });
-    var bt = h('button', { type: 'button', class: 'howbtn', id: 'tr-go', text: trBusy ? 'Montando o plano...' : p ? 'Atualizar plano' : 'Montar meu plano' });
+    var bt = h('button', { type: 'button', class: 'howbtn', id: 'tr-go', text: trBusy ? 'Montando o plano...' : p ? 'Refazer plano' : 'Montar meu plano' });
     if (trBusy) bt.disabled = true;
     bt.addEventListener('click', function () { trAtualiza(false); });
     var be = h('button', { type: 'button', class: 'link', id: 'tr-editar', text: trEdita ? 'Fechar' : 'Editar meta e dias' });
     be.addEventListener('click', function () { trEdita = !trEdita; renderTreinador(); });
     ac.appendChild(bt); ac.appendChild(be); box.appendChild(ac);
     if (trMsg) box.appendChild(h('p', { class: 'tip', 'aria-live': 'polite', text: trMsg }));
-    if (!p && !trBusy) box.appendChild(h('p', { class: 'tip', text: 'Depois de montado, o plano se atualiza sozinho a cada corrida nova que chegar do Strava.' }));
+    if (!p && !trBusy) box.appendChild(h('p', { class: 'tip', text: 'O plano detalha a semana atual e é refeito sozinho toda segunda. Cada corrida que chega do Strava é comparada com o planejado na hora.' }));
     if (trEdita) {
       var fN = h('input', { id: 'tr-nome', value: m.nome }), fD = h('input', { id: 'tr-data', type: 'date', value: m.prova });
       var fK = h('input', { id: 'tr-km', type: 'number', step: 'any', min: '1', value: m.km }), fP = h('input', { id: 'tr-pace', value: clock(m.pace), placeholder: '6:30' });

@@ -15,6 +15,27 @@ function tipoDe(p) {
   return 'outro';
 }
 
+// Modelo e limite de resposta por tipo de chamada. Sonnet para fotos e para o plano do treinador;
+// Haiku (cerca de 1/3 do preço) para o que é só texto e curto.
+const SONNET = process.env.ANTHROPIC_MODEL || 'claude-sonnet-5-5';
+const HAIKU = process.env.ANTHROPIC_MODEL_LEVE || 'claude-haiku-5-5';
+const POR_TIPO = {
+  refeicao: { leve: true, max: 1600 },
+  receita: { leve: false, max: 2500 },
+  dia: { leve: true, max: 900 },
+  atividade: { leve: false, max: 1000 },
+  semana: { leve: true, max: 1800 },
+  fechamento: { leve: true, max: 2200 },
+  treinador: { leve: false, max: 2500 },
+  outro: { leve: false, max: 2000 }
+};
+function escolhe(tipo, temFoto) {
+  const c = POR_TIPO[tipo] || POR_TIPO.outro;
+  return { modelo: c.leve && !temFoto ? HAIKU : SONNET, max: c.max };
+}
+// Ferramenta única e obrigatória: a resposta chega como objeto JSON já validado pela API.
+const FERRAMENTA = { name: 'responder', description: 'Devolve a resposta no formato JSON pedido no texto.', input_schema: { type: 'object', additionalProperties: true } };
+
 function extraiJson(txt) {
   const t = String(txt || '').trim().replace(/^```(?:json)?/i, '').replace(/```$/, '').trim();
   try { return JSON.parse(t); } catch (e) {}
@@ -40,8 +61,9 @@ export default rota(async (req, res) => {
 
   const conteudo = [
     ...imagens.map((i) => ({ type: 'image', source: { type: 'base64', media_type: i.tipo || 'image/jpeg', data: i.base64 } })),
-    { type: 'text', text: prompt + '\n\nResponda somente com o JSON, sem texto antes ou depois. Dentro dos textos, use aspas simples em vez de aspas duplas.' }
+    { type: 'text', text: prompt + '\n\nEntregue a resposta chamando a ferramenta responder com o objeto JSON pedido. Dentro dos textos, use aspas simples em vez de aspas duplas.' }
   ];
+  const tipo = tipoDe(String(prompt)), esc = escolhe(tipo, imagens.length > 0);
 
   const chama = async (msgs) => {
     const r = await fetch('https://api.anthropic.com/v1/messages', {
@@ -51,30 +73,34 @@ export default rota(async (req, res) => {
         'anthropic-version': '2023-06-01',
         'content-type': 'application/json'
       },
-      body: JSON.stringify({ model: process.env.ANTHROPIC_MODEL || 'claude-sonnet-5-5', max_tokens: 6000, messages: msgs })
+      body: JSON.stringify({ model: esc.modelo, max_tokens: esc.max, messages: msgs, tools: [FERRAMENTA], tool_choice: { type: 'tool', name: 'responder' } })
     });
     const j = await r.json();
     if (!r.ok) {
       console.error('Anthropic', r.status, JSON.stringify(j).slice(0, 500));
       throw Object.assign(new Error((j.error && j.error.message) || 'Falha na IA'), { status: 502, code: 'ia' });
     }
-    const modelo = j.model || process.env.ANTHROPIC_MODEL || 'claude-sonnet-5-5';
+    const modelo = j.model || esc.modelo;
     try {
-      await banco('uso_ia', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ user_id: u.id, tipo: tipoDe(String(prompt)), modelo, entrada: (j.usage && j.usage.input_tokens) || 0, saida: (j.usage && j.usage.output_tokens) || 0, imagens: imagens.length }) });
+      await banco('uso_ia', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ user_id: u.id, tipo, modelo, entrada: (j.usage && j.usage.input_tokens) || 0, saida: (j.usage && j.usage.output_tokens) || 0, imagens: imagens.length }) });
     } catch (e) { /* registro de uso não pode derrubar o cálculo */ }
+    const ferr = (j.content || []).filter((c) => c.type === 'tool_use')[0];
     const texto = (j.content || []).filter((c) => c.type === 'text').map((c) => c.text).join('');
-    if (!texto) console.error('Anthropic sem texto', JSON.stringify(j).slice(0, 500));
-    return { texto, uso: j.usage, parou: j.stop_reason };
+    if (!ferr && !texto) console.error('Anthropic sem resposta', JSON.stringify(j).slice(0, 500));
+    return { objeto: ferr && ferr.input && typeof ferr.input === 'object' && Object.keys(ferr.input).length ? ferr.input : null, texto, uso: j.usage, parou: j.stop_reason };
   };
   const msgs = [{ role: 'user', content: conteudo }];
   let r1 = await chama(msgs), resultado;
+  if (r1.parou === 'max_tokens') console.error('Resposta cortada no limite', tipo, esc.max);
+  if (r1.objeto) return responde(res, 200, { resultado: r1.objeto, uso: r1.uso });
   try { resultado = extraiJson(r1.texto); } catch (e) {
-    // JSON inválido (aspas soltas, texto cortado): pede uma vez para a IA corrigir.
-    console.error('JSON inválido', r1.parou, e.message);
+    // Sem objeto válido (resposta cortada ou fora do formato): pede uma vez uma versão mais enxuta.
+    console.error('Resposta sem JSON', tipo, r1.parou, e.message);
     const r2 = await chama(msgs.concat([
-      { role: 'assistant', content: r1.texto || '{}' },
-      { role: 'user', content: 'Esse JSON está inválido (' + e.message + '). Devolva o mesmo conteúdo como JSON válido, mais enxuto se precisar, sem aspas duplas dentro dos textos. Só o JSON.' }
+      { role: 'assistant', content: r1.texto || 'Vou responder.' },
+      { role: 'user', content: 'A resposta não veio completa. Responda de novo, mais enxuta, chamando a ferramenta responder com o objeto JSON pedido.' }
     ]));
+    if (r2.objeto) return responde(res, 200, { resultado: r2.objeto, uso: r2.uso });
     resultado = extraiJson(r2.texto); r1 = r2;
   }
   responde(res, 200, { resultado, uso: r1.uso });
