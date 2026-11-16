@@ -4580,8 +4580,15 @@ window.MOVES = (function () {
       if (lados.length > 1 && lados.every(aliTemQtd)) lados.forEach(function (x) { out.push(x.trim()); });
       else out.push(p);
     });
+    // "Músculo bovino moído, preparado: 200g": um trecho sem quantidade seguido de um modo de preparo
+    // (ou de algo que começa com "com/sem/de") é o mesmo alimento; junta os dois.
+    for (var i = out.length - 2; i >= 0; i--) {
+      var prox = aliNorm(out[i + 1]).replace(/^[^a-z]+/, '');
+      if (!aliTemQtd(out[i]) && ALI_PREP.test(prox)) { out.splice(i, 2, out[i] + ', ' + out[i + 1]); }
+    }
     return out;
   }
+  var ALI_PREP = /^(preparad|cozid|grelhad|assad|frit|refogad|moid|cru|crua|temperad|desfiad|picad|ralad|light|integral|natural|desnatad|congelad|sem |com |de |no |na |em |ao |a milanesa|empanad|defumad|cozinhad|feit|caseir|magr|gord)/;
   function aliTemQtd(x) { var r = aliLe(x); return !!(r.g || r.n); }
   // Lê um trecho: quantidade (g, contagem com unidade ou número antes do alimento) e o nome normalizado.
   function aliLe(txt) {
