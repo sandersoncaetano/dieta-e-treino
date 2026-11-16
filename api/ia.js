@@ -35,6 +35,9 @@ function escolhe(tipo, temFoto) {
 }
 // Ferramenta única e obrigatória: a resposta chega como objeto JSON já validado pela API.
 const FERRAMENTA = { name: 'responder', description: 'Devolve a resposta no formato JSON pedido no texto.', input_schema: { type: 'object', additionalProperties: true } };
+// Refeição por trechos: esquema explícito, para a lista vir como lista de verdade.
+const ITEM = { type: 'object', properties: { trecho: { type: 'integer' }, nome: { type: 'string' }, quantidade: { type: 'string' }, gramas: { type: 'number' }, kcal: { type: 'number' }, proteina_g: { type: 'number' }, gordura_g: { type: 'number' }, carbo_g: { type: 'number' } }, required: ['trecho', 'nome', 'kcal', 'proteina_g', 'gordura_g'] };
+const FERR_ITENS = { name: 'responder', description: 'Devolve os itens calculados da refeição.', input_schema: { type: 'object', properties: { itens: { type: 'array', items: ITEM }, observacao: { type: 'string' } }, required: ['itens'] } };
 
 // Às vezes o modelo devolve listas e objetos da ferramenta como texto JSON: converte de volta.
 function desembrulha(o) {
@@ -42,7 +45,13 @@ function desembrulha(o) {
   console.log('ia resposta', Object.keys(o).map((k) => k + ':' + (Array.isArray(o[k]) ? 'lista' : typeof o[k])).join(' '));
   for (const k of Object.keys(o)) {
     const v = o[k];
-    if (typeof v === 'string' && /^\s*[\[{]/.test(v)) { try { o[k] = JSON.parse(v); } catch (e) { /* mantém o texto */ } }
+    if (typeof v !== 'string') continue;
+    const i = v.search(/[\[{]/), fim = Math.max(v.lastIndexOf(']'), v.lastIndexOf('}'));
+    if (i < 0 || fim <= i || i > 20) continue;
+    const trecho = v.slice(i, fim + 1);
+    try { o[k] = JSON.parse(trecho); } catch (e) {
+      try { o[k] = JSON.parse(trecho.replace(/'/g, '"')); } catch (e2) { console.error('ia campo em texto', k, v.slice(0, 300)); }
+    }
   }
   return o;
 }
@@ -84,7 +93,7 @@ export default rota(async (req, res) => {
         'anthropic-version': '2023-06-01',
         'content-type': 'application/json'
       },
-      body: JSON.stringify({ model: esc.modelo, max_tokens: esc.max, messages: msgs, tools: [FERRAMENTA], tool_choice: { type: 'tool', name: 'responder' } })
+      body: JSON.stringify({ model: esc.modelo, max_tokens: esc.max, messages: msgs, tools: [/Trechos do relato/.test(String(prompt)) ? FERR_ITENS : FERRAMENTA], tool_choice: { type: 'tool', name: 'responder' } })
     });
     const j = await r.json();
     if (!r.ok) {
