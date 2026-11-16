@@ -3429,6 +3429,7 @@ window.MOVES = (function () {
   function desde(per) { return PER_DIAS[per] ? addDias(Store.day(), -PER_DIAS[per]) : '0000-00-00'; }
   function perNome(per) { return { '1M': 'último mês', '3M': 'últimos 3 meses', '6M': 'últimos 6 meses', '1A': 'último ano', 'Tudo': 'todo o período' }[per] || ''; }
   function fmtN0(v, c) { return Number(v).toLocaleString('pt-BR', { minimumFractionDigits: c || 0, maximumFractionDigits: c || 0 }); }
+  function escuro() { return document.documentElement.getAttribute('data-theme') === 'dark' || (!document.documentElement.getAttribute('data-theme') && window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches); }
   function temaGrafico(c, chave, grande) {
     var fg = cor('fg'), mut = cor('muted'), lin = cor('line');
     var opt = c.options || {};
@@ -3456,7 +3457,9 @@ window.MOVES = (function () {
         plugins: {
           legend: { display: nds > 1, position: 'bottom', labels: { usePointStyle: true, pointStyle: 'circle', boxWidth: 8, boxHeight: 8, padding: 14, color: fg, font: { size: grande ? 14 : 12, weight: '600' }, filter: function (it, d) { return !d.datasets[it.datasetIndex].semLegenda; } } },
           tooltip: {
-            backgroundColor: alfa(fg.length === 7 ? fg : '#142338', 0.94), titleColor: '#fff', bodyColor: '#fff', padding: 10, cornerRadius: 10, boxPadding: 4, usePointStyle: true,
+            // Fundo escuro com texto claro nos dois temas (no escuro, a cor do texto do app é clara).
+            backgroundColor: alfa(escuro() ? '#22324f' : (fg.length === 7 ? fg : '#142338'), 0.96), borderColor: escuro() ? alfa('#8fb3ff', 0.35) : 'transparent', borderWidth: escuro() ? 1 : 0,
+            titleColor: '#fff', bodyColor: '#fff', footerColor: '#dbe6f7', padding: 10, cornerRadius: 10, boxPadding: 4, usePointStyle: true,
             titleFont: { size: 13, weight: '700' }, bodyFont: { size: 13 },
             filter: function (it) { return it.raw !== null && it.raw !== undefined && !(it.dataset.semDica); },
             callbacks: Object.assign({ title: function (its) { if (!its.length) return ''; var x = its[0].parsed.x; return xDias ? dsem(numDia(x)) + ', ' + br(numDia(x)) : its[0].label; } }, c.dicas || {})
@@ -3840,10 +3843,13 @@ window.MOVES = (function () {
       ab.appendChild(v);
       if (f.comeu !== Math.round(r.comeu)) ab.appendChild(h('p', { class: 'tip', text: 'As refeições da semana mudaram depois desta análise. Analise de novo.' }));
     } else ab.appendChild(h('p', { class: 'tip', text: r.dom > hoje ? 'A semana ainda está em andamento. O ideal é fechar no domingo, depois de fechar o dia.' : 'Toque para a IA avaliar a semana, inclusive o peso do fim de semana no resultado.' }));
-    var bt = h('button', { type: 'button', class: 'go', id: 'fech-go', text: fechBusy ? 'Analisando...' : (f && f.resumo ? 'Analisar de novo' : 'Fechar a semana') });
-    if (fechBusy) bt.disabled = true;
-    bt.addEventListener('click', function () { fechaSemana(seg); });
-    ab.appendChild(bt);
+    // Só dá para fechar a semana a partir do domingo dela.
+    if (r.dom <= hoje) {
+      var bt = h('button', { type: 'button', class: 'go', id: 'fech-go', text: fechBusy ? 'Analisando...' : (f && f.resumo ? 'Analisar de novo' : 'Fechar a semana') });
+      if (fechBusy) bt.disabled = true;
+      bt.addEventListener('click', function () { fechaSemana(seg); });
+      ab.appendChild(bt);
+    }
     if (fechMsg) ab.appendChild(h('p', { class: 'tip', 'aria-live': 'polite', text: fechMsg }));
     box.appendChild(ab);
   }
