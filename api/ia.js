@@ -20,7 +20,7 @@ function tipoDe(p) {
 const SONNET = process.env.ANTHROPIC_MODEL || 'claude-sonnet-5-5';
 const HAIKU = process.env.ANTHROPIC_MODEL_LEVE || 'claude-haiku-5-5';
 const POR_TIPO = {
-  refeicao: { leve: true, max: 1600 },
+  refeicao: { leve: true, max: 1000 },
   receita: { leve: false, max: 2500 },
   dia: { leve: true, max: 900 },
   atividade: { leve: false, max: 1000 },

@@ -724,7 +724,7 @@ footer .col { display: grid; gap: 10px; }
 
 <script>
 var Store = (function () {
-  var COLLS = ['treinos', 'cardio', 'lombar', 'cargas', 'imagens', 'refeicoes', 'descansos', 'dias', 'peso', 'strava', 'receitas', 'analises', 'medidas', 'composicao', 'saude_dia', 'semanas', 'fechamentos', 'treinador'];
+  var COLLS = ['treinos', 'cardio', 'lombar', 'cargas', 'imagens', 'refeicoes', 'descansos', 'dias', 'peso', 'strava', 'receitas', 'analises', 'medidas', 'composicao', 'saude_dia', 'semanas', 'fechamentos', 'treinador', 'alimentos'];
   var KEY = 'caderno-treino';
   var cache = {}; COLLS.forEach(function (c) { cache[c] = {}; });
   var subs = [], db = null, mode = 'loading';
@@ -4480,6 +4480,174 @@ window.MOVES = (function () {
     return Object.keys(g).map(function (k) { return g[k]; }).filter(function (x) { return x.n >= 2; })
       .sort(function (a, b) { return b.n - a.n || ((b.v.criado || '') > (a.v.criado || '') ? 1 : -1); }).slice(0, 4);
   }
+  /* Alimentos conhecidos: leitura do relato e cálculo local */
+  var ALI_NUM = { um: 1, uma: 1, dois: 2, duas: 2, tres: 3, quatro: 4, cinco: 5, meio: .5, meia: .5 };
+  var ALI_UN = /\b(scoops?|dosador(?:es)?|unidades?|un|fatias?|colher(?:es)?(?: de (?:sopa|cha|sobremesa))?|xicaras?|copos?|latas?|pedacos?|conchas?|porcoes|porcao|long necks?)\b/;
+  var ALI_FILL = /\b(aproximadamente|aprox|cerca de|cerca|uns|umas|mais ou menos|em torno de|peso|total|so|apenas)\b/g;
+  var ALI_STOP = { de: 1, do: 1, da: 1, dos: 1, das: 1, e: 1, com: 1, no: 1, na: 1, o: 1, a: 1 };
+  function aliNorm(s) { return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, ''); }
+  function aliUnid(u) {
+    u = u.replace(/ de (sopa|cha|sobremesa)/, '_$1');
+    if (/^colher/.test(u)) return u.indexOf('_') > -1 ? 'colher_' + u.split('_')[1] : 'colher';
+    var T = [[/^(scoop|dosador)/, 'scoop'], [/^un/, 'un'], [/^fatia/, 'fatia'], [/^xicara/, 'xicara'], [/^copo/, 'copo'], [/^(lata|long neck)/, 'lata'], [/^pedaco/, 'pedaco'], [/^concha/, 'concha'], [/^porc/, 'porcao']];
+    for (var i = 0; i < T.length; i++) if (T[i][0].test(u)) return T[i][1];
+    return u;
+  }
+  function aliNumero(t) { return ALI_NUM[t] != null ? ALI_NUM[t] : Number(String(t).replace(',', '.')); }
+  // Separa o relato em trechos, sem quebrar números decimais (1,5 kg) nem nomes como "pele e osso".
+  function aliTrechos(relato) {
+    var partes = String(relato || '').replace(/\r/g, '').split(/\n|;|\+|(?<!\d)[.,]|[.,](?!\d)/);
+    var out = [];
+    partes.forEach(function (p) {
+      p = p.trim(); if (!p) return;
+      // Dois pesos no mesmo trecho ligados por "e": separa.
+      // "Arroz 100g e feijão 50g": separa no "e" só quando cada lado tem a sua quantidade.
+      var lados = p.split(/ e /i);
+      if (lados.length > 1 && lados.every(aliTemQtd)) lados.forEach(function (x) { out.push(x.trim()); });
+      else out.push(p);
+    });
+    return out;
+  }
+  function aliTemQtd(x) { var r = aliLe(x); return !!(r.g || r.n); }
+  // Lê um trecho: quantidade (g, contagem com unidade ou número antes do alimento) e o nome normalizado.
+  function aliLe(txt) {
+    var n = aliNorm(txt).replace(/(\d+)\s*%/g, '$1pct').replace(/[()\[\]:"'!?]/g, ' ').replace(/\s+/g, ' ').trim();
+    var r = { txt: txt, g: null, n: null, un: null, amb: false };
+    var gs = [], re = /(\d+(?:[.,]\d+)?)\s*(kg|g|gr|gramas?|ml|l|litros?)\b/g, m;
+    while ((m = re.exec(n))) gs.push(aliNumero(m[1]) * (/^(kg|l|litro)/.test(m[2]) ? 1000 : 1));
+    n = n.replace(re, ' ');
+    var mu = n.match(new RegExp('\\b(\\d+(?:[.,]\\d+)?|um|uma|dois|duas|tres|quatro|cinco|meio|meia)\\s+' + ALI_UN.source));
+    if (mu) { r.n = aliNumero(mu[1]); r.un = aliUnid(mu[2]); n = n.replace(mu[0], ' '); }
+    else {
+      var ml = n.match(/^\s*(\d+(?:[.,]\d+)?|um|uma|dois|duas|tres|quatro|cinco|meio|meia)\s+(?=[a-z])/);
+      if (ml) { r.n = aliNumero(ml[1]); r.un = 'un'; n = n.replace(ml[0], ' '); }
+      else { var mf = n.match(/\s(\d+(?:[.,]\d+)?)\s*(unidades?)?\s*$/); if (mf) { r.n = aliNumero(mf[1]); r.un = 'un'; n = n.replace(mf[0], ' '); } }
+    }
+    if (gs.length > 1) r.amb = true;
+    if (gs.length === 1) { if (r.n && r.n > 1 && r.un !== 'un') r.amb = true; else if (r.n && r.n > 1) r.amb = true; else { r.g = gs[0]; r.n = null; r.un = null; } }
+    if (/(^|\s)\d+([.,]\d+)?(\s|$)/.test(n)) r.amb = true;
+    n = n.replace(ALI_FILL, ' ').replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+    var w = n.split(' ').filter(Boolean);
+    while (w.length && ALI_STOP[w[0]]) w.shift();
+    while (w.length && ALI_STOP[w[w.length - 1]]) w.pop();
+    r.nome = w.join(' ');
+    if (!r.nome || w.length > 12) r.amb = true;
+    return r;
+  }
+  // Tabela de alimentos aprendida: um documento por jeito de escrever (apelido), com valores por 100 g,
+  // por unidade (scoop, fatia, unidade...) ou pela porção habitual quando ele não informa quantidade.
+  function aliKey(nome) { return nome.replace(/ /g, '_').slice(0, 90); }
+  function aliGet(nome) { return nome ? Store.get('alimentos', aliKey(nome)) : null; }
+  function aliMult(v, f) { return { kcal: v.kcal * f, p: v.p * f, g: v.g * f, c: v.c * f }; }
+  function aliValor(a, t) {
+    if (!a || t.amb) return null;
+    if (t.g) {
+      if (a.g100) return aliMult(a.g100, t.g / 100);
+      var uu = a.un && Object.keys(a.un).map(function (k) { return a.un[k]; }).filter(function (x) { return x.gramas; })[0];
+      return uu ? aliMult(uu, t.g / uu.gramas) : null;
+    }
+    if (t.n) {
+      var u = a.un && a.un[t.un];
+      if (u) return aliMult(u, t.n);
+      if (t.un === 'un' && a.pad && !a.g100) return aliMult(a.pad, t.n);
+      return null;
+    }
+    return a.pad ? aliMult(a.pad, 1) : null;
+  }
+  function aliQtd(t) {
+    if (t.g) return fmtN(t.g, 0) + ' g';
+    if (t.n) return fmtN(t.n, 1) + ' ' + ({ un: t.n > 1 ? 'unidades' : 'unidade', scoop: t.n > 1 ? 'scoops' : 'scoop', porcao: t.n > 1 ? 'porções' : 'porção' }[t.un] || t.un.replace('_', ' de ') + (t.n > 1 ? 's' : ''));
+    return 'porção habitual';
+  }
+  // Lê o relato inteiro e calcula o que já é conhecido; "faltam" lista os trechos que precisam da IA.
+  function aliCalcula(relato) {
+    var ts = aliTrechos(relato).map(aliLe), itens = [], faltam = [];
+    ts.forEach(function (t, i) {
+      var a = aliGet(t.nome), v = aliValor(a, t);
+      if (!v) { faltam.push(i); itens.push(null); return; }
+      itens.push({ nome: a.nome || t.nome, quantidade: aliQtd(t), kcal: Math.round(v.kcal), proteina_g: Math.round(v.p * 10) / 10, gordura_g: Math.round(v.g * 10) / 10, carbo_g: Math.round(v.c * 10) / 10, conhecido: true });
+    });
+    return { trechos: ts, itens: itens, faltam: faltam, temPad: ts.some(function (t) { return !t.g && !t.n; }) };
+  }
+  function aliMedia(velho, novo, k) {
+    if (!velho || !velho.k) return Object.assign({}, novo, { k: 1 });
+    var o = { k: velho.k + 1 };
+    ['kcal', 'p', 'g', 'c', 'gramas'].forEach(function (x) { if (novo[x] != null) o[x] = velho[x] != null ? (velho[x] * velho.k + novo[x]) / (velho.k + 1) : novo[x]; });
+    return k === 'troca' ? Object.assign({}, novo, { k: 1 }) : o;
+  }
+  // Aprende um trecho com os valores calculados (pela IA ou do histórico). troca=true substitui o que havia.
+  function aliAprende(t, v, nome, fonte, troca) {
+    if (!t || t.amb || !t.nome || v.kcal == null || isNaN(v.kcal)) return;
+    var key = aliKey(t.nome), a = Object.assign({ alias: t.nome, nome: nome || t.nome }, Store.get('alimentos', key) || {});
+    if (nome) a.nome = nome;
+    var c = v.c != null ? v.c : Math.max(0, (v.kcal - 4 * (v.p || 0) - 9 * (v.g || 0)) / 4);
+    var tot = { kcal: v.kcal, p: v.p || 0, g: v.g || 0, c: c };
+    var md = troca ? 'troca' : null;
+    if (t.g) a.g100 = aliMedia(a.g100, aliMult(tot, 100 / t.g), md);
+    else if (t.n) {
+      var por = aliMult(tot, 1 / t.n); if (v.gramas) por.gramas = v.gramas / t.n;
+      a.un = Object.assign({}, a.un || {}); a.un[t.un] = aliMedia(a.un[t.un], por, md);
+      if (v.gramas && !a.g100) a.g100 = aliMedia(null, aliMult(tot, 100 / v.gramas));
+    } else a.pad = aliMedia(a.pad, tot, md);
+    a.n = (a.n || 0) + 1; a.fonte = fonte; a.atualizado = new Date().toISOString();
+    Store.set('alimentos', key, a);
+  }
+  // Primeira carga: aprende com as refeições já calculadas, quando cada trecho do relato casa com um item.
+  var aliSemeando = false;
+  function aliSemente() {
+    if (aliSemeando || !Store.loaded('alimentos') || !Store.loaded('refeicoes') || Store.get('alimentos', '_meta')) return;
+    aliSemeando = true;
+    var n = 0;
+    sorted('refeicoes').forEach(function (r) {
+      var m = r.v;
+      if (!m.relato || (m.ajustes || []).length || m.receita || m.origem === 'receita' || m.origem === 'local' || !Array.isArray(m.itens)) return;
+      var its = m.itens.filter(function (x) { return !/^Receita:/.test(x.nome || ''); }), ts = aliTrechos(m.relato).map(aliLe);
+      if (its.length !== ts.length) return;
+      ts.forEach(function (t, i) {
+        var it = its[i], gq = String(it.quantidade || '').match(/(\d+(?:[.,]\d+)?)\s*g\b/);
+        if (t.g && gq && Math.abs(aliNumero(gq[1]) - t.g) > 1 && !/osso|comest/i.test(it.quantidade)) return;
+        aliAprende(t, { kcal: Number(it.kcal), p: Number(it.proteina_g) || 0, g: Number(it.gordura_g) || 0, gramas: t.n && gq ? aliNumero(gq[1]) : null }, it.nome, 'historico');
+        n++;
+      });
+    });
+    Store.set('alimentos', '_meta', { semeado: new Date().toISOString(), trechos: n });
+  }
+  // Avaliação da refeição feita pelo app.
+  var LAZER = /cervej|chopp|vinho|drink|sorvete|doce|chocolate|bolo|pizza|hamb[uú]rguer|salgad|refrigerante|heineken|brahma|skol|caipirinha/i;
+  function mealAval(doc, id, tot, itens) {
+    var kOut = 0; mealsOf(doc.data).forEach(function (r) { if (r.id !== id) kOut += r.v.kcal || 0; });
+    var meta = metaDia(doc.data), sobra = meta - kOut - tot.kcal;
+    var lazer = doc.tipo === 'sobremesa' || LAZER.test(doc.relato || '');
+    var mk = itens.slice().sort(function (a, b) { return b.kcal - a.kcal; })[0], mp = itens.slice().sort(function (a, b) { return b.proteina_g - a.proteina_g; })[0];
+    var sob = sobra >= 0 ? ' Sobram ' + nInt(sobra) + ' kcal no dia.' : '';
+    if (sobra < 0) return { nivel: 'atencao', texto: 'Com esta refeição o dia passa da meta em ' + nInt(-sobra) + ' kcal; o que mais pesou foi ' + (mk ? mk.nome + ' (' + nInt(mk.kcal) + ' kcal)' : 'o total') + '.' };
+    if (lazer) return { nivel: sobra < 150 ? 'ok' : 'bom', texto: 'Cabe na meta do dia.' + sob };
+    if (tot.p >= 25 || (tot.kcal > 0 && tot.p * 4 / tot.kcal >= .3)) return { nivel: 'bom', texto: 'Boa proteína (' + nInt(tot.p) + ' g)' + (mp ? ', principalmente de ' + mp.nome : '') + '.' + sob };
+    if (tot.kcal > 300 && tot.g * 9 / tot.kcal > .5) { var mg = itens.slice().sort(function (a, b) { return b.gordura_g - a.gordura_g; })[0]; return { nivel: 'ok', texto: (mg ? mg.nome : 'A refeição') + ' pesou pela gordura (' + nInt(mg ? mg.gordura_g : tot.g) + ' g).' + sob }; }
+    if (tot.kcal < 250) return { nivel: 'ok', texto: 'Refeição leve, com ' + nInt(tot.p) + ' g de proteína.' + sob };
+    return { nivel: 'ok', texto: 'Pouca proteína (' + nInt(tot.p) + ' g) para o tamanho da refeição; inclua uma fonte magra, como frango, ovos ou whey.' + sob };
+  }
+  function mealAplica(cur, itens, obs) {
+    var tot = { kcal: 0, p: 0, g: 0, c: 0 };
+    itens.forEach(function (x) { tot.kcal += x.kcal || 0; tot.p += x.proteina_g || 0; tot.g += x.gordura_g || 0; tot.c += x.carbo_g || 0; });
+    cur.itens = itens.map(function (x) { return { nome: x.nome, quantidade: x.quantidade, kcal: Math.round(x.kcal || 0), proteina_g: Math.round((x.proteina_g || 0) * 10) / 10, gordura_g: Math.round((x.gordura_g || 0) * 10) / 10 }; });
+    cur.kcal = Math.round(tot.kcal); cur.proteina_g = Math.round(tot.p); cur.gordura_g = Math.round(tot.g); cur.carbo_g = Math.round(tot.c);
+    cur.avaliacao = mealAval(cur, cur._id, { kcal: cur.kcal, p: cur.proteina_g, g: cur.gordura_g }, cur.itens);
+    cur.observacao = obs;
+  }
+  function mealPromptItens(doc, cal) {
+    var lista = cal.trechos.map(function (t, i) {
+      var k = cal.itens[i];
+      return (i + 1) + ') ' + t.txt + (k ? '  [já calculado: ' + k.kcal + ' kcal, não inclua]' : '');
+    }).join('\n');
+    return 'Você é um nutricionista estimando uma refeição de um adulto brasileiro. ' +
+      'Use as quantidades informadas e valores típicos da tabela TACO; quando faltar quantidade, estime pela foto ou por uma porção comum. ' +
+      'Referências deste usuário: whey Black Skull 100% HD, 1 scoop de 35 g = 129 kcal e 21 g de proteína. ' +
+      'Trechos do relato (' + tipoNome(doc.tipo) + '):\n' + lista + '\n' +
+      'Calcule SÓ os trechos sem valor. Para cada um, devolva um item com o número do trecho, um nome curto e claro do alimento, a quantidade, os gramas considerados e os valores totais desse trecho. ' +
+      (doc.foto ? 'Se a foto mostrar alimentos que não estão no relato, inclua-os com trecho 0. ' : '') +
+      'Responda com JSON: {"itens":[{"trecho":1,"nome":"texto","quantidade":"texto","gramas":0,"kcal":0,"proteina_g":0,"gordura_g":0,"carbo_g":0}],"observacao":"no máximo uma frase sobre o que precisou ser estimado"}';
+  }
   function calcMeal(id, forca) {
     var doc = Store.get('refeicoes', id);
     if (!doc) return;
@@ -4488,7 +4656,49 @@ window.MOVES = (function () {
       var igual = mealIgual(doc.relato, id);
       if (igual) { copiaValores(doc, igual.v); Store.set('refeicoes', id, doc); renderFood(); return; }
     }
+    // Relato simples (sem correções nem receita): calcula no app o que já é conhecido e pede à IA só o resto.
+    var cal = doc.relato && !doc.receita && !(doc.ajustes || []).length ? aliCalcula(doc.relato) : null;
+    if (cal && !cal.trechos.length) cal = null;
+    if (cal && !forca && !cal.faltam.length && !(doc.foto && cal.temPad)) {
+      doc._id = id;
+      mealAplica(doc, cal.itens, 'Calculado pelo app com alimentos que você já registrou' + (doc.foto ? '; a foto não foi analisada (toque em Recalcular para usar a IA).' : '.'));
+      delete doc._id; doc.origem = 'local';
+      Store.set('refeicoes', id, doc); usoLocal('refeicao'); renderFood(); return;
+    }
+    if (cal && forca) cal = { trechos: cal.trechos, itens: cal.itens.map(function () { return null; }), faltam: cal.trechos.map(function (t, i) { return i; }) };
     foodBusy[id] = true; foodMsg[id] = ''; renderFood();
+    if (cal) {
+      Store.sample().then(function (sample) {
+        if (!sample) throw new Error('indisponivel');
+        return foodImage(id, doc).then(function (b) {
+          var opts = { modelTier: 'default', cache: false }; if (b) opts.images = [b];
+          return sample.json(mealPromptItens(doc, cal), opts);
+        });
+      }).then(function (r) {
+        var cur = Store.get('refeicoes', id); if (!cur) return;
+        var novos = (Array.isArray(r.itens) ? r.itens : []).slice(0, 20), porT = {};
+        novos.forEach(function (x) { var t = Number(x.trecho) || 0; (porT[t] = porT[t] || []).push(x); });
+        var itens = [];
+        cal.trechos.forEach(function (t, i) {
+          if (cal.itens[i]) { itens.push(cal.itens[i]); return; }
+          var xs = porT[i + 1] || [];
+          xs.forEach(function (x) { itens.push({ nome: String(x.nome || t.txt), quantidade: String(x.quantidade || aliQtd(t)), kcal: Number(x.kcal) || 0, proteina_g: Number(x.proteina_g) || 0, gordura_g: Number(x.gordura_g) || 0, carbo_g: Number(x.carbo_g) || 0 }); });
+          // Aprende quando o trecho virou um item só.
+          if (xs.length === 1) aliAprende(t, { kcal: Number(xs[0].kcal), p: Number(xs[0].proteina_g) || 0, g: Number(xs[0].gordura_g) || 0, c: xs[0].carbo_g != null ? Number(xs[0].carbo_g) : null, gramas: Number(xs[0].gramas) || null }, String(xs[0].nome || ''), 'ia', !!forca);
+        });
+        (porT[0] || []).forEach(function (x) { itens.push({ nome: String(x.nome || 'Item da foto'), quantidade: String(x.quantidade || ''), kcal: Number(x.kcal) || 0, proteina_g: Number(x.proteina_g) || 0, gordura_g: Number(x.gordura_g) || 0, carbo_g: Number(x.carbo_g) || 0 }); });
+        var conhec = cal.itens.filter(Boolean).length;
+        cur._id = id;
+        mealAplica(cur, itens, String(r.observacao || '') + (conhec ? (r.observacao ? ' ' : '') + conhec + (conhec === 1 ? ' item veio' : ' itens vieram') + ' dos alimentos já conhecidos.' : ''));
+        delete cur._id; cur.origem = 'estimativa';
+        Store.set('refeicoes', id, cur);
+      }).catch(function (e) {
+        foodMsg[id] = e && e.message === 'indisponivel'
+          ? 'O cálculo automático não está disponível aqui. Preencha os valores ou me mande a refeição na conversa.'
+          : 'Não consegui calcular agora. Toque em Recalcular ou preencha os valores.';
+      }).then(function () { delete foodBusy[id]; renderFood(); });
+      return;
+    }
     Store.sample().then(function (sample) {
       if (!sample) throw new Error('indisponivel');
       var sobra = (doc.ajustes || []).filter(function (a) { return a.foto; }).slice(-1)[0];
@@ -6041,6 +6251,7 @@ window.MOVES = (function () {
   var firstData = true, lastImgs = '', retomou = false;
   var stravaAuto = false;
   Store.watch(function () {
+    aliSemente();
     if (!stravaAuto && Object.keys(Store.all('strava')).length) { stravaAuto = true; syncStrava(true); }
     if (firstData && !$('gym').contains(document.activeElement)) { firstData = false; pickDefault(); }
     var a = document.activeElement;
