@@ -263,6 +263,13 @@ input[type="date"] { height: 46px; }
 .ali-ed { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
 .ali-ed label { font-size: .75rem; color: var(--muted); display: grid; gap: 2px; }
 .ali-ed input { min-width: 0; }
+.st-bar { display: flex; align-items: center; gap: 10px; justify-content: space-between; border-radius: 14px; padding: 10px 12px; margin: 0 0 14px;
+  background: color-mix(in srgb, #fc4c02 12%, var(--surface)); border: 1px solid color-mix(in srgb, #fc4c02 35%, var(--line)); }
+.st-bar div { display: grid; gap: 1px; min-width: 0; }
+.st-bar b { font-size: .95rem; }
+.st-bar span { font-size: .8rem; color: var(--muted); }
+.st-bar button { flex: none; min-height: 44px; padding: 0 16px; border-radius: 12px; border: 0; background: #fc4c02; color: #fff; font: inherit; font-weight: 800; cursor: pointer; }
+.st-bar button:disabled { opacity: .7; }
 .tr-box { display: grid; gap: 12px; margin: 0 0 18px; }
 .tr-head { border-radius: 14px; padding: 14px; background: color-mix(in srgb, var(--accent) 14%, var(--surface)); display: grid; gap: 4px; }
 .tr-head h2 { margin: 0; font-size: 1.1rem; }
@@ -562,6 +569,7 @@ footer .col { display: grid; gap: 10px; }
   </section>
 
   <section class="view" id="v-cardio" hidden>
+    <div id="c-strava" class="st-bar-host"></div>
     <div id="treinador" class="tr-box"></div>
     <div class="limit">
       <strong>Corrida leve</strong>
@@ -678,6 +686,7 @@ footer .col { display: grid; gap: 10px; }
   </section>
 
   <section class="view" id="v-desempenho" hidden>
+    <div id="d-strava" class="st-bar-host"></div>
     <div id="d-detalhe" hidden></div>
     <section class="panel" id="d-lista"></section>
     <section class="panel" id="d-esforco"></section>
@@ -2438,6 +2447,7 @@ window.MOVES = (function () {
       .sort(function (a, b) { return a.v.data < b.v.data ? 1 : a.v.data > b.v.data ? -1 : 0; });
   }
   function renderCardio() {
+    stravaBarras();
     renderTreinador();
     var ul = $('c-list'); ul.textContent = '';
     var rows = cardioTudo();
@@ -2659,9 +2669,23 @@ window.MOVES = (function () {
     });
     return n;
   }
+  // Barra de destaque para atualizar do Strava (Evolução e Cardio).
+  function stravaUlt() { try { return localStorage.getItem('dt-strava-ult'); } catch (e) { return null; } }
+  function stravaBarras() {
+    ['d-strava', 'c-strava'].forEach(function (id) {
+      var host = $(id); if (!host) return;
+      host.textContent = '';
+      var u = stravaUlt(), quando = '';
+      if (u) { var d = new Date(u), hj = Store.day(), dd = Store.day(d); quando = (dd === hj ? 'hoje' : dd === addDias(hj, -1) ? 'ontem' : br(dd)) + ' às ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }); }
+      var bt = h('button', { type: 'button', id: id + '-go', text: stravaBusy ? 'Atualizando...' : 'Atualizar' });
+      if (stravaBusy) bt.disabled = true;
+      bt.addEventListener('click', function () { syncStrava(false); });
+      host.appendChild(h('div', { class: 'st-bar' }, h('div', {}, h('b', { text: 'Atividades do Strava' }), h('span', { text: stravaBusy ? 'Buscando atividades novas...' : (stravaMsg && !stravaBusy && u && Date.now() - new Date(u).getTime() < 120000 ? stravaMsg : (u ? 'Última atualização: ' + quando : 'Toque para buscar as atividades do relógio.')) })), bt));
+    });
+  }
   function syncStrava(quieto) {
     if (stravaBusy) return;
-    stravaBusy = true; if (!quieto) { stravaMsg = ''; renderBalanco(); }
+    stravaBusy = true; if (!quieto) { stravaMsg = ''; renderBalanco(); } stravaBarras();
     var ini = new Date(); ini.setDate(ini.getDate() - 60);
     var mcpRef = null, nfc = 0;
     Store.mcp().then(function (mcp) {
@@ -2723,6 +2747,7 @@ window.MOVES = (function () {
       });
       return cadeia.then(function () {
         var comp = completarCalorias(), cfc = completarFC(), tmp = tempoStrava();
+        try { localStorage.setItem('dt-strava-ult', new Date().toISOString()); } catch (e) {}
         stravaMsg = lista.length + ' atividades lidas do Strava' + (n ? ', ' + n + ' novas ou alteradas.' : '. Nada novo.') +
           (comp ? ' Calorias preenchidas em ' + comp + (comp === 1 ? ' registro.' : ' registros.') : '') +
           (nfc + cfc ? ' Frequência cardíaca lida em ' + (nfc + cfc) + (nfc + cfc === 1 ? ' atividade.' : ' atividades.') : '') +
@@ -2731,7 +2756,7 @@ window.MOVES = (function () {
       });
     }).catch(function (e) {
       if (!quieto) stravaMsg = e && e.code === 'sem_mcp' ? 'A leitura do Strava não está disponível nesta tela.' : stravaErro(e);
-    }).then(function () { stravaBusy = false; renderHist(); renderCardio(); anaPendentes(); trRetorno(); trAtualiza(true); });
+    }).then(function () { stravaBusy = false; renderHist(); renderCardio(); anaPendentes(); trRetorno(); trAtualiza(true); stravaBarras(); renderDesempenho(); });
   }
   function renderBalanco() {
     var box = $('balanco'); box.textContent = '';
@@ -4385,6 +4410,7 @@ window.MOVES = (function () {
   }
   function renderDesempenho() {
     var v = $('v-desempenho'); if (!v) return;
+    stravaBarras();
     var det = $('d-detalhe'), sec = ['d-lista', 'd-esforco', 'd-cond', 'd-mapa'];
     if (dSel) {
       sec.forEach(function (s2) { $(s2).hidden = true; });
