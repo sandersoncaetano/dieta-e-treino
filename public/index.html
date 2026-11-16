@@ -243,6 +243,17 @@ input[type="date"] { height: 46px; }
 .big-saldo.sup { color: var(--stop); }
 .chart { width: 100%; height: auto; display: block; }
 .seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; padding: 4px; margin: 4px 0 14px; background: var(--mat); border-radius: 12px; }
+.food-pre { border: 1px solid var(--line); border-radius: 12px; padding: 8px 10px; margin: 6px 0; display: grid; gap: 4px; font-size: .9rem; }
+.food-pre > b { font-size: .8rem; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.fp-it { display: flex; gap: 8px; align-items: baseline; justify-content: space-between; }
+.fp-it span { min-width: 0; }
+.fp-it.falta { color: var(--stop, #b3261e); font-weight: 700; }
+.fp-it.ia span { color: var(--muted); }
+.fp-it button { flex: none; font-size: .82rem; }
+.bar-ov { position: fixed; inset: 0; z-index: 9500; background: rgba(0,0,0,.45); display: grid; place-items: center; padding: 16px; }
+.bar-box { background: var(--bg); color: var(--fg); width: 100%; max-width: 420px; max-height: 92vh; overflow: auto; border-radius: 16px; padding: 16px; display: grid; gap: 10px; }
+.bar-box video { width: 100%; border-radius: 12px; background: #000; max-height: 260px; object-fit: cover; }
+.bar-box h2 { margin: 0; font-size: 1.2rem; }
 .ali-box summary { font-weight: 800; cursor: pointer; font-size: 1.05rem; }
 .ali-busca { margin: 10px 0; }
 .ali-it { border-top: 1px solid var(--line); padding: 10px 0; display: grid; gap: 4px; }
@@ -604,10 +615,12 @@ footer .col { display: grid; gap: 10px; }
       <div id="food-freq" hidden></div>
       <div class="field"><label for="food-relato">O que você comeu</label><textarea id="food-relato" rows="3" placeholder="Ex.: 85 g de arroz, 78 g de feijão e 95 g de lombo"></textarea></div>
       <div id="food-sug" class="freq-list sug" hidden></div>
+      <div id="food-pre" class="food-pre" aria-live="polite" hidden></div>
       <p class="tip">Para ditar, toque no campo e use o microfone do teclado.</p>
       <div id="food-rec"></div>
       <div class="photo-row">
         <div class="pick-wrap"><button type="button" class="howbtn" tabindex="-1">Adicionar foto</button><input type="file" accept="image/*" id="food-file" class="file" aria-label="Escolher foto da refeição"></div>
+        <button type="button" class="howbtn" id="food-bar">Código de barras</button>
         <span class="tip" id="food-name"></span>
       </div>
       <img id="food-prev" class="food-prev" alt="Prévia da foto escolhida" hidden>
@@ -4764,6 +4777,8 @@ window.MOVES = (function () {
     // Relato simples (sem correções nem receita): calcula no app o que já é conhecido e pede à IA só o resto.
     var cal = doc.relato && !doc.receita && !(doc.ajustes || []).length ? aliCalcula(doc.relato) : null;
     if (cal && !cal.trechos.length) cal = null;
+    var exclui = {}; (doc.ia_trechos || []).forEach(function (n) { exclui[n] = 1; });
+    if (cal) cal.trechos.forEach(function (t, i) { if (exclui[t.nome] && cal.itens[i]) { cal.itens[i] = null; cal.faltam.push(i); } });
     if (cal && !forca && !cal.faltam.length && !(doc.foto && cal.temPad)) {
       doc._id = id;
       mealAplica(doc, cal.itens, 'Calculado pelo app com alimentos que você já registrou' + (doc.foto ? '; a foto não foi analisada (toque em Recalcular para usar a IA).' : '.'));
@@ -4789,7 +4804,7 @@ window.MOVES = (function () {
           var xs = porT[i + 1] || [];
           xs.forEach(function (x) { itens.push({ nome: String(x.nome || t.txt), quantidade: String(x.quantidade || aliQtd(t)), kcal: Number(x.kcal) || 0, proteina_g: Number(x.proteina_g) || 0, gordura_g: Number(x.gordura_g) || 0, carbo_g: Number(x.carbo_g) || 0 }); });
           // Aprende quando o trecho virou um item só.
-          if (xs.length === 1) aliAprende(t, { kcal: Number(xs[0].kcal), p: Number(xs[0].proteina_g) || 0, g: Number(xs[0].gordura_g) || 0, c: xs[0].carbo_g != null ? Number(xs[0].carbo_g) : null, gramas: Number(xs[0].gramas) || null }, String(xs[0].nome || ''), 'ia', !!forca);
+          if (xs.length === 1) aliAprende(t, { kcal: Number(xs[0].kcal), p: Number(xs[0].proteina_g) || 0, g: Number(xs[0].gordura_g) || 0, c: xs[0].carbo_g != null ? Number(xs[0].carbo_g) : null, gramas: Number(xs[0].gramas) || null }, String(xs[0].nome || ''), 'ia', !!forca || !!exclui[t.nome]);
         });
         (porT[0] || []).forEach(function (x) { itens.push({ nome: String(x.nome || 'Item da foto'), quantidade: String(x.quantidade || ''), kcal: Number(x.kcal) || 0, proteina_g: Number(x.proteina_g) || 0, gordura_g: Number(x.gordura_g) || 0, carbo_g: Number(x.carbo_g) || 0 }); });
         var conhec = cal.itens.filter(Boolean).length;
@@ -5945,9 +5960,112 @@ window.MOVES = (function () {
         name.textContent = 'Não consegui ler esta foto (' + info + '). Escolha outra.';
       });
     });
+    /* Prévia antes de calcular: o que já é conhecido, o que vai para a IA e o que está sem quantidade */
+    var preExclui = {}, preT = null, semQtdOk = false;
+    function semQtd(cal) {
+      return cal.trechos.filter(function (t, i) { return !t.g && !t.n && !t.amb && (!cal.itens[i] || preExclui[t.nome]); });
+    }
+    function renderPre() {
+      var el = $('food-pre'), v = relEl.value.trim();
+      el.textContent = '';
+      if (!v) { el.hidden = true; return; }
+      var cal = aliCalcula(v);
+      if (!cal.trechos.length) { el.hidden = true; return; }
+      el.hidden = false; semQtdOk = false;
+      el.appendChild(h('b', { text: 'Antes de calcular' }));
+      cal.trechos.forEach(function (t, i) {
+        var k = cal.itens[i], ex = preExclui[t.nome];
+        if (!t.g && !t.n && !t.amb && (!k || ex)) { el.appendChild(h('div', { class: 'fp-it falta' }, h('span', { text: '⚠ Falta a quantidade: ' + t.txt }))); return; }
+        if (k && !ex) {
+          var b = h('button', { type: 'button', class: 'link', text: 'Não é este' });
+          b.addEventListener('click', function () { preExclui[t.nome] = 1; renderPre(); });
+          el.appendChild(h('div', { class: 'fp-it' }, h('span', { text: '✓ ' + k.nome + ' · ' + k.quantidade + ' · ' + nInt(k.kcal) + ' kcal' }), b));
+          return;
+        }
+        var row = h('div', { class: 'fp-it ia' }, h('span', { text: (ex ? 'A IA vai recalcular: ' : 'A IA vai calcular: ') + t.txt }));
+        if (ex) { var u = h('button', { type: 'button', class: 'link', text: 'Usar o conhecido' }); u.addEventListener('click', function () { delete preExclui[t.nome]; renderPre(); }); row.appendChild(u); }
+        el.appendChild(row);
+      });
+    }
+    relEl.addEventListener('input', function () { clearTimeout(preT); preT = setTimeout(renderPre, 350); $('food-msg').textContent = ''; });
+
+    /* Código de barras: Open Food Facts */
+    function semNumeros(n) { return String(n || '').replace(/\d+([.,]\d+)?\s*(g|kg|ml|l|%|un)\b/gi, ' ').replace(/\d+/g, ' ').replace(/\s+/g, ' ').trim(); }
+    function abreCodigo() {
+      var ov = h('div', { class: 'bar-ov', role: 'dialog', 'aria-label': 'Ler código de barras' });
+      var box = h('div', { class: 'bar-box' }); ov.appendChild(box);
+      var fx = h('button', { type: 'button', class: 'link', text: 'Fechar', style: 'justify-self:end' });
+      var vid = h('video', { playsinline: '', muted: '', autoplay: '' }), st = h('p', { class: 'tip', 'aria-live': 'polite' }), res = h('div');
+      var cod = h('input', { id: 'bar-cod', inputmode: 'numeric', placeholder: 'Ou digite os números do código' });
+      var go = h('button', { type: 'button', class: 'howbtn', id: 'bar-buscar', text: 'Buscar' });
+      box.appendChild(h('div', { class: 'tr-acoes', style: 'justify-content:space-between' }, h('h2', { text: 'Código de barras' }), fx));
+      box.appendChild(vid); box.appendChild(st); box.appendChild(h('div', { class: 'tr-acoes' }, cod, go)); box.appendChild(res);
+      document.body.appendChild(ov);
+      var stream = null, loop = null, achou = false;
+      function para() { if (loop) clearInterval(loop); loop = null; if (stream) stream.getTracks().forEach(function (t) { t.stop(); }); stream = null; vid.hidden = true; }
+      function fecha() { para(); ov.remove(); }
+      fx.addEventListener('click', fecha);
+      ov.addEventListener('click', function (e) { if (e.target === ov) fecha(); });
+      go.addEventListener('click', function () { var c = cod.value.replace(/\D/g, ''); if (c.length >= 8) { para(); busca(c); } else st.textContent = 'Digite os 8 a 14 números do código.'; });
+      if ('BarcodeDetector' in window && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        st.textContent = 'Aponte a câmera para o código de barras do produto.';
+        var det = new window.BarcodeDetector({ formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e'] });
+        navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } }).then(function (s) {
+          stream = s; vid.srcObject = s; vid.play().catch(function () {});
+          loop = setInterval(function () {
+            if (achou || vid.readyState < 2) return;
+            det.detect(vid).then(function (cs) { if (cs && cs[0] && !achou) { achou = true; cod.value = cs[0].rawValue; para(); busca(cs[0].rawValue); } }).catch(function () {});
+          }, 300);
+        }, function () { vid.hidden = true; st.textContent = 'Não consegui abrir a câmera. Digite os números do código.'; });
+      } else { vid.hidden = true; st.textContent = 'Este navegador não lê código pela câmera. Digite os números do código.'; }
+      function busca(c) {
+        res.textContent = ''; st.textContent = 'Buscando o produto ' + c + '...';
+        fetch('https://world.openfoodfacts.org/api/v2/product/' + c + '.json?fields=product_name,product_name_pt,brands,nutriments,serving_quantity,serving_size')
+          .then(function (r) { return r.json(); }).then(function (j) {
+            var p = j && j.status === 1 && j.product;
+            if (!p) { st.textContent = 'Produto não encontrado na Open Food Facts. Escreva o alimento normalmente ou fotografe o rótulo.'; achou = false; return; }
+            var n = p.nutriments || {}, kcal = n['energy-kcal_100g'] != null ? Number(n['energy-kcal_100g']) : n.energy_100g != null ? Number(n.energy_100g) / 4.184 : null;
+            var nome = semNumeros(p.product_name_pt || p.product_name || 'Produto') + (p.brands ? ' ' + semNumeros(String(p.brands).split(',')[0]) : '');
+            if (kcal == null || isNaN(kcal)) { st.textContent = nome + ': o produto existe, mas está sem tabela nutricional cadastrada.'; return; }
+            var v = { kcal: kcal, p: Number(n.proteins_100g) || 0, g: Number(n.fat_100g) || 0, c: Number(n.carbohydrates_100g) || 0 };
+            var porc = Number(p.serving_quantity) || null;
+            st.textContent = '';
+            var gi = h('input', { id: 'bar-g', type: 'number', inputmode: 'decimal', value: String(porc || 100) });
+            var add = h('button', { type: 'button', class: 'go', id: 'bar-add', text: 'Adicionar à refeição' });
+            res.appendChild(h('div', { class: 'verdict' }, h('b', { text: nome }),
+              h('p', { text: 'Em 100 g: ' + nInt(v.kcal) + ' kcal · ' + fmtN(v.p, 1) + ' g proteína · ' + fmtN(v.g, 1) + ' g gordura · ' + fmtN(v.c, 1) + ' g carbo' + (p.serving_size ? '. Porção do rótulo: ' + p.serving_size + '.' : '.') })));
+            res.appendChild(h('div', { class: 'field' }, h('label', { for: 'bar-g', text: 'Quanto você comeu (g ou ml)' }), gi));
+            res.appendChild(add);
+            add.addEventListener('click', function () {
+              var g = Number(String(gi.value).replace(',', '.')); if (!(g > 0)) { gi.focus(); return; }
+              var t = aliLe(nome), key = aliKey(t.nome), a = Object.assign({}, Store.get('alimentos', key) || {});
+              a.alias = t.nome; a.nome = nome; a.g100 = Object.assign({}, v, { k: 1 }); a.fonte = 'rotulo'; a.codigo = c; a.n = (a.n || 0) + 1; a.atualizado = new Date().toISOString();
+              if (porc) { a.un = Object.assign({}, a.un || {}); a.un.porcao = { kcal: v.kcal * porc / 100, p: v.p * porc / 100, g: v.g * porc / 100, c: v.c * porc / 100, gramas: porc, k: 1 }; }
+              Store.set('alimentos', key, a);
+              var atual = relEl.value.trim();
+              relEl.value = (atual ? atual.replace(/[.,;]\s*$/, '') + '. ' : '') + nome + ' ' + fmtN(g, 0) + 'g';
+              fecha(); renderPre(); salvoOk('Produto adicionado');
+            });
+          }).catch(function () { st.textContent = 'Não consegui consultar a Open Food Facts agora. Tente de novo ou escreva o alimento.'; achou = false; });
+      }
+    }
+    $('food-bar').addEventListener('click', abreCodigo);
+
     $('food-form').addEventListener('submit', function (e) {
       e.preventDefault();
       var relato = $('food-relato').value.trim(), msg = $('food-msg'), f = foodFile;
+      // Sem quantidade em algum alimento: avisa antes de calcular (com foto, a IA pode estimar pela imagem).
+      if (relato && !f && !semQtdOk && !foodRec.id) {
+        var falta = semQtd(aliCalcula(relato));
+        if (falta.length) {
+          msg.textContent = '';
+          msg.appendChild(document.createTextNode('Falta a quantidade de: ' + falta.map(function (t) { return t.txt.trim(); }).join(', ') + '. Informe em gramas ou unidades (ex.: "frango assado 150g"). '));
+          var mesmo = h('button', { type: 'button', class: 'link', id: 'food-mesmo', text: 'Calcular mesmo assim' });
+          mesmo.addEventListener('click', function () { semQtdOk = true; $('food-form').requestSubmit(); });
+          msg.appendChild(mesmo); renderPre();
+          return;
+        }
+      }
       if (foodLendo) { msg.textContent = 'Aguarde a foto terminar de carregar.'; return; }
       if (!foodTipo) {
         msg.textContent = 'Escolha a refeição: café, almoço, lanche, sobremesa, jantar ou outro.';
@@ -5961,6 +6079,7 @@ window.MOVES = (function () {
       var id = foodDate + '_' + Date.now();
       var doc = { data: foodDate, tipo: foodTipo, relato: relato, kcal: null, proteina_g: null, itens: [], criado: new Date().toISOString() };
       if (rec) doc.receita = rec;
+      var exNomes = Object.keys(preExclui); if (exNomes.length && relato) doc.ia_trechos = exNomes;
       var btn = $('food-save'); btn.disabled = true; msg.textContent = 'Salvando...';
       var ready = f ? storePhoto(f).then(function (ph) {
         doc.foto = ph.foto; if (ph.asset_id) doc.asset_id = ph.asset_id;
@@ -5973,6 +6092,7 @@ window.MOVES = (function () {
         Store.set('refeicoes', id, doc);
         foodRec = { id: '', qtd: 1, un: 'porcao' }; renderRecPick();
         $('food-relato').value = ''; file.value = ''; foodFile = null; name.textContent = '';
+        preExclui = {}; semQtdOk = false; renderPre();
         foodErro = ''; prev.hidden = true;
         tipoChips();
         msg.textContent = f && !doc.foto ? 'Refeição salva sem a foto. Não consegui usar a imagem (' + photoInfo(f) + ').' : '';
