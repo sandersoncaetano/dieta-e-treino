@@ -311,7 +311,8 @@
       var locais = todas.filter(function (x) { return x.modelo === 'local'; });
       var rows = todas.filter(function (x) { return x.modelo !== 'local'; });
       if (!rows.length) { c.textContent = 'Nenhuma chamada à IA registrada ainda.'; return; }
-      function custo(x) { return (x.entrada * cfg.precoEntrada + x.saida * cfg.precoSaida) / 1e6; }
+      // Haiku custa cerca de 1/3 do Sonnet (US$ 1 e US$ 5 por milhão de tokens).
+      function custo(x) { var hk = /haiku/i.test(x.modelo || ''); return (x.entrada * (hk ? 1 : cfg.precoEntrada) + x.saida * (hk ? 5 : cfg.precoSaida)) / 1e6; }
       function soma(lista) { var t = { n: 0, tok: 0, img: 0, usd: 0 }; lista.forEach(function (x) { t.n++; t.tok += x.entrada + x.saida; t.img += x.imagens; t.usd += custo(x); }); return t; }
       function dinheiro(v) {
         if (moeda === 'BRL' && cot && cot.valor) { var b = v * cot.valor; return 'R$ ' + b.toFixed(2).replace('.', ','); }
@@ -369,7 +370,7 @@
         h += '<div style="' + lin + ';display:block"><div style="display:flex;justify-content:space-between;gap:12px"><strong>' + (nomes[k] || k) + '</strong><span style="white-space:nowrap">' + dinheiro(t.usd) + '</span></div>' +
           '<div style="' + sub + '">' + ch(t.n) + (t.img ? ', ' + t.img + (t.img === 1 ? ' foto' : ' fotos') : '') + ' · ' + mil(t.tok) + ' tokens</div></div>';
       });
-      h += '<p style="margin:12px 0 0;' + sub + '">Estimativa com US$ ' + cfg.precoEntrada + ' por milhão de tokens de entrada e US$ ' + cfg.precoSaida + ' de saída. O valor cobrado de fato está em console.anthropic.com, em Usage e Billing, em dólar' + (moeda === 'BRL' ? '; a fatura do cartão em reais pode vir um pouco diferente por causa de IOF e da cotação do banco' : '') + '.</p></div>';
+      h += '<p style="margin:12px 0 0;' + sub + '">Estimativa com US$ ' + cfg.precoEntrada + ' por milhão de tokens de entrada e US$ ' + cfg.precoSaida + ' de saída no Sonnet (US$ 1 e US$ 5 no Haiku). O valor cobrado de fato está em console.anthropic.com, em Usage e Billing, em dólar' + (moeda === 'BRL' ? '; a fatura do cartão em reais pode vir um pouco diferente por causa de IOF e da cotação do banco' : '') + '.</p></div>';
       c.innerHTML = h;
       c.querySelectorAll('[data-moeda]').forEach(function (b) {
         b.addEventListener('click', function () {
