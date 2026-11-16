@@ -243,6 +243,15 @@ input[type="date"] { height: 46px; }
 .big-saldo.sup { color: var(--stop); }
 .chart { width: 100%; height: auto; display: block; }
 .seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; padding: 4px; margin: 4px 0 14px; background: var(--mat); border-radius: 12px; }
+.ali-box summary { font-weight: 800; cursor: pointer; font-size: 1.05rem; }
+.ali-busca { margin: 10px 0; }
+.ali-it { border-top: 1px solid var(--line); padding: 10px 0; display: grid; gap: 4px; }
+.ali-it h3 { margin: 0; font-size: 1rem; }
+.ali-it small { color: var(--muted); }
+.ali-val { font-size: .9rem; }
+.ali-ed { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.ali-ed label { font-size: .75rem; color: var(--muted); display: grid; gap: 2px; }
+.ali-ed input { min-width: 0; }
 .tr-box { display: grid; gap: 12px; margin: 0 0 18px; }
 .tr-head { border-radius: 14px; padding: 14px; background: color-mix(in srgb, var(--accent) 14%, var(--surface)); display: grid; gap: 4px; }
 .tr-head h2 { margin: 0; font-size: 1.1rem; }
@@ -608,6 +617,7 @@ footer .col { display: grid; gap: 10px; }
     <h2>Refeições do dia</h2>
     <div class="mini" id="food-list"></div>
     <div id="food-day"></div>
+    <details class="panel ali-box" id="ali-box"><summary id="ali-sum">Alimentos conhecidos</summary><div id="ali-lista"></div></details>
   </section>
 
   <section class="view" id="v-planos" hidden>
@@ -4663,6 +4673,86 @@ window.MOVES = (function () {
       (doc.foto ? 'Se a foto mostrar alimentos que não estão no relato, inclua-os com trecho 0. ' : '') +
       'Responda com JSON: {"itens":[{"trecho":1,"nome":"texto","quantidade":"texto","gramas":0,"kcal":0,"proteina_g":0,"gordura_g":0,"carbo_g":0}],"observacao":"no máximo uma frase sobre o que precisou ser estimado"}';
   }
+  /* Tela dos alimentos conhecidos: ver, corrigir e apagar */
+  var aliFiltro = '', aliEdita = null, aliAberto = false;
+  var ALI_BASE_NOME = { g100: '100 g', pad: 'porção habitual' };
+  function aliBases(a) {
+    var b = [];
+    if (a.g100) b.push(['g100', a.g100]);
+    Object.keys(a.un || {}).forEach(function (u) { b.push(['un.' + u, a.un[u]]); });
+    if (a.pad) b.push(['pad', a.pad]);
+    return b;
+  }
+  function aliBaseNome(k, v) {
+    if (ALI_BASE_NOME[k]) return ALI_BASE_NOME[k];
+    var u = k.slice(3);
+    return '1 ' + ({ un: 'unidade', scoop: 'scoop', porcao: 'porção' }[u] || u.replace('_', ' de ')) + (v && v.gramas ? ' (' + fmtN(v.gramas, 0) + ' g)' : '');
+  }
+  function renderAli() {
+    var box = $('ali-lista'); if (!box) return;
+    var todos = Store.all('alimentos') || {}, ks = Object.keys(todos).filter(function (k) { return k !== '_meta' && todos[k] && todos[k].alias; });
+    $('ali-sum').textContent = 'Alimentos conhecidos (' + ks.length + ')';
+    if (!aliAberto) return;
+    if (box.contains(document.activeElement) && document.activeElement.tagName === 'INPUT' && document.activeElement.id !== 'ali-q') return;
+    box.textContent = '';
+    box.appendChild(h('p', { class: 'tip', text: 'É a tabela que o app usa para calcular refeições sem IA. Cada linha é um jeito como você escreve o alimento; os valores vieram do seu histórico ou de cálculos da IA. Corrija aqui se algum estiver errado.' }));
+    var q = h('input', { id: 'ali-q', class: 'ali-busca', type: 'search', placeholder: 'Buscar alimento', value: aliFiltro });
+    q.addEventListener('input', function () { aliFiltro = q.value; renderAli(); var e = $('ali-q'); e.focus(); e.setSelectionRange(e.value.length, e.value.length); });
+    box.appendChild(q);
+    var f = aliNorm(aliFiltro).trim();
+    ks = ks.filter(function (k) { return !f || k.replace(/_/g, ' ').indexOf(f) > -1 || aliNorm(todos[k].nome).indexOf(f) > -1; })
+      .sort(function (a, b) { return (todos[a].nome || a).localeCompare(todos[b].nome || b, 'pt-BR'); });
+    if (!ks.length) { box.appendChild(h('p', { class: 'tip', text: f ? 'Nenhum alimento com esse nome.' : 'Ainda nenhum alimento conhecido. Eles aparecem conforme as refeições são calculadas.' })); return; }
+    var FT = { historico: 'do histórico', ia: 'calculado pela IA', usuario: 'corrigido por você' };
+    ks.forEach(function (k) {
+      var a = todos[k], it = h('div', { class: 'ali-it', id: 'ali-' + k });
+      it.appendChild(h('h3', { text: a.nome || a.alias }));
+      it.appendChild(h('small', { text: 'Você escreve: "' + a.alias + '" · ' + (FT[a.fonte] || a.fonte || '') + (a.n > 1 ? ' · visto ' + a.n + ' vezes' : '') }));
+      var ed = aliEdita === k;
+      aliBases(a).forEach(function (bv) {
+        var v = bv[1];
+        if (!ed) { it.appendChild(h('div', { class: 'ali-val', text: aliBaseNome(bv[0], v) + ': ' + nInt(v.kcal) + ' kcal · ' + fmtN(v.p, 1) + ' g proteína · ' + fmtN(v.g, 1) + ' g gordura · ' + fmtN(v.c, 1) + ' g carbo' })); return; }
+        var g = h('div', { class: 'ali-ed' });
+        [['kcal', 'kcal'], ['p', 'Proteína (g)'], ['g', 'Gordura (g)']].forEach(function (c) {
+          var inp = h('input', { type: 'number', step: 'any', inputmode: 'decimal', id: 'ali-' + k + '-' + bv[0] + '-' + c[0], value: String(Math.round(v[c[0]] * 10) / 10) });
+          g.appendChild(h('label', { for: inp.id }, document.createTextNode(c[1]), inp));
+        });
+        it.appendChild(h('b', { class: 'ali-val', text: aliBaseNome(bv[0], v) })); it.appendChild(g);
+      });
+      var acoes = h('div', { class: 'tr-acoes' });
+      if (ed) {
+        var nm = h('input', { id: 'ali-nome-' + k, value: a.nome || '' });
+        it.insertBefore(h('label', { class: 'field' }, document.createTextNode('Nome'), nm), it.children[2]);
+        var sv = h('button', { type: 'button', class: 'howbtn', id: 'ali-salvar-' + k, text: 'Salvar' });
+        sv.addEventListener('click', function () {
+          var n2 = Object.assign({}, a); n2.nome = nm.value.trim() || a.alias;
+          aliBases(a).forEach(function (bv) {
+            var nv = Object.assign({}, bv[1]);
+            ['kcal', 'p', 'g'].forEach(function (c) { var x = Number(String($('ali-' + k + '-' + bv[0] + '-' + c).value).replace(',', '.')); if (isFinite(x) && x >= 0) nv[c] = x; });
+            nv.c = Math.max(0, (nv.kcal - 4 * nv.p - 9 * nv.g) / 4); nv.k = 1;
+            if (bv[0].indexOf('un.') === 0) { n2.un = Object.assign({}, n2.un); n2.un[bv[0].slice(3)] = nv; } else n2[bv[0]] = nv;
+          });
+          n2.fonte = 'usuario'; n2.atualizado = new Date().toISOString();
+          Store.set('alimentos', k, n2); aliEdita = null; renderAli(); salvoOk('Alimento corrigido');
+        });
+        var cc = h('button', { type: 'button', class: 'link', text: 'Cancelar' });
+        cc.addEventListener('click', function () { aliEdita = null; renderAli(); });
+        acoes.appendChild(sv); acoes.appendChild(cc);
+      } else {
+        var eb = h('button', { type: 'button', class: 'link', id: 'ali-editar-' + k, text: 'Corrigir' });
+        eb.addEventListener('click', function () { aliEdita = k; renderAli(); });
+        var db = h('button', { type: 'button', class: 'link', id: 'ali-apagar-' + k, text: 'Apagar' });
+        db.addEventListener('click', function () {
+          if (!db.dataset.sure) { db.dataset.sure = '1'; db.textContent = 'Confirmar: a próxima vez vai para a IA'; return; }
+          Store.del('alimentos', k); renderAli();
+        });
+        acoes.appendChild(eb); acoes.appendChild(db);
+      }
+      it.appendChild(acoes);
+      box.appendChild(it);
+    });
+  }
+  document.addEventListener('toggle', function (e) { if (e.target && e.target.id === 'ali-box') { aliAberto = e.target.open; renderAli(); } }, true);
   function calcMeal(id, forca) {
     var doc = Store.get('refeicoes', id);
     if (!doc) return;
@@ -5518,6 +5608,7 @@ window.MOVES = (function () {
     box.appendChild(h('p', { class: 'tip', text: 'Semana: ' + nInt(wk) + ' de 15.600 kcal, com ' + Object.keys(days).length + ' dia(s) registrado(s).' }));
   }
   function renderFood() {
+    renderAli();
     if (!recForm && !document.querySelector('#rec-box :focus')) renderRec();
     if (!document.querySelector('#food-rec :focus')) renderRecPick();
     renderFoodSummary();
