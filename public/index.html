@@ -3113,7 +3113,7 @@ window.MOVES = (function () {
       var e = it[k]; ser += e.series || 0; plan += e.planejadas || 0;
       var rr = repsDe(e);
       vol += (e.kg || 0) * rr.reduce(function (a, b) { return a + b; }, 0);
-      if (e.series) ex.push({ id: k, nome: e.nome || k, kg: e.kg || 0, reps: e.reps || 0, series: e.series, rtxt: repsTxt(e) });
+      if (e.series) ex.push({ id: k, nome: e.nome || k, kg: e.kg || 0, reps: e.reps || 0, series: e.series, rtxt: repsTxt(e), rs: rr });
     });
     return { key: ks[0], letra: t.treino, nome: t.nome, vol: Math.round(vol), series: ser, planejadas: plan, ex: ex };
   }
@@ -3219,6 +3219,79 @@ window.MOVES = (function () {
       'Anteriores do mesmo tipo, da mais recente para a mais antiga: ' + JSON.stringify(ant.map(anaCompacta)) + '. ' +
       'Outras atividades próximas: ' + (anaVizinhas(m).join('; ') || 'nenhuma') + '.';
   }
+  /* Uso local: registra na tela Uso da IA os casos resolvidos sem IA. */
+  function usoLocal(tipo) {
+    Store.sample().then(function (s) { if (s && s.local) return s.local(tipo); }).catch(function () {});
+  }
+  function pctTxt(p) { return fmtN(Math.abs(p) * 100, 0) + '%'; }
+  function anaLocal(m, ant) {
+    var n = ant.length, corr = m.grupo === 'corrida', lib = trMeta().liberado, viz = anaVizinhas(m);
+    var mesmoDia = viz.filter(function (v) { return v.indexOf('mesmo dia') === 0; }).length;
+    var ve = null, motivo = '', p = null, base = null, v = null;
+    if (m.km) { v = m.efic; base = media(ant, 'efic'); }
+    else if (m.treino) { v = m.treino.vol; base = m.treinoAnt ? m.treinoAnt.vol : null; }
+    else { v = m.min; base = media(ant, 'min'); }
+    if (v != null && base) p = (v - base) / Math.abs(base);
+    if (corr && m.acima150 && !lib) { ve = 'atencao'; motivo = 'fc'; }
+    else if (m.treino && m.treino.planejadas && m.treino.series < m.treino.planejadas) { ve = 'atencao'; motivo = 'series'; }
+    else if (mesmoDia >= 2) { ve = 'atencao'; motivo = 'carga'; }
+    else if (m.treino ? !m.treinoAnt : n < 2) ve = 'inicio';
+    else if (p === null) ve = 'estavel';
+    else ve = p >= .03 ? 'evolucao' : p <= -.03 ? 'queda' : 'estavel';
+    var nomeG = anaGrupoNome(m.grupo).toLowerCase(), L = m.treino ? m.treino.letra : '';
+    var T = m.km ? { evolucao: 'Mais eficiente que a média', estavel: 'No mesmo nível das anteriores', queda: 'Mais pesada que a média', inicio: 'Começo da série', atencao: { fc: 'FC acima do combinado', carga: 'Muitas atividades seguidas' }[motivo] }
+      : m.treino ? { evolucao: 'Volume subiu no treino ' + L, estavel: 'Treino ' + L + ' estável', queda: 'Volume caiu no treino ' + L, inicio: 'Primeiro treino ' + L + ' para comparar', atencao: { series: 'Faltaram séries', carga: 'Muitas atividades seguidas' }[motivo] }
+      : { evolucao: 'Sessão mais longa', estavel: 'Sessão no mesmo ritmo', queda: 'Sessão mais curta', inicio: 'Começo da série', atencao: 'Muitas atividades seguidas' };
+    var dg = [];
+    if (m.km) {
+      dg.push('Você fez ' + fmtN(m.km, 2) + ' km a ' + clock(m.pace) + '/km' + (m.fc ? ', com FC média de ' + Math.round(m.fc) + ' bpm' : '') + '.');
+      if (m.efic && base && n >= 2) dg.push('Isso dá ' + fmtN(m.efic, 2) + ' metros por batimento, ' + (Math.abs(p) < .03 ? 'praticamente igual à' : pctTxt(p) + (p > 0 ? ' acima da' : ' abaixo da')) + ' média das ' + n + ' anteriores.');
+      else if (n < 2) dg.push('Ainda há poucas atividades do mesmo tipo para comparar.');
+      if (corr && m.acima150) dg.push(m.acima150 + (m.acima150 === 1 ? ' km ficou' : ' km ficaram') + ' acima de 150 bpm' + (lib ? '.' : ', acima do combinado para corrida leve.'));
+      else if (m.deriva >= 12) dg.push('A FC subiu ' + m.deriva + ' bpm do primeiro ao último km.');
+    } else if (m.treino) {
+      dg.push('Treino ' + L + ' com ' + m.treino.series + ' séries' + (m.treino.planejadas ? ' de ' + m.treino.planejadas + ' planejadas' : '') + ' e ' + nInt(m.treino.vol) + ' kg de volume.');
+      if (m.treinoAnt && p !== null) dg.push(Math.abs(p) < .03 ? 'Volume praticamente igual ao último treino ' + L + '.' : 'O volume ficou ' + pctTxt(p) + (p > 0 ? ' acima' : ' abaixo') + ' do último treino ' + L + '.');
+      else dg.push('É o primeiro treino ' + L + ' registrado para comparar.');
+    } else {
+      dg.push(Math.round(m.min) + ' min de ' + nomeG + (m.fc ? ', com FC média de ' + Math.round(m.fc) + ' bpm' : '') + '.');
+      if (m.rotina) dg.push(m.rotina.concluida ? 'A rotina foi concluída, com ' + m.rotina.series + ' séries.' : 'A rotina ficou incompleta, com ' + m.rotina.series + ' séries.');
+      else if (p !== null && n >= 2) dg.push('Duração ' + (Math.abs(p) < .03 ? 'parecida com' : pctTxt(p) + (p > 0 ? ' acima da' : ' abaixo da')) + ' média das anteriores.');
+    }
+    var ctx = [];
+    if (m.temp != null && m.temp >= 28) ctx.push('estava ' + Math.round(m.temp) + ' °C');
+    if (viz.length) ctx.push('houve outra atividade ' + (mesmoDia ? 'no mesmo dia' : 'no dia anterior'));
+    if (ctx.length && (ve === 'queda' || ve === 'atencao' || m.km)) dg.push('Contexto: ' + ctx.join(' e ') + ', o que pode pesar no esforço.');
+    var dest = anaInd(m, ant).filter(function (o) { return o.dir; }).slice(0, 3).map(function (o) { return o.rot + ': ' + o.txt + (o.base ? ' (' + o.base + ')' : ''); });
+    var sug;
+    if (m.km && corr) {
+      sug = m.acima150 && !lib ? 'Segure o ritmo nos primeiros km para a FC não passar de 150 bpm.'
+        : m.deriva >= 12 ? 'Comece mais devagar e beba água antes: a FC subiu bastante no fim.'
+        : ve === 'queda' ? 'Faça a próxima bem leve e durma bem; uma corrida mais pesada isolada é normal.'
+        : ve === 'evolucao' ? 'Mantenha o ritmo confortável: a eficiência está subindo.'
+        : 'Mantenha o ritmo confortável, em que dá para conversar.';
+    } else if (m.km) {
+      sug = ve === 'queda' ? 'Na próxima, vá num ritmo confortável e veja se foi só um dia mais pesado.' : 'Mantenha a regularidade e o ritmo confortável.';
+    } else if (m.treino) {
+      var sobe = (m.treino.ex || []).filter(function (e) { var ea = m.treinoAnt && m.treinoAnt.ex.filter(function (x) { return x.id === e.id; })[0]; return e.rs && e.rs.length && Math.min.apply(null, e.rs) >= 12 && e.kg > 0 && (!ea || ea.kg === e.kg); })[0];
+      sug = motivo === 'series' ? 'Complete as ' + m.treino.planejadas + ' séries planejadas do treino ' + L + '.'
+        : sobe ? 'No ' + sobe.nome + ' você fez ' + sobe.rtxt + ' com ' + fmtN(sobe.kg, 1) + ' kg: suba um pouco a carga.'
+        : ve === 'queda' ? 'Descanse bem antes do próximo treino ' + L + '; se a queda se repetir, aumente o descanso entre as séries.'
+        : 'Tente subir 1 repetição ou um pouco de carga em um exercício.';
+    } else {
+      sug = m.rotina && !m.rotina.concluida ? 'Tente completar a rotina inteira na próxima.' : 'Mantenha a regularidade.';
+    }
+    if (motivo === 'carga') sug = 'Muitas atividades em pouco tempo: faça a próxima mais leve ou descanse.';
+    return { veredito: ve, titulo: T[ve] || VERED[ve][0], diagnostico: dg.slice(0, 3).join(' '), destaques: dest, sugestao: sug };
+  }
+  function analisaLocal(id) {
+    var m = anaMet(id); if (!m) return;
+    var ant = anaAnteriores(m, 6), r = anaLocal(m, ant), velho = Store.get('analises', id);
+    var conta = !(velho && velho.origem === 'local' && velho.chave === anaChave(m));
+    Store.set('analises', id, { data: m.data, grupo: m.grupo, nome: m.nome, veredito: r.veredito, titulo: r.titulo, diagnostico: r.diagnostico,
+      destaques: r.destaques, sugestao: r.sugestao, chave: anaChave(m), base: ant.length, origem: 'local', criado: new Date().toISOString() });
+    if (conta) usoLocal('atividade');
+  }
   function analisar(id) {
     var m = anaMet(id); if (!m || anaBusy[id]) return Promise.resolve();
     var ant = anaAnteriores(m, 6);
@@ -3236,7 +3309,7 @@ window.MOVES = (function () {
         veredito: vs.indexOf(r.veredito) >= 0 ? r.veredito : 'estavel',
         titulo: String(r.titulo || '').slice(0, 80), diagnostico: String(r.diagnostico || ''),
         destaques: Array.isArray(r.destaques) ? r.destaques.slice(0, 3).map(String) : [],
-        sugestao: String(r.sugestao || ''), chave: anaChave(m), base: ant.length, criado: new Date().toISOString()
+        sugestao: String(r.sugestao || ''), chave: anaChave(m), base: ant.length, origem: 'ia', criado: new Date().toISOString()
       });
     }).catch(function (e) {
       if (antes) Store.set('analises', id, antes); else Store.del('analises', id);
@@ -3253,10 +3326,8 @@ window.MOVES = (function () {
       return !x || x.chave !== anaChave(m);
     }).sort(function (x, y) { return st[x].data < st[y].data ? -1 : 1; }).slice(-5);
     if (!ids.length) return;
-    anaFila = true;
-    var c = Promise.resolve();
-    ids.forEach(function (k) { c = c.then(function () { return analisar(k); }); });
-    c.then(function () { anaFila = false; });
+    ids.forEach(analisaLocal);
+    renderAtiv(); renderCardio();
   }
   var VERED = { evolucao: ['Evolução', 'bom'], estavel: ['Estável', ''], queda: ['Queda', 'atencao'], atencao: ['Atenção', 'atencao'], inicio: ['Começo da série', ''] };
   function anaCard(id) {
@@ -3278,13 +3349,16 @@ window.MOVES = (function () {
       if (x.destaques && x.destaques.length) { var ul = h('ul'); x.destaques.forEach(function (d) { ul.appendChild(h('li', { text: d })); }); vb.appendChild(ul); }
       if (x.sugestao) vb.appendChild(h('p', {}, h('strong', { text: 'Próxima sessão: ' }), document.createTextNode(x.sugestao)));
       card.appendChild(vb);
-      card.appendChild(h('p', { class: 'tip', text: 'Comparado com ' + (x.base ? x.base + (x.base === 1 ? ' atividade anterior' : ' atividades anteriores') : 'nenhuma atividade anterior') + ' do mesmo tipo.' + (x.chave !== anaChave(m) ? ' Os dados mudaram depois da análise.' : '') }));
+      card.appendChild(h('p', { class: 'tip', text: (x.origem === 'ia' ? 'Leitura da IA. ' : 'Análise do app. ') + 'Comparado com ' + (x.base ? x.base + (x.base === 1 ? ' atividade anterior' : ' atividades anteriores') : 'nenhuma atividade anterior') + ' do mesmo tipo.' + (x.chave !== anaChave(m) ? ' Os dados mudaram depois da análise.' : '') }));
     } else card.appendChild(h('p', { class: 'tip', text: anaMsg[id] || 'Ainda sem análise.' }));
     if (anaMsg[id] && x) card.appendChild(h('p', { class: 'tip', text: anaMsg[id] }));
     var bt = h('button', { type: 'button', class: 'howbtn', id: 'ana-' + id, text: x ? 'Refazer análise' : 'Analisar' });
     if (anaBusy[id]) bt.disabled = true;
-    bt.addEventListener('click', function () { analisar(id); });
-    card.appendChild(bt);
+    bt.addEventListener('click', function () { anaMsg[id] = ''; analisaLocal(id); renderAtiv(); renderCardio(); });
+    var bi = h('button', { type: 'button', class: 'link', id: 'ana-ia-' + id, text: anaBusy[id] ? 'Pedindo à IA...' : 'Pedir leitura da IA' });
+    if (anaBusy[id]) bi.disabled = true;
+    bi.addEventListener('click', function () { analisar(id); });
+    card.appendChild(h('div', { class: 'tr-acoes' }, bt, bi));
     return card;
   }
   function renderAtiv() {
@@ -4727,24 +4801,46 @@ window.MOVES = (function () {
       'Em nivel, use "bom" se o dia cumpriu ou está a caminho de cumprir as metas, "ok" se precisa de ajuste e "atencao" se ficou claramente fora. ' +
       'Em resumo, escreva até duas frases curtas em português. Em sugestoes, dê de zero a três ações concretas, uma frase cada.';
   }
+  // Avaliação do dia feita pelo app, com as mesmas regras que antes iam no prompt da IA.
+  function dayLocal(d, t) {
+    var meta = metaDia(d), piso = 1900, pm = protMeta(d), fds = [0, 6].indexOf(weekday(d)) > -1, hoje = d === Store.day();
+    var k = Math.round(t.k), p = Math.round(t.p), rest = meta - k, faltaP = pm.min - p;
+    var hora = new Date().getHours(), cedo = hoje && hora < 19;
+    var seg = segDe(d), wk = 0, dias = {}, abaixo = 0;
+    sorted('refeicoes').forEach(function (r) { if (r.v.data >= seg && r.v.data <= d) { wk += r.v.kcal || 0; dias[r.v.data] = (dias[r.v.data] || 0) + (r.v.kcal || 0); } });
+    Object.keys(dias).forEach(function (x) { if ((x < d || !hoje) && dias[x] < piso) abaixo++; });
+    var nivel;
+    if (rest < -150 || (!cedo && p < pm.min * 0.7)) nivel = 'atencao';
+    else if (rest < 0 || faltaP > 0) nivel = 'ok';
+    else nivel = 'bom';
+    if (fds && rest >= 0 && faltaP <= 5) nivel = 'bom';
+    var maior = mealsOf(d).slice().sort(function (a, b) { return (b.v.kcal || 0) - (a.v.kcal || 0); })[0];
+    var r1 = 'Você comeu ' + nInt(k) + ' kcal e ' + nInt(p) + ' g de proteína.';
+    if (rest >= 0) r1 += hoje ? ' Ainda cabem ' + nInt(rest) + ' kcal até a meta de ' + nInt(meta) + '.' : ' Ficou ' + nInt(rest) + ' kcal abaixo da meta de ' + nInt(meta) + '.';
+    else r1 += ' Passou ' + nInt(-rest) + ' kcal da meta de ' + nInt(meta) + (maior ? '; o que mais pesou foi ' + tipoNome(maior.v.tipo).toLowerCase() + ' (' + nInt(maior.v.kcal) + ' kcal).' : '.');
+    var r2 = faltaP > 0 ? 'Faltam ' + faltaP + ' g de proteína para o mínimo de ' + pm.min + ' g.' : p > pm.max ? 'A proteína passou da faixa (' + pm.min + ' a ' + pm.max + ' g), sem problema.' : 'A proteína ficou dentro da meta (' + pm.min + ' a ' + pm.max + ' g).';
+    var sug = [];
+    if (hoje && faltaP > 0 && rest > 0 && cedo) {
+      sug.push('Priorize proteína magra nas próximas refeições (100 g de frango grelhado têm cerca de 32 g e 160 kcal).');
+    } else if (hoje && faltaP > 0 && rest > 0) {
+      var n = Math.min(Math.ceil(faltaP / 21), Math.floor(rest / 129), 2);
+      if (n >= 1) sug.push('Tome ' + (n === 1 ? '1 scoop' : n + ' scoops') + ' de whey com água: o dia fecha em ' + nInt(k + 129 * n) + ' kcal e ' + nInt(p + 21 * n) + ' g de proteína.' + (p + 21 * n < pm.min ? ' Ainda fica abaixo do mínimo, mas tudo bem por hoje.' : ''));
+      else sug.push('Não cabe mais um scoop de whey hoje; amanhã reforce a proteína no café e no almoço.');
+    } else if (hoje && rest >= 0 && faltaP <= 0) {
+      sug.push(k < piso ? 'Se tiver fome, um lanche com proteína magra cabe; não precisa comer sem fome.' : 'Não precisa comer mais hoje.');
+    } else if (!hoje && faltaP > 0) sug.push('Amanhã reforce a proteína: inclua uma porção magra em cada refeição.');
+    if (rest < 0) sug.push(fds ? 'Fim de semana tem cerveja e sobremesa no plano; o que importa é a semana. Amanhã siga o plano normal, sem compensar.' : 'Amanhã siga o plano normal, sem compensar com jejum ou cortes.');
+    if (abaixo >= 3) sug.push('Já são ' + abaixo + ' dias abaixo de 1.900 kcal nesta semana; comer pouco por muitos dias atrapalha a preservação do músculo.');
+    if (weekday(d) === 0) sug.push('A semana fechou em ' + nInt(wk) + ' de 15.600 kcal' + (wk > 15600 ? ', ' + nInt(wk - 15600) + ' acima.' : '.'));
+    return { nivel: nivel, resumo: r1 + ' ' + r2, sugestoes: sug.slice(0, 3) };
+  }
   function closeDay() {
     var d = foodDate, t = dayTotals(d);
     if (!t.n) return;
-    dayBusy = true; dayMsg = ''; renderDay();
-    Store.sample().then(function (sample) {
-      if (!sample) throw new Error('indisponivel');
-      return sample.json(dayPrompt(d, t), { modelTier: 'default', cache: false });
-    }).then(function (r) {
-      Store.set('dias', d, {
-        data: d, sig: daySig(t),
-        nivel: ['bom', 'ok', 'atencao'].indexOf(r.nivel) > -1 ? r.nivel : 'ok',
-        resumo: String(r.resumo || ''),
-        sugestoes: Array.isArray(r.sugestoes) ? r.sugestoes.slice(0, 3).map(String) : [],
-        criado: new Date().toISOString()
-      });
-    }).catch(function (e) {
-      dayMsg = e && e.message === 'indisponivel' ? 'A avaliação automática não está disponível aqui.' : 'Não consegui avaliar agora. Tente de novo.';
-    }).then(function () { dayBusy = false; renderDay(); });
+    var r = dayLocal(d, t);
+    Store.set('dias', d, { data: d, sig: daySig(t), nivel: r.nivel, resumo: r.resumo, sugestoes: r.sugestoes, origem: 'local', criado: new Date().toISOString() });
+    usoLocal('dia');
+    dayMsg = ''; renderDay();
   }
   function renderDay() {
     var box = $('food-day'); box.textContent = '';

@@ -26,7 +26,15 @@ function extraiJson(txt) {
 export default rota(async (req, res) => {
   if (req.method !== 'POST') return responde(res, 405, { erro: 'Use POST' });
   const u = await usuario(req);
-  const { prompt, imagens = [] } = await corpo(req);
+  const pedido = await corpo(req);
+  // Caso resolvido no próprio app, sem IA: só registra para a tela Uso da IA mostrar a economia.
+  if (pedido.local) {
+    const t = String(pedido.local);
+    if (!['dia', 'atividade', 'refeicao', 'treinador', 'semana', 'fechamento'].includes(t)) return responde(res, 400, { erro: 'Tipo inválido' });
+    await banco('uso_ia', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ user_id: u.id, tipo: t, modelo: 'local', entrada: 0, saida: 0, imagens: 0 }) });
+    return responde(res, 200, { ok: true });
+  }
+  const { prompt, imagens = [] } = pedido;
   if (!prompt || String(prompt).length > 60000) return responde(res, 400, { erro: 'Prompt inválido' });
   if (imagens.length > 4) return responde(res, 400, { erro: 'Imagens demais' });
 

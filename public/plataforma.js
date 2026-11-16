@@ -181,6 +181,7 @@
     }
     var f = function (prompt, opts) { return json(prompt, opts); };
     f.json = json;
+    f.local = function (tipo) { return api('/api/ia', { local: tipo }); };
     return f;
   }
 
@@ -300,13 +301,15 @@
     var desde = new Date(); desde.setDate(1); desde.setHours(0, 0, 0, 0);
     var mesAnt = new Date(desde); mesAnt.setMonth(mesAnt.getMonth() - 1);
     var cotP = fetch('/api/cotacao').then(function (x) { return x.ok ? x.json() : null; }).catch(function () { return null; });
-    Promise.all([config(), sb.from('uso_ia').select('criado,tipo,entrada,saida,imagens').order('criado', { ascending: true }).limit(20000), cotP]).then(function (r) {
+    Promise.all([config(), sb.from('uso_ia').select('criado,tipo,modelo,entrada,saida,imagens').order('criado', { ascending: true }).limit(20000), cotP]).then(function (r) {
       var cfg = r[0], q = r[1], cot = r[2], c = box.querySelector('#pl-uso-c');
       var moeda = 'USD';
       try { moeda = localStorage.getItem('dt-moeda') === 'BRL' ? 'BRL' : 'USD'; } catch (e) {}
       cfg = { precoEntrada: Number(cfg.precoEntrada) || 3, precoSaida: Number(cfg.precoSaida) || 15, cotacaoDolar: Number(cfg.cotacaoDolar) || null };
       if (q.error) { c.textContent = 'Não consegui ler o uso: ' + q.error.message; return; }
-      var rows = q.data || [];
+      var todas = q.data || [];
+      var locais = todas.filter(function (x) { return x.modelo === 'local'; });
+      var rows = todas.filter(function (x) { return x.modelo !== 'local'; });
       if (!rows.length) { c.textContent = 'Nenhuma chamada à IA registrada ainda.'; return; }
       function custo(x) { return (x.entrada * cfg.precoEntrada + x.saida * cfg.precoSaida) / 1e6; }
       function soma(lista) { var t = { n: 0, tok: 0, img: 0, usd: 0 }; lista.forEach(function (x) { t.n++; t.tok += x.entrada + x.saida; t.img += x.imagens; t.usd += custo(x); }); return t; }
@@ -340,6 +343,23 @@
       var tot = soma(rows), med = tot.usd / diasUso;
       h += '<p style="margin:12px 0 0">Em ' + diasUso + (diasUso === 1 ? ' dia' : ' dias') + ' de uso, a média é de <strong>' + dinheiro(med) + ' por dia</strong>, o que daria cerca de <strong>' + dinheiro(med * 30) + ' por mês</strong>.</p>';
       if (diasUso < 7) h += '<p style="margin:6px 0 0;' + sub + '">Com poucos dias de uso, a média ainda oscila: os primeiros dias tiveram testes e análises de histórico que não se repetem todo dia.</p>';
+      if (locais.length) {
+        // Economia: cada caso resolvido no app vale o custo médio que aquele tipo tinha com IA.
+        var medTipo = {}, porTipo = {};
+        rows.forEach(function (x) { var m = medTipo[x.tipo] || (medTipo[x.tipo] = { n: 0, usd: 0 }); m.n++; m.usd += custo(x); });
+        var eco = 0, eco7 = 0, n7 = 0;
+        locais.forEach(function (x) {
+          var m = medTipo[x.tipo], v = m ? m.usd / m.n : 0; eco += v;
+          if (new Date(x.criado) >= sete) { eco7 += v; n7++; }
+          porTipo[x.tipo] = (porTipo[x.tipo] || 0) + 1;
+        });
+        var nm = { refeicao: 'refeições', dia: 'fechar o dia', atividade: 'atividades', treinador: 'treinador', semana: 'pesagem', fechamento: 'fechamento da semana' };
+        h += '<div style="margin-top:14px;padding:12px;border-radius:12px;background:color-mix(in srgb,var(--ok,#1f8a4c) 12%,transparent)">' +
+          '<strong>Resolvidas no app, sem IA: ' + locais.length + '</strong>' +
+          '<div style="' + sub + ';margin-top:2px">' + Object.keys(porTipo).map(function (k) { return porTipo[k] + ' de ' + (nm[k] || k); }).join(', ') + '</div>' +
+          '<p style="margin:6px 0 0">Economia estimada: <strong>' + dinheiro(eco) + '</strong>' + (n7 && n7 !== locais.length ? ' (' + dinheiro(eco7) + ' nos últimos 7 dias)' : '') + '.</p>' +
+          '<p style="margin:4px 0 0;' + sub + '">Calculada pelo custo médio que cada tipo tinha quando ia para a IA.</p></div>';
+      }
       var nomes = { refeicao: 'Refeições', dia: 'Fechar o dia', receita: 'Receitas', atividade: 'Análise de atividades', semana: 'Análise da pesagem', fechamento: 'Fechamento da semana', treinador: 'Treinador de corrida', outro: 'Outros' };
       var tipos = {};
       rows.forEach(function (x) { (tipos[x.tipo] = tipos[x.tipo] || []).push(x); });
