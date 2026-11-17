@@ -406,6 +406,13 @@ select { font: inherit; color: var(--fg); background: var(--bg); border: 2px sol
 .rec-passos { margin: 0; padding-left: 22px; display: grid; gap: 6px; }
 .rec-item h4 { margin: 6px 0 0; font-size: .95rem; }
 .rec-txt { white-space: pre-wrap; }
+.rec-100 { font-weight: 700; }
+.rec-regg { display: grid; grid-template-columns: auto 1fr auto; gap: 8px; align-items: center; }
+.rec-regg input { min-width: 0; }
+.rec-vers { border: 1px solid var(--line); border-radius: 12px; padding: 8px 10px; }
+.rec-vers summary { font-weight: 700; cursor: pointer; }
+.rec-ver { border-top: 1px solid var(--line); padding: 8px 0; display: grid; gap: 4px; }
+.rec-ver p { margin: 0; font-size: .88rem; color: var(--muted); }
 #rec-busca { margin: 10px 0 6px; }
 .durs.rec-filtros { margin: 0 0 6px; display: flex; flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; }
 .rec-filtros .dur { flex: none; }
@@ -4762,10 +4769,22 @@ window.MOVES = (function () {
     var ts = aliTrechos(relato).map(aliLe), itens = [], faltam = [];
     ts.forEach(function (t, i) {
       var a = aliGet(t.nome), v = aliValor(a, t);
+      // Receita salva escrita pelo nome ("226 g de mousse de morango fit"): usa a versão atual dela.
+      if (!v) { var rv = recDoRelato(t); if (rv) { a = { nome: 'Receita: ' + rv.nome }; v = rv.v; } }
       if (!v) { faltam.push(i); itens.push(null); return; }
       itens.push({ nome: a.nome || t.nome, quantidade: aliQtd(t), kcal: Math.round(v.kcal), proteina_g: Math.round(v.p * 10) / 10, gordura_g: Math.round(v.g * 10) / 10, carbo_g: Math.round(v.c * 10) / 10, conhecido: true });
     });
     return { trechos: ts, itens: itens, faltam: faltam, temPad: ts.some(function (t) { return !t.g && !t.n; }) };
+  }
+  function recDoRelato(t) {
+    if (!t || t.amb || !t.nome) return null;
+    var all = Store.all('receitas') || {}, ach = null;
+    Object.keys(all).forEach(function (k) { var r = all[k]; if (k.charAt(0) !== '_' && r && r.total && r.nome && aliLe(r.nome).nome === t.nome) ach = r; });
+    if (!ach) return null;
+    var T = ach.total, base = { kcal: T.kcal || 0, p: T.proteina_g || 0, g: T.gordura_g || 0, c: T.carbo_g || 0 };
+    if (t.g) return ach.peso_g ? { nome: ach.nome, v: aliMult(base, t.g / ach.peso_g) } : null;
+    var n = t.n || 1; if (t.un && t.un !== 'un' && t.un !== 'porcao') return null;
+    return { nome: ach.nome, v: aliMult(base, n / (ach.porcoes || 1)) };
   }
   function aliMedia(velho, novo, k) {
     if (!velho || !velho.k) return Object.assign({}, novo, { k: 1 });
@@ -5928,8 +5947,9 @@ window.MOVES = (function () {
   var REC_TAGS = [['cafe', 'Café da manhã'], ['almoco', 'Almoço e jantar'], ['lanche', 'Lanche'], ['sobremesa', 'Doce'], ['marmita', 'Marmita'], ['rapida', 'Rápida']];
   var recBusca = '', recFiltro = '', recOrdem = 'uso', recAberta = null, recPorc = {};
   function recUsos(id) {
-    var n = 0, ult = null, all = Store.all('refeicoes') || {};
-    Object.keys(all).forEach(function (k) { var m = all[k]; if (m.receita && m.receita.id === id) { n++; if (!ult || m.data > ult) ult = m.data; } });
+    var n = 0, ult = null, all = Store.all('refeicoes') || {}, r = Store.get('receitas', id), rot = r && r.nome ? 'Receita: ' + r.nome : null;
+    // Conta a receita escolhida no formulário e também a escrita no relato ("226 g de mousse...").
+    Object.keys(all).forEach(function (k) { var m = all[k]; if ((m.receita && m.receita.id === id) || (rot && (m.itens || []).some(function (x) { return x.nome === rot; }))) { n++; if (!ult || m.data > ult) ult = m.data; } });
     return { n: n, ult: ult };
   }
   // Multiplica o primeiro número de "300 g de abobrinha" pelo fator das porções.
@@ -6010,8 +6030,9 @@ window.MOVES = (function () {
     desenha();
   }
   // Leva a receita para o registro de refeições, já escolhida e com as porções.
-  function recRegistrar(id, porc) {
-    foodRec = { id: id, qtd: porc, un: 'porcao' };
+  var recGramas = {};
+  function recRegistrar(id, porc, un) {
+    foodRec = { id: id, qtd: porc, un: un || 'porcao' };
     location.hash = 'refeicoes';
     setTimeout(function () { renderRecPick(); var f = $('food-form'); if (f) f.scrollIntoView({ behavior: 'smooth', block: 'start' }); salvoOk('Escolha o tipo da refeição e salve'); }, 200);
   }
@@ -6072,7 +6093,9 @@ window.MOVES = (function () {
       var id = f.id || 'r' + Date.now();
       var old = Store.get('receitas', id) || {};
       var mudou = !f.id || old.ingredientes !== i || old.porcoes !== p || (old.peso_g || null) !== (g || null);
+      if (f.novaPrep && old.peso_g && !g) { msg.textContent = 'Informe o peso pronto desta preparação para registrar por gramas.'; return; }
       var doc = Object.assign({}, old, { nome: n, ingredientes: i, preparo: pr, tags: f.tags.slice(), tempo_min: tm || null, porcoes: p || null, peso_g: g || null, criado: old.criado || new Date().toISOString() });
+      if (f.novaPrep && old.total) { doc.versoes = (old.versoes || []).concat([recVersao(old)]).slice(-20); doc.preparado = Store.day(); mudou = true; }
       var fim = function () {
         Store.set('receitas', id, doc);
         recForm = null; recAberta = id;
@@ -6093,7 +6116,8 @@ window.MOVES = (function () {
     var cancel = h('button', { type: 'button', class: 'link', id: 'rec-cancel', text: 'Cancelar' });
     cancel.addEventListener('click', function () { recForm = null; renderRec(); });
     return h('div', { class: 'rec-form' },
-      h('h3', { text: f.id ? 'Editar receita' : 'Nova receita' }),
+      h('h3', { text: f.novaPrep ? 'Nova preparação' : f.id ? 'Editar receita' : 'Nova receita' }),
+      f.novaPrep ? h('p', { class: 'tip', text: 'Ajuste o que mudou desta vez e informe o peso pronto. A versão anterior fica guardada no histórico, e as refeições já registradas não mudam.' }) : null,
       h('div', { class: 'field' }, h('label', { for: 'rec-nome', text: 'Nome do prato' }), nome),
       h('div', { class: 'field' }, h('label', { for: 'rec-ing', text: 'Ingredientes com quantidades' }), ing),
       h('p', { class: 'tip', text: 'Pode colar a receita inteira, de outro app ou do ChatGPT. Se deixar nome ou porções em branco, eles saem do texto. Para ditar, use o microfone do teclado.' }),
@@ -6109,6 +6133,7 @@ window.MOVES = (function () {
       h('p', { class: 'tip', text: 'Pese a panela pronta, sem a panela, para poder registrar por gramas depois. É a forma mais precisa.' }),
       go, msg, cancel);
   }
+  function recVersao(c) { return { data: c.preparado || (c.criado || '').slice(0, 10) || null, ingredientes: c.ingredientes, porcoes: c.porcoes, peso_g: c.peso_g, total: c.total, itens: c.itens, observacao: c.observacao }; }
   function recDetalhe(r, it) {
     var v = r.v, porc = recPorc[r.id] || v.porcoes || 1, f = porc / (v.porcoes || 1);
     // Porções: escala ingredientes e valores
@@ -6117,9 +6142,23 @@ window.MOVES = (function () {
     menos.addEventListener('click', function () { recPorc[r.id] = Math.max(1, porc - 1); renderRec(); });
     mais.addEventListener('click', function () { recPorc[r.id] = porc + 1; renderRec(); });
     var pv = recPor(v, porc, 'porcao');
-    var reg = h('button', { type: 'button', class: 'go', id: 'rec-reg-' + r.id, text: 'Registrar 1 porção como refeição' });
-    reg.addEventListener('click', function () { recRegistrar(r.id, 1); });
-    it.appendChild(reg);
+    // Registro: por gramas quando a receita tem o peso pronto; senão, por porção.
+    if (v.peso_g) {
+      var g100 = recPor(v, 100, 'g');
+      it.appendChild(h('p', { class: 'rec-100', text: 'A cada 100 g: ' + nInt(g100.kcal) + ' kcal · ' + fmtN(v.total.proteina_g * 100 / v.peso_g, 1) + ' g de proteína' }));
+      var gi = h('input', { type: 'number', inputmode: 'decimal', id: 'rec-reg-g-' + r.id, value: String(recGramas[r.id] || 200), 'aria-label': 'Quantos gramas' });
+      var gs = h('span', { class: 'tip' });
+      var atualizaG = function () { var g = num(gi.value) || 0; recGramas[r.id] = g; var x = recPor(v, g, 'g'); gs.textContent = g ? '= ' + nInt(x.kcal) + ' kcal · ' + nInt(x.proteina_g) + ' g de proteína' : ''; };
+      gi.addEventListener('input', atualizaG); atualizaG();
+      var regG = h('button', { type: 'button', class: 'go', id: 'rec-reg-' + r.id, text: 'Registrar' });
+      regG.addEventListener('click', function () { var g = num(gi.value); if (!(g > 0)) { gi.focus(); return; } recRegistrar(r.id, g, 'g'); });
+      it.appendChild(h('div', { class: 'rec-regg' }, h('label', { for: gi.id, text: 'Comi (g)' }), gi, regG));
+      it.appendChild(gs);
+    } else {
+      var reg = h('button', { type: 'button', class: 'go', id: 'rec-reg-' + r.id, text: 'Registrar 1 porção como refeição' });
+      reg.addEventListener('click', function () { recRegistrar(r.id, 1); });
+      it.appendChild(reg);
+    }
     it.appendChild(h('p', { class: 'tip', text: 'Rende ' + (v.porcoes || 1) + (v.porcoes === 1 ? ' porção' : ' porções') + (v.peso_g ? ' (' + nInt(v.peso_g) + ' g pronta)' : '') + '. Abaixo, ajuste para quantas porções vai cozinhar.' }));
     it.appendChild(h('div', { class: 'rec-porc' }, menos, h('div', {}, h('b', { text: 'Cozinhar ' + fmtN(porc, 1) + (porc === 1 ? ' porção' : ' porções') }), h('span', { text: 'total ' + nInt(pv.kcal) + ' kcal · ' + nInt(pv.proteina_g) + ' g de proteína' })), mais));
     var coz = h('button', { type: 'button', class: 'howbtn', id: 'rec-coz-' + r.id, text: 'Modo cozinha' });
@@ -6135,6 +6174,27 @@ window.MOVES = (function () {
     var ps = recPassos(v);
     if (ps.length) { var ol = h('ol', { class: 'rec-passos' }); ps.forEach(function (x) { ol.appendChild(h('li', { text: x })); }); it.appendChild(h('h4', { text: 'Modo de preparo' })); it.appendChild(ol); }
     if (v.observacao) it.appendChild(h('p', { class: 'tip', text: v.observacao }));
+    // Preparações: cada vez que a receita muda, a anterior vai para o histórico.
+    var vs = v.versoes || [];
+    var np = h('button', { type: 'button', class: 'howbtn', id: 'rec-nova-' + r.id, text: 'Nova preparação' });
+    np.addEventListener('click', function () { recForm = { id: r.id, novaPrep: true, nome: v.nome, ingredientes: v.ingredientes, preparo: v.preparo, tags: (v.tags || []).slice(), tempo_min: v.tempo_min, porcoes: v.porcoes, peso_g: '' }; renderRec(); });
+    it.appendChild(h('div', { class: 'tr-acoes' }, np, h('span', { class: 'tip', text: v.preparado ? 'Versão atual de ' + br(v.preparado) : '' })));
+    if (vs.length) {
+      var hist = h('details', { class: 'rec-vers' }, h('summary', { text: 'Preparações anteriores (' + vs.length + ')' }));
+      vs.slice().reverse().forEach(function (x, j) {
+        var idx = vs.length - 1 - j, per100 = x.peso_g && x.total ? ' · ' + nInt(x.total.kcal * 100 / x.peso_g) + ' kcal e ' + fmtN(x.total.proteina_g * 100 / x.peso_g, 1) + ' g prot. por 100 g' : x.total ? ' · ' + nInt(x.total.kcal) + ' kcal no total' : '';
+        var us = h('button', { type: 'button', class: 'link', id: 'rec-volta-' + r.id + '-' + idx, text: 'Usar esta de novo' });
+        us.addEventListener('click', function () {
+          var c = Store.get('receitas', r.id); if (!c) return;
+          var hs = (c.versoes || []).slice(), velha = hs.splice(idx, 1)[0];
+          hs.push(recVersao(c));
+          Store.set('receitas', r.id, Object.assign({}, c, velha, { versoes: hs.slice(-20), preparado: velha.data || null }));
+          salvoOk('Versão restaurada'); renderRec(); renderRecPick();
+        });
+        hist.appendChild(h('div', { class: 'rec-ver' }, h('b', { text: (x.data ? br(x.data) : 'Sem data') + (x.peso_g ? ' · rendeu ' + nInt(x.peso_g) + ' g' : '') + per100 }), h('p', { class: 'rec-txt', text: x.ingredientes || '' }), us));
+      });
+      it.appendChild(hist);
+    }
     var ed = h('button', { type: 'button', class: 'howbtn', id: 'rec-ed-' + r.id, text: 'Editar' });
     ed.addEventListener('click', function () { recForm = { id: r.id, nome: v.nome, ingredientes: v.ingredientes, preparo: v.preparo, tags: (v.tags || []).slice(), tempo_min: v.tempo_min, porcoes: v.porcoes, peso_g: v.peso_g }; renderRec(); });
     var rc = h('button', { type: 'button', class: 'howbtn', id: 'rec-calc-' + r.id, text: 'Recalcular' });
@@ -6198,7 +6258,7 @@ window.MOVES = (function () {
       var topo = h('button', { type: 'button', class: 'rec-topo', id: 'rec-abre-' + r.id, 'aria-expanded': String(aberta) },
         v.foto ? h('img', { src: v.foto, alt: '' }) : h('span', { class: 'rec-sem', 'aria-hidden': 'true', text: '🍲' }),
         h('span', { class: 'rec-info' }, h('b', { text: v.nome || 'Receita nova' }),
-          h('span', { text: recBusy[r.id] ? 'Calculando...' : t ? nInt(r.p1.kcal) + ' kcal · ' + nInt(r.p1.proteina_g) + ' g prot. por porção' : (recMsg[r.id] || 'Ainda sem cálculo') }),
+          h('span', { text: recBusy[r.id] ? 'Calculando...' : t ? (v.peso_g ? nInt(t.kcal * 100 / v.peso_g) + ' kcal · ' + fmtN(t.proteina_g * 100 / v.peso_g, 1) + ' g prot. por 100 g' : nInt(r.p1.kcal) + ' kcal · ' + nInt(r.p1.proteina_g) + ' g prot. por porção') : (recMsg[r.id] || 'Ainda sem cálculo') }),
           h('small', { text: [v.tempo_min ? v.tempo_min + ' min' : '', r.u.n ? 'usada ' + r.u.n + (r.u.n === 1 ? ' vez' : ' vezes') + (r.u.ult ? ', última em ' + br(r.u.ult).slice(0, 5) : '') : 'ainda não usada', t && r.p1.kcal && r.p1.proteina_g * 4 / r.p1.kcal >= .3 ? 'proteína alta' : ''].filter(Boolean).join(' · ') })));
       topo.addEventListener('click', function () { recAberta = aberta ? null : r.id; renderRec(); });
       it.appendChild(h('div', { class: 'rec-head' }, topo, fav));
