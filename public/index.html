@@ -300,6 +300,7 @@ input[type="date"] { height: 46px; }
 .tr-chk { display: flex; gap: 10px; align-items: center; font-weight: 600; }
 .tr-chk input { width: 22px; height: 22px; flex: none; }
 .tr-acoes { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+#v-historico > .seg { grid-template-columns: repeat(4, 1fr); }
 .seg-treino { margin: 12px 0 0; grid-template-columns: repeat(4, 1fr); }
 .pl-tit { font-size: 1.05rem; margin: 18px 0 8px; }
 .pl-card { border: 1px solid var(--line); border-radius: 14px; padding: 12px; margin: 0 0 10px; background: var(--card, transparent); scroll-margin-top: 80px; }
@@ -698,6 +699,7 @@ footer .col { display: grid; gap: 10px; }
       <button type="button" role="tab" id="hs-registro" data-sec="registro">Registro</button>
       <button type="button" role="tab" id="hs-graficos" data-sec="graficos">Gráficos</button>
       <button type="button" role="tab" id="hs-analises" data-sec="analises">Análises</button>
+      <button type="button" role="tab" id="hs-semana" data-sec="semana">Semana</button>
     </div>
     <div id="h-sec-registro" role="tabpanel" aria-labelledby="hs-registro">
       <section class="panel" id="h-cal"></section>
@@ -725,9 +727,11 @@ footer .col { display: grid; gap: 10px; }
       <section class="panel" id="g-corrida"></section>
       <section class="panel" id="h-evo"></section>
     </div>
-    <div id="h-sec-analises" role="tabpanel" aria-labelledby="hs-analises" hidden>
-      <section class="panel" id="a-fech"></section>
+    <div id="h-sec-semana" role="tabpanel" aria-labelledby="hs-semana" hidden>
       <section class="panel" id="a-semana"></section>
+      <section class="panel" id="a-fech"></section>
+    </div>
+    <div id="h-sec-analises" role="tabpanel" aria-labelledby="hs-analises" hidden>
       <section class="panel" id="a-corpo"></section>
       <section class="panel" id="balanco"></section>
       <section class="panel" id="h-ativ"></section>
@@ -3598,13 +3602,13 @@ window.MOVES = (function () {
   function histMostra(sec, soMostra) {
     histSec = sec;
     try { localStorage.setItem('dt-hist-sec', sec); } catch (e) {}
-    ['registro', 'graficos', 'analises'].forEach(function (s2) {
+    ['registro', 'graficos', 'analises', 'semana'].forEach(function (s2) {
       var b = $('hs-' + s2); if (b) b.setAttribute('aria-selected', String(s2 === sec));
       var p = $('h-sec-' + s2); if (p) p.hidden = s2 !== sec;
     });
     if (sec === 'graficos' && !soMostra) renderGraficos();
   }
-  ['registro', 'graficos', 'analises'].forEach(function (s2) {
+  ['registro', 'graficos', 'analises', 'semana'].forEach(function (s2) {
     var b = $('hs-' + s2); if (b) b.addEventListener('click', function () { histMostra(s2); });
   });
   histMostra(histSec, true);
@@ -3782,6 +3786,12 @@ window.MOVES = (function () {
       'Dias úteis: ' + sn(r.saldoUteis) + ' kcal; fim de semana: ' + sn(r.saldoFds) + ' kcal' + (r.devolveu ? ' (devolveu ' + r.devolveu + '% do déficit dos dias úteis).' : '.'),
       'Exercício: ' + nInt(r.gEx) + ' kcal considerados; sem os treinos, o saldo seria ' + sn(r.semTreino) + '. Proteína média de ' + nInt(r.prot) + ' g/dia (meta ' + protTxt(r.dom) + ').'
     ];
+    // Pesagem feita nesta semana (normalmente na sexta): liga o fechamento à balança.
+    var pes = Object.keys(Object.assign({}, Store.all('peso') || {}, Store.all('composicao') || {})).sort().filter(function (d) { return d >= r.seg && d <= r.dom && pesoDe(d); });
+    if (pes.length) {
+      var dP = pes[pes.length - 1], b = balDados(), cmp = pesagemVsSaldo(dP, b, balAjuste(b, balSemanas(b)).kcal), pk = pesoDe(dP);
+      pontos.push('Pesagem de ' + dsem(dP) + ' (' + br(dP).slice(0, 5) + '): ' + kg1(pk.kg) + ' kg' + (cmp ? ', ' + sinalKg(cmp.real) + ' desde ' + br(cmp.d0).slice(0, 5) + ' (o saldo previa ' + sinalKg(cmp.prev) + ').' : '.') + (dP < r.dom ? ' Os dias depois dela entram na próxima pesagem.' : ''));
+    }
     return { nivel: nivel, pontos: pontos };
   }
   function fechPrompt(r) {
@@ -3814,7 +3824,7 @@ window.MOVES = (function () {
   function irParaFechamento(seg) {
     histSel = addDias(seg, 6); histMes = histSel.slice(0, 7);
     location.hash = '#historico';
-    histMostra('analises');
+    histMostra('semana');
     setTimeout(function () { var p = $('a-fech'); if (p) p.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 250);
   }
   // Coloca um elemento logo depois de outro (ações no topo do bloco).
@@ -3824,7 +3834,11 @@ window.MOVES = (function () {
     box.textContent = '';
     var seg = segDe(histSel), r = semanaResumo(seg), f = Store.get('fechamentos', seg), hoje = Store.day();
     box.appendChild(h('h2', { text: 'Fechamento da semana' }));
-    var fSub = box.appendChild(h('p', { class: 'g-sub', text: DSEMF[0] + ' ' + br(seg) + ' a ' + DSEMF[6] + ' ' + br(r.dom) + (r.dom > hoje ? ' · em andamento' : '') + '. Mude a semana pelo calendário do Registro.' }));
+    var fAnt = h('button', { type: 'button', class: 'wk-nav', id: 'fech-ant', 'aria-label': 'Semana anterior', text: '‹' }), fProx = h('button', { type: 'button', class: 'wk-nav', id: 'fech-prox', 'aria-label': 'Próxima semana', text: '›' });
+    fAnt.addEventListener('click', function () { histSel = addDias(seg, -1); histMes = histSel.slice(0, 7); renderHist(); });
+    fProx.addEventListener('click', function () { histSel = addDias(seg, 7); if (histSel > hoje) histSel = hoje; histMes = histSel.slice(0, 7); renderHist(); });
+    if (addDias(seg, 7) > hoje) fProx.disabled = true;
+    var fSub = box.appendChild(h('div', { class: 'wk-head' }, fAnt, h('strong', { text: DSEMF[0] + ' ' + br(seg).slice(0, 5) + ' a ' + DSEMF[6] + ' ' + br(r.dom).slice(0, 5) + (r.dom > hoje ? ' · em andamento' : '') }), fProx));
     if (!r.nReg) { box.appendChild(h('p', { class: 'tip', text: 'Nenhum dia com refeições registradas nesta semana.' })); return; }
     // Resumo em números
     var fx = function (v) { return (v > 0 ? '+' : v < 0 ? '−' : '') + nInt(Math.abs(v)); };
@@ -4246,7 +4260,7 @@ window.MOVES = (function () {
       sub.push(durTxt(a.seg || (a.min || 0) * 60));
       if (a.kcal) sub.push(nInt(a.kcal) + ' kcal');
       var b = h('button', { type: 'button', class: 'd-item', id: 'd-at-' + a._id },
-        h('span', { class: 'd-ic', 'aria-hidden': 'true', text: ehBike(a.tipo) ? '🚴' : ehCorrida(a.tipo) ? '🏃' : a.tipo === 'WeightTraining' ? '🏋️' : /walk|hike/i.test(a.tipo) ? '🚶' : '❤️' }),
+        h('span', { class: 'd-ic', 'aria-hidden': 'true', text: ehBike(a.tipo) ? '🚴' : ehCorrida(a.tipo) ? '🏃' : a.tipo === 'WeightTraining' ? '🏋️' : /walk|hike/i.test(a.tipo) ? '🚶' : /pilates|yoga/i.test(a.tipo) ? '🧘' : /swim/i.test(a.tipo) ? '🏊' : '💪' }),
         h('span', { class: 'd-tx' }, h('strong', { text: a.nome || tipoPt(a.tipo) }), h('span', { text: sub.join(' · ') })),
         a.esf ? h('span', { class: 'd-esf', title: 'Esforço relativo', text: a.esf }) : h('span'));
       b.addEventListener('click', function () { abreAtividade(a._id); });
@@ -5335,11 +5349,27 @@ window.MOVES = (function () {
   function sinalCm(x) { x = Math.round(x * 10) / 10; return (x > 0 ? '+' : x < 0 ? '−' : '') + fmtN(Math.abs(x), 1) + ' cm'; }
   /* Análise da semana: quando chega a pesagem, a IA junta tudo e sugere um ajuste */
   var semBusy = false, semMsg = '', semTentou = {};
+  // Pesagem anterior (pelo menos 4 dias antes) e o peso/gordura de um dia.
+  function pesoDe(d) { var c = (Store.all('composicao') || {})[d], p = Store.get('peso', d), kg = c && c.peso_kg || p && p.kg; return kg ? { kg: kg, gord: c && c.gordura_pct ? kg * c.gordura_pct / 100 : null } : null; }
+  function pesagemAntes(dPes) {
+    var ks = Object.keys(Object.assign({}, Store.all('peso') || {}, Store.all('composicao') || {})).sort().filter(function (d) { return d <= addDias(dPes, -4) && d >= addDias(dPes, -21) && pesoDe(d); });
+    return ks.length ? ks[ks.length - 1] : null;
+  }
+  // Compara o saldo entre duas pesagens com o que a balança mostrou (pesagem de sexta contra a anterior).
+  function pesagemVsSaldo(dPes, b, aj) {
+    var d0 = pesagemAntes(dPes); if (!d0) return null;
+    var p0 = pesoDe(d0), p1 = pesoDe(dPes); if (!p0 || !p1) return null;
+    var sal = 0, dias = 0, reg = 0;
+    for (var d = d0; d < dPes; d = addDias(d, 1)) { var x = diaInfo(d, b, aj); dias++; if (x.n) { reg++; sal += x.saldo; } }
+    return { d0: d0, dias: dias, reg: reg, saldo: sal, prev: sal / 7700, real: p1.kg - p0.kg, gord: p0.gord != null && p1.gord != null ? p1.gord - p0.gord : null };
+  }
   function semLocal(dPes) {
     var b = balDados(), aj = balAjuste(b, balSemanas(b)).kcal, t = compTendencia(), pm = protMeta(dPes);
     var n = 0, k = 0, pr = 0, tr = 0, sal = 0;
-    for (var i = 6; i >= 0; i--) { var d = addDias(dPes, -i), x = diaInfo(d, b, aj); if (x.n) { n++; k += x.k; pr += x.p; sal += x.saldo; } tr += atividadesDe(d).length; }
-    var pontos = [];
+    // Os 7 dias ANTES da pesagem (a pesagem é de manhã, então o próprio dia ainda não conta).
+    for (var i = 7; i >= 1; i--) { var d = addDias(dPes, -i), x = diaInfo(d, b, aj); if (x.n) { n++; k += x.k; pr += x.p; sal += x.saldo; } tr += atividadesDe(d).length; }
+    var pontos = [], cmp = pesagemVsSaldo(dPes, b, aj);
+    if (cmp) pontos.push('Desde a pesagem de ' + br(cmp.d0).slice(0, 5) + ': saldo de ' + (cmp.saldo > 0 ? '+' : cmp.saldo < 0 ? '−' : '') + nInt(Math.abs(cmp.saldo)) + ' kcal em ' + cmp.reg + ' de ' + cmp.dias + ' dias registrados, o que previa ' + sinalKg(cmp.prev) + '; a balança mostrou ' + sinalKg(cmp.real) + (cmp.gord != null ? ' (gordura ' + sinalKg(cmp.gord) + ')' : '') + '.');
     if (t.nivel) pontos.push('Tendência das pesagens: gordura ' + sinalKg(t.dg) + ', massa magra ' + sinalKg(t.dm) + ', peso ' + sinalKg(t.dp) + '.');
     else pontos.push('Ainda há ' + (t.n || 0) + ' pesagens; a tendência da composição precisa de pelo menos 4.');
     pontos.push(n ? 'Nos 7 dias: ' + n + ' com refeições, média de ' + nInt(k / n) + ' kcal e ' + nInt(pr / n) + ' g de proteína por dia (meta ' + pm.min + ' a ' + pm.max + ').' : 'Nenhuma refeição registrada nos 7 dias antes da pesagem.');
