@@ -300,7 +300,8 @@ input[type="date"] { height: 46px; }
 .tr-chk { display: flex; gap: 10px; align-items: center; font-weight: 600; }
 .tr-chk input { width: 22px; height: 22px; flex: none; }
 .tr-acoes { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-#v-historico > .seg { grid-template-columns: repeat(4, 1fr); }
+.seg-ana { grid-template-columns: repeat(4, minmax(0, 1fr)); margin: 0 0 12px; }
+.seg-ana button { font-size: .88rem; padding-left: 4px; padding-right: 4px; }
 .seg-treino { margin: 12px 0 0; grid-template-columns: repeat(4, 1fr); }
 .pl-tit { font-size: 1.05rem; margin: 18px 0 8px; }
 .pl-card { border: 1px solid var(--line); border-radius: 14px; padding: 12px; margin: 0 0 10px; background: var(--card, transparent); scroll-margin-top: 80px; }
@@ -699,7 +700,6 @@ footer .col { display: grid; gap: 10px; }
       <button type="button" role="tab" id="hs-registro" data-sec="registro">Registro</button>
       <button type="button" role="tab" id="hs-graficos" data-sec="graficos">Gráficos</button>
       <button type="button" role="tab" id="hs-analises" data-sec="analises">Análises</button>
-      <button type="button" role="tab" id="hs-semana" data-sec="semana">Semana</button>
     </div>
     <div id="h-sec-registro" role="tabpanel" aria-labelledby="hs-registro">
       <section class="panel" id="h-cal"></section>
@@ -727,13 +727,20 @@ footer .col { display: grid; gap: 10px; }
       <section class="panel" id="g-corrida"></section>
       <section class="panel" id="h-evo"></section>
     </div>
-    <div id="h-sec-semana" role="tabpanel" aria-labelledby="hs-semana" hidden>
-      <section class="panel" id="a-semana"></section>
-      <section class="panel" id="a-fech"></section>
-    </div>
     <div id="h-sec-analises" role="tabpanel" aria-labelledby="hs-analises" hidden>
+      <div class="seg seg-ana" role="tablist" aria-label="Tipos de análise">
+        <button type="button" role="tab" id="as-semana">Semana</button>
+        <button type="button" role="tab" id="as-pesagem">Pesagem</button>
+        <button type="button" role="tab" id="as-corpo">Corpo</button>
+        <button type="button" role="tab" id="as-ativ">Atividades</button>
+      </div>
+      <div id="a-sec-semana" role="tabpanel" aria-labelledby="as-semana"><section class="panel" id="a-fech"></section></div>
+      <div id="a-sec-pesagem" role="tabpanel" aria-labelledby="as-pesagem" hidden><section class="panel" id="a-semana"></section></div>
+      <div id="a-sec-corpo" role="tabpanel" aria-labelledby="as-corpo" hidden>
       <section class="panel" id="a-corpo"></section>
       <section class="panel" id="balanco"></section>
+      </div>
+      <div id="a-sec-ativ" role="tabpanel" aria-labelledby="as-ativ" hidden>
       <section class="panel" id="h-ativ"></section>
       <section class="panel">
         <h2>Painel de força</h2>
@@ -743,6 +750,7 @@ footer .col { display: grid; gap: 10px; }
           <tbody id="forca"></tbody>
         </table></div>
       </section>
+      </div>
     </div>
   </section>
   </section>
@@ -3602,15 +3610,28 @@ window.MOVES = (function () {
   function histMostra(sec, soMostra) {
     histSec = sec;
     try { localStorage.setItem('dt-hist-sec', sec); } catch (e) {}
-    ['registro', 'graficos', 'analises', 'semana'].forEach(function (s2) {
+    ['registro', 'graficos', 'analises'].forEach(function (s2) {
       var b = $('hs-' + s2); if (b) b.setAttribute('aria-selected', String(s2 === sec));
       var p = $('h-sec-' + s2); if (p) p.hidden = s2 !== sec;
     });
     if (sec === 'graficos' && !soMostra) renderGraficos();
   }
-  ['registro', 'graficos', 'analises', 'semana'].forEach(function (s2) {
+  ['registro', 'graficos', 'analises'].forEach(function (s2) {
     var b = $('hs-' + s2); if (b) b.addEventListener('click', function () { histMostra(s2); });
   });
+  // Subguias de Análises: Semana, Pesagem, Corpo e Atividades.
+  var anaSec = 'semana';
+  try { anaSec = localStorage.getItem('dt-ana-sec') || 'semana'; } catch (e) {}
+  function anaMostra(sec) {
+    anaSec = sec;
+    try { localStorage.setItem('dt-ana-sec', sec); } catch (e) {}
+    ['semana', 'pesagem', 'corpo', 'ativ'].forEach(function (s2) {
+      var b = $('as-' + s2); if (b) b.setAttribute('aria-selected', String(s2 === sec));
+      var p = $('a-sec-' + s2); if (p) p.hidden = s2 !== sec;
+    });
+  }
+  ['semana', 'pesagem', 'corpo', 'ativ'].forEach(function (s2) { var b = $('as-' + s2); if (b) b.addEventListener('click', function () { anaMostra(s2); }); });
+  anaMostra(anaSec);
   histMostra(histSec, true);
   function renderGraficos() {
     if (histSec !== 'graficos' || $('h-sec-graficos').hidden) return;
@@ -3824,7 +3845,7 @@ window.MOVES = (function () {
   function irParaFechamento(seg) {
     histSel = addDias(seg, 6); histMes = histSel.slice(0, 7);
     location.hash = '#historico';
-    histMostra('semana');
+    histMostra('analises'); anaMostra('semana');
     setTimeout(function () { var p = $('a-fech'); if (p) p.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 250);
   }
   // Coloca um elemento logo depois de outro (ações no topo do bloco).
