@@ -79,6 +79,8 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 .intro .col { display: grid; gap: 10px; }
 .titlebar { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .ir-atual { width: 100%; font-weight: 800; margin: 4px 0; }
+#t-peso.tem-aviso { position: relative; }
+#t-peso.tem-aviso::after { content: ''; position: absolute; top: 4px; right: 22%; width: 10px; height: 10px; border-radius: 50%; background: #e5484d; }
 .rec-top { display: grid; justify-items: center; gap: 1px; min-width: 64px; padding: 4px 6px; border-radius: 12px; border: 2px solid var(--line); background: var(--surface); color: var(--fg); font-weight: 700; font-size: .8rem; }
 .rec-top svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .topo-acoes { display: grid; grid-auto-flow: column; gap: 6px; position: relative; }
@@ -385,7 +387,42 @@ table.fech-tab th:first-child { white-space: nowrap; }
 select { font: inherit; color: var(--fg); background: var(--bg); border: 2px solid var(--line); border-radius: 8px; padding: 8px 10px; width: 100%; min-width: 0; height: 46px; }
 .rec-pick { display: grid; gap: 8px; background: var(--mat); border-radius: 10px; padding: 10px 12px; }
 .rec-qty { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: end; }
-.rec-item { border-top: 1px solid var(--line); padding-top: 10px; display: grid; gap: 6px; }
+.rec-item { border-top: 1px solid var(--line); padding: 10px 0; display: grid; gap: 8px; }
+.rec-head { display: flex; gap: 8px; align-items: center; }
+.rec-topo { flex: 1; min-width: 0; display: flex; gap: 10px; align-items: center; text-align: left; background: none; border: 0; padding: 0; color: inherit; font: inherit; cursor: pointer; }
+.rec-topo img, .rec-sem { width: 64px; height: 64px; flex: none; border-radius: 12px; object-fit: cover; background: var(--mat); display: grid; place-items: center; font-size: 1.8rem; }
+.rec-info { display: grid; gap: 2px; min-width: 0; }
+.rec-info b { font-size: 1.05rem; }
+.rec-info span { font-size: .9rem; }
+.rec-info small { color: var(--muted); font-size: .8rem; }
+.rec-fav { flex: none; width: 44px; height: 44px; border-radius: 12px; border: 1px solid var(--line); background: none; color: #e0a800; font-size: 1.4rem; cursor: pointer; }
+.rec-porc { display: grid; grid-template-columns: 48px 1fr 48px; gap: 8px; align-items: center; text-align: center; background: var(--mat); border-radius: 12px; padding: 8px; }
+.rec-porc div { display: grid; }
+.rec-porc span { font-size: .85rem; color: var(--muted); }
+.rec-pm { min-height: 44px; font-size: 1.3rem; padding: 0; }
+.rec-ing, .rec-check { list-style: none; padding: 0; margin: 0; display: grid; gap: 4px; }
+.rec-ing li { display: flex; justify-content: space-between; gap: 8px; border-bottom: 1px dashed var(--line); padding: 4px 0; }
+.rec-ing small { color: var(--muted); flex: none; }
+.rec-passos { margin: 0; padding-left: 22px; display: grid; gap: 6px; }
+.rec-item h4 { margin: 6px 0 0; font-size: .95rem; }
+.rec-txt { white-space: pre-wrap; }
+#rec-busca { margin: 10px 0 6px; }
+.durs.rec-filtros { margin: 0 0 6px; display: flex; flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; }
+.rec-filtros .dur { flex: none; }
+.rec-ord { margin: 0 0 6px; }
+.rec-compras { margin-top: 14px; border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; }
+.rec-compras summary { font-weight: 800; cursor: pointer; }
+.rec-check label { display: grid; grid-template-columns: 24px 1fr; gap: 2px 8px; align-items: center; padding: 4px 0; }
+.rec-check input { width: 20px; height: 20px; }
+.rec-check small { grid-column: 2; color: var(--muted); font-size: .78rem; }
+.rec-check input:checked + span { text-decoration: line-through; color: var(--muted); }
+.coz-ov { position: fixed; inset: 0; z-index: 9600; background: var(--bg); color: var(--fg); display: grid; padding: 16px; overflow: auto; }
+.coz-box { max-width: 640px; width: 100%; margin: 0 auto; display: grid; grid-template-rows: auto 1fr auto; gap: 16px; }
+.coz-corpo { font-size: 1.25rem; line-height: 1.5; }
+.coz-corpo h2 { font-size: 1.3rem; }
+.coz-ing { padding-left: 20px; display: grid; gap: 8px; }
+.coz-passo { font-size: 1.6rem; line-height: 1.45; font-weight: 600; }
+.coz-nav { display: grid; grid-template-columns: 1fr 2fr; gap: 10px; }
 .rec-item h3 { font-size: 1.1rem; }
 .rec-item > img { display: block; width: 100%; max-height: 220px; object-fit: cover; border-radius: 10px; }
 .rec-form { display: grid; gap: 10px; border-top: 1px solid var(--line); padding-top: 12px; }
@@ -607,7 +644,7 @@ footer .col { display: grid; gap: 10px; }
   <section class="view" id="v-peso" hidden>
     <section class="panel" id="peso-box">
       <h2>Peso</h2>
-      <p class="lede">Uma pesagem por semana basta. Escolha quinta ou sexta e mantenha o mesmo dia, ao acordar, depois de ir ao banheiro e antes de comer.</p>
+      <p class="lede">Uma pesagem por semana basta: na sexta, ao acordar, depois de ir ao banheiro e antes de comer.</p>
       <div class="field"><label for="peso-kg" id="peso-label">Peso da semana (kg)</label><input type="number" inputmode="decimal" step="any" min="0" id="peso-kg" placeholder="Ex.: 104,8"><span class="tip" id="peso-dia"></span></div>
       <button class="go" type="button" id="peso-save">Salvar peso</button>
       <p class="side-note" id="peso-msg" aria-live="polite"></p>
@@ -729,12 +766,12 @@ footer .col { display: grid; gap: 10px; }
     </div>
     <div id="h-sec-analises" role="tabpanel" aria-labelledby="hs-analises" hidden>
       <div class="seg seg-ana" role="tablist" aria-label="Tipos de análise">
-        <button type="button" role="tab" id="as-semana">Semana</button>
+        <button type="button" role="tab" id="as-ativ">Atividades</button>
         <button type="button" role="tab" id="as-pesagem">Pesagem</button>
         <button type="button" role="tab" id="as-corpo">Corpo</button>
-        <button type="button" role="tab" id="as-ativ">Atividades</button>
+        <button type="button" role="tab" id="as-semana">Semana</button>
       </div>
-      <div id="a-sec-semana" role="tabpanel" aria-labelledby="as-semana"><section class="panel" id="a-fech"></section></div>
+      <div id="a-sec-semana" role="tabpanel" aria-labelledby="as-semana" hidden><section class="panel" id="a-fech"></section></div>
       <div id="a-sec-pesagem" role="tabpanel" aria-labelledby="as-pesagem" hidden><section class="panel" id="a-semana"></section></div>
       <div id="a-sec-corpo" role="tabpanel" aria-labelledby="as-corpo" hidden>
       <section class="panel" id="a-corpo"></section>
@@ -3620,8 +3657,8 @@ window.MOVES = (function () {
     var b = $('hs-' + s2); if (b) b.addEventListener('click', function () { histMostra(s2); });
   });
   // Subguias de Análises: Semana, Pesagem, Corpo e Atividades.
-  var anaSec = 'semana';
-  try { anaSec = localStorage.getItem('dt-ana-sec') || 'semana'; } catch (e) {}
+  var anaSec = 'ativ';
+  try { anaSec = localStorage.getItem('dt-ana-sec') || 'ativ'; } catch (e) {}
   function anaMostra(sec) {
     anaSec = sec;
     try { localStorage.setItem('dt-ana-sec', sec); } catch (e) {}
@@ -5177,7 +5214,12 @@ window.MOVES = (function () {
         renderFoodSummary();
       });
     }
-    card.appendChild(h('div', { class: 'photo-row' }, edt, ajb, again, rep, del));
+    var arec = null;
+    if (!m.receita && typeof m.kcal === 'number' && (m.relato || (m.itens || []).length)) {
+      arec = h('button', { type: 'button', class: 'link', id: 'frec-' + id, text: 'Salvar como receita' });
+      arec.addEventListener('click', function () { refeicaoParaReceita(id); });
+    }
+    card.appendChild(h('div', { class: 'photo-row' }, edt, ajb, again, rep, del, arec));
     if (foodAdj[id]) card.appendChild(adjBox(id));
     return card;
   }
@@ -5528,12 +5570,22 @@ window.MOVES = (function () {
       box.appendChild(tab);
     }
   }
+  // Medidas a cada 2 semanas, na sexta: avisa a partir da sexta em que já passaram 13 dias da última.
+  function medVence() {
+    var ks = Object.keys(Store.all('medidas') || {}).sort(), hoje = Store.day(), ult = ks.length ? ks[ks.length - 1] : null;
+    var dias = ult ? Math.round(diaNum(hoje) - diaNum(ult)) : 99, wd = weekday(hoje);
+    var devido = !ult ? wd === 5 : (dias >= 13 && (wd === 5 || dias >= 15));
+    return { devido: devido && ult !== hoje, dias: dias, texto: ult ? 'As últimas medidas foram em ' + br(ult) + ', há ' + dias + ' dias. Hoje, no meio da manhã, depois do cardio e do café, meça ao menos a cintura.' : 'Faça a primeira medição hoje, no meio da manhã, depois do cardio e do café. Ao menos a cintura.' };
+  }
+  function medBadge() { var b = $('t-peso'); if (b) b.classList.toggle('tem-aviso', medVence().devido); }
   function renderMed() {
+    medBadge();
     var box = $('med-box'); if (!box) return;
     if (box.contains(document.activeElement) && document.activeElement.tagName === 'INPUT') return;
     box.textContent = '';
     box.appendChild(h('h2', { text: 'Medidas' }));
-    box.appendChild(h('p', { class: 'lede', text: 'A cintura mostra a perda de gordura melhor que a balança, porque não muda com água nem com músculo. Meça a cada 2 semanas, no mesmo dia da pesagem, de manhã e antes de comer.' }));
+    box.appendChild(h('p', { class: 'lede', text: 'A cintura mostra a perda de gordura melhor que a balança, porque não muda com água nem com músculo. Meça a cada 2 semanas, na sexta, sempre nas mesmas condições (no meio da manhã, depois do cardio e do café). O app avisa quando for a hora.' }));
+    var mv = medVence(); if (mv.devido) box.appendChild(h('div', { class: 'verdict ok', id: 'med-aviso' }, h('b', { text: 'Dia de medir' }), h('p', { text: mv.texto })));
     var doc = Store.get('medidas', foodDate) || {};
     box.appendChild(h('p', { class: 'tip', text: (doc.data ? 'Medidas de ' : 'Serão registradas na ') + dsem(foodDate) + ', ' + br(foodDate) + ', o dia escolhido no topo. Só a cintura já basta; as outras são opcionais.' }));
     var inps = {}, grid = h('div', { class: 'med-grid' });
@@ -5803,7 +5855,7 @@ window.MOVES = (function () {
   }
   function recLista() {
     var all = Store.all('receitas');
-    return Object.keys(all).map(function (k) { return { id: k, v: all[k] }; }).sort(function (a, b) { return (a.v.nome || '').localeCompare(b.v.nome || '', 'pt-BR'); });
+    return Object.keys(all).filter(function (k) { return k.charAt(0) !== '_'; }).map(function (k) { return { id: k, v: all[k] }; }).sort(function (a, b) { return (a.v.nome || '').localeCompare(b.v.nome || '', 'pt-BR'); });
   }
   function renderRecPick() {
     var box = $('food-rec'); if (!box) return;
@@ -5846,7 +5898,7 @@ window.MOVES = (function () {
       'Em porcoes, informe o rendimento: use o informado pelo usuário; se ele não informou, use o rendimento do texto ou da foto; sem nenhuma pista, use 1. Em nome, um nome curto para o prato. ' +
       'O total é a receita inteira. Em observacao, escreva no máximo uma frase dizendo o que precisou ser estimado. ' +
       (r.foto ? 'Há uma foto anexada: pode ser do prato pronto ou da receita escrita. Use-a para completar ou conferir ingredientes e quantidades, mas o texto tem prioridade. ' : '') +
-      'Receita: ' + (r.nome || '(sem nome, sugira um)') + '. ' + (r.porcoes ? 'Rende ' + r.porcoes + (r.porcoes === 1 ? ' porção' : ' porções') : 'Rendimento não informado pelo usuário') + (r.peso_g ? ', com ' + r.peso_g + ' g de peso pronto' : '') + '. Ingredientes e preparo: ' + (r.ingredientes || '(veja a foto)');
+      'Receita: ' + (r.nome || '(sem nome, sugira um)') + '. ' + (r.porcoes ? 'Rende ' + r.porcoes + (r.porcoes === 1 ? ' porção' : ' porções') : 'Rendimento não informado pelo usuário') + (r.peso_g ? ', com ' + r.peso_g + ' g de peso pronto' : '') + '. Ingredientes: ' + (r.ingredientes || '(veja a foto)') + (r.preparo ? '. Modo de preparo: ' + r.preparo : '');
   }
   function calcRec(id) {
     var r = Store.get('receitas', id); if (!r) return;
@@ -5873,17 +5925,118 @@ window.MOVES = (function () {
       recMsg[id] = e && e.message === 'indisponivel' ? 'O cálculo automático não está disponível aqui.' : 'Não consegui calcular agora. Toque em Recalcular.';
     }).then(function () { delete recBusy[id]; renderRec(); renderRecPick(); });
   }
+  var REC_TAGS = [['cafe', 'Café da manhã'], ['almoco', 'Almoço e jantar'], ['lanche', 'Lanche'], ['sobremesa', 'Doce'], ['marmita', 'Marmita'], ['rapida', 'Rápida']];
+  var recBusca = '', recFiltro = '', recOrdem = 'uso', recAberta = null, recPorc = {};
+  function recUsos(id) {
+    var n = 0, ult = null, all = Store.all('refeicoes') || {};
+    Object.keys(all).forEach(function (k) { var m = all[k]; if (m.receita && m.receita.id === id) { n++; if (!ult || m.data > ult) ult = m.data; } });
+    return { n: n, ult: ult };
+  }
+  // Multiplica o primeiro número de "300 g de abobrinha" pelo fator das porções.
+  function recEscala(txt, f) {
+    if (f === 1) return txt;
+    return String(txt || '').replace(/(\d+(?:[.,]\d+)?)/, function (x) { var v = Number(x.replace(',', '.')) * f; return fmtN(v, v < 1 ? 2 : v < 10 ? 1 : 0); });
+  }
+  /* Lista de compras: ingredientes das receitas escolhidas, com marcação */
+  function compras() { return Store.get('receitas', '_compras') || { itens: [] }; }
+  function compraAdd(r, porc) {
+    var c = compras(), f = porc / (r.porcoes || 1), its = (r.itens || []).filter(function (x) { return x.nome; });
+    its.forEach(function (x) { c.itens.push({ txt: x.nome + (x.quantidade ? ' · ' + recEscala(x.quantidade, f) : ''), rec: r.nome, feito: false }); });
+    Store.set('receitas', '_compras', { itens: c.itens.slice(-120), atualizado: new Date().toISOString() });
+    return its.length;
+  }
+  function comprasBox() {
+    var c = compras(), w = h('details', { class: 'panel-sub rec-compras', id: 'rec-compras' });
+    var pend = c.itens.filter(function (x) { return !x.feito; }).length;
+    w.appendChild(h('summary', { text: 'Lista de compras' + (c.itens.length ? ' (' + pend + ' de ' + c.itens.length + ')' : '') }));
+    if (!c.itens.length) { w.appendChild(h('p', { class: 'tip', text: 'Abra uma receita e toque em "Lista de compras" para juntar os ingredientes aqui.' })); return w; }
+    var ul = h('ul', { class: 'rec-check' });
+    c.itens.forEach(function (x, i) {
+      var cb = h('input', { type: 'checkbox', id: 'cmp-' + i }); cb.checked = !!x.feito;
+      cb.addEventListener('change', function () { var cc = compras(); cc.itens[i].feito = cb.checked; Store.set('receitas', '_compras', cc); });
+      ul.appendChild(h('li', {}, h('label', { for: 'cmp-' + i }, cb, h('span', { text: x.txt }), h('small', { text: x.rec || '' }))));
+    });
+    w.appendChild(ul);
+    var lim = h('button', { type: 'button', class: 'link', id: 'cmp-limpa', text: 'Tirar os marcados' });
+    lim.addEventListener('click', function () { var cc = compras(); cc.itens = cc.itens.filter(function (x) { return !x.feito; }); Store.set('receitas', '_compras', cc); renderRec(); });
+    var tudo = h('button', { type: 'button', class: 'link', id: 'cmp-zera', text: 'Esvaziar a lista' });
+    tudo.addEventListener('click', function () { if (!tudo.dataset.sure) { tudo.dataset.sure = 1; tudo.textContent = 'Confirmar'; return; } Store.set('receitas', '_compras', { itens: [] }); renderRec(); });
+    var comp = h('button', { type: 'button', class: 'howbtn', id: 'cmp-share', text: 'Compartilhar' });
+    comp.addEventListener('click', function () {
+      var txt = 'Lista de compras\n' + compras().itens.filter(function (x) { return !x.feito; }).map(function (x) { return '• ' + x.txt; }).join('\n');
+      if (navigator.share) navigator.share({ text: txt }).catch(function () {});
+      else if (navigator.clipboard) navigator.clipboard.writeText(txt).then(function () { salvoOk('Lista copiada'); });
+    });
+    w.appendChild(h('div', { class: 'tr-acoes' }, comp, lim, tudo));
+    w.open = !!recCompraAberta;
+    w.addEventListener('toggle', function () { recCompraAberta = w.open; });
+    return w;
+  }
+  var recCompraAberta = false;
+  /* Modo cozinha: tela cheia, letras grandes, um passo por vez e tela sempre acesa */
+  function recPassos(r) {
+    var t = String(r.preparo || '').trim();
+    if (!t) return [];
+    return t.split(/\n+|(?:^|\s)\d+[.)]\s+/).map(function (x) { return x.trim(); }).filter(Boolean);
+  }
+  function modoCozinha(r, porc) {
+    var passos = recPassos(r), f = porc / (r.porcoes || 1), i = 0, lock = null;
+    var ov = h('div', { class: 'coz-ov', role: 'dialog', 'aria-label': 'Modo cozinha: ' + r.nome });
+    var corpo = h('div', { class: 'coz-corpo' });
+    function fecha() { if (lock) lock.release().catch(function () {}); ov.remove(); document.removeEventListener('keydown', tecla); }
+    function tecla(e) { if (e.key === 'Escape') fecha(); if (e.key === 'ArrowRight') vai(1); if (e.key === 'ArrowLeft') vai(-1); }
+    function vai(d) { i = Math.max(0, Math.min(passos.length, i + d)); desenha(); }
+    function desenha() {
+      corpo.textContent = '';
+      if (i === 0) {
+        corpo.appendChild(h('h2', { text: 'Ingredientes · ' + fmtN(porc, 1) + (porc === 1 ? ' porção' : ' porções') }));
+        var ul = h('ul', { class: 'coz-ing' });
+        (r.itens || []).forEach(function (x) { ul.appendChild(h('li', { text: (x.quantidade ? recEscala(x.quantidade, f) + ' · ' : '') + x.nome })); });
+        if (!(r.itens || []).length) ul.appendChild(h('li', { text: r.ingredientes || '' }));
+        corpo.appendChild(ul);
+      } else {
+        corpo.appendChild(h('small', { text: 'Passo ' + i + ' de ' + passos.length }));
+        corpo.appendChild(h('p', { class: 'coz-passo', text: passos[i - 1] }));
+      }
+      ant.disabled = i === 0; prox.textContent = i >= passos.length ? 'Concluir' : i === 0 ? (passos.length ? 'Começar o preparo' : 'Concluir') : 'Próximo passo';
+    }
+    var ant = h('button', { type: 'button', class: 'howbtn', id: 'coz-ant', text: 'Voltar' }), prox = h('button', { type: 'button', class: 'go', id: 'coz-prox' });
+    ant.addEventListener('click', function () { vai(-1); });
+    prox.addEventListener('click', function () { if (i >= passos.length) fecha(); else vai(1); });
+    var x = h('button', { type: 'button', class: 'link', id: 'coz-fecha', text: 'Fechar' }); x.addEventListener('click', fecha);
+    ov.appendChild(h('div', { class: 'coz-box' }, h('div', { class: 'tr-acoes', style: 'justify-content:space-between' }, h('b', { text: r.nome }), x), corpo, h('div', { class: 'coz-nav' }, ant, prox)));
+    document.body.appendChild(ov); document.addEventListener('keydown', tecla);
+    if (navigator.wakeLock) navigator.wakeLock.request('screen').then(function (l) { lock = l; }).catch(function () {});
+    desenha();
+  }
+  // Leva a receita para o registro de refeições, já escolhida e com as porções.
+  function recRegistrar(id, porc) {
+    foodRec = { id: id, qtd: porc, un: 'porcao' };
+    location.hash = 'refeicoes';
+    setTimeout(function () { renderRecPick(); var f = $('food-form'); if (f) f.scrollIntoView({ behavior: 'smooth', block: 'start' }); salvoOk('Escolha o tipo da refeição e salve'); }, 200);
+  }
   function recFormBox() {
     var f = recForm;
     var nome = h('input', { id: 'rec-nome', type: 'text', placeholder: 'Ex.: Frango com legumes (ou deixe que eu sugiro)' });
     var ing = h('textarea', { id: 'rec-ing', rows: '5', placeholder: 'Ex.: 1 kg de peito de frango, 300 g de abobrinha, 200 g de cenoura, 2 colheres de sopa de azeite, cebola, alho e sal' });
+    var prep = h('textarea', { id: 'rec-prep', rows: '4', placeholder: 'Um passo por linha. Ex.:\nTempere o frango\nRefogue a cebola no azeite\nJunte os legumes e cozinhe 10 min' });
     var por = h('input', { id: 'rec-por', type: 'number', inputmode: 'numeric', min: '1', step: '1', placeholder: 'Pelo texto' });
     var pes = h('input', { id: 'rec-peso', type: 'number', inputmode: 'numeric', min: '0', step: 'any', placeholder: 'Opcional' });
-    nome.value = f.nome; ing.value = f.ingredientes; por.value = f.porcoes; pes.value = f.peso_g || '';
+    var tmp = h('input', { id: 'rec-tempo', type: 'number', inputmode: 'numeric', min: '0', step: '1', placeholder: 'Opcional' });
+    nome.value = f.nome || ''; ing.value = f.ingredientes || ''; prep.value = f.preparo || ''; por.value = f.porcoes || ''; pes.value = f.peso_g || ''; tmp.value = f.tempo_min || '';
     nome.addEventListener('input', function () { f.nome = nome.value; });
     ing.addEventListener('input', function () { f.ingredientes = ing.value; });
+    prep.addEventListener('input', function () { f.preparo = prep.value; });
     por.addEventListener('input', function () { f.porcoes = por.value; });
     pes.addEventListener('input', function () { f.peso_g = pes.value; });
+    tmp.addEventListener('input', function () { f.tempo_min = tmp.value; });
+    f.tags = f.tags || [];
+    var tg = h('div', { class: 'durs', role: 'group', 'aria-label': 'Categorias' });
+    REC_TAGS.forEach(function (t) {
+      var b = h('button', { type: 'button', class: 'dur', id: 'rec-tag-' + t[0], 'aria-pressed': String(f.tags.indexOf(t[0]) > -1), text: t[1] });
+      b.addEventListener('click', function () { var i = f.tags.indexOf(t[0]); if (i > -1) f.tags.splice(i, 1); else f.tags.push(t[0]); b.setAttribute('aria-pressed', String(i < 0)); });
+      tg.appendChild(b);
+    });
     var msg = h('p', { class: 'side-note', 'aria-live': 'polite' });
     var atual = f.id ? (Store.get('receitas', f.id) || {}).foto : null;
     var fi = h('input', { type: 'file', accept: 'image/*', class: 'file', id: 'rec-file', 'aria-label': 'Escolher foto da receita' });
@@ -5911,7 +6064,7 @@ window.MOVES = (function () {
     rm.addEventListener('click', function () { f.jpg = null; f.semFoto = true; fi.value = ''; fn.textContent = 'A foto será removida ao salvar.'; fp.hidden = true; rm.hidden = true; });
     var go = h('button', { type: 'button', class: 'go', id: 'rec-save', text: 'Salvar e calcular' });
     go.addEventListener('click', function () {
-      var n = f.nome.trim(), i = f.ingredientes.trim(), p = Math.round(num(f.porcoes) || 0), g = num(f.peso_g);
+      var n = (f.nome || '').trim(), i = (f.ingredientes || '').trim(), pr = (f.preparo || '').trim(), p = Math.round(num(f.porcoes) || 0), g = num(f.peso_g), tm = Math.round(num(f.tempo_min) || 0);
       if (f.lendo) { msg.textContent = 'Aguarde a foto terminar de carregar.'; return; }
       if (!i && !f.jpg && !(atual && !f.semFoto)) { msg.textContent = 'Liste os ingredientes com as quantidades ou adicione uma foto da receita.'; return; }
       if (!n && !i && f.id) { msg.textContent = 'Dê um nome à receita.'; return; }
@@ -5919,10 +6072,10 @@ window.MOVES = (function () {
       var id = f.id || 'r' + Date.now();
       var old = Store.get('receitas', id) || {};
       var mudou = !f.id || old.ingredientes !== i || old.porcoes !== p || (old.peso_g || null) !== (g || null);
-      var doc = Object.assign({}, old, { nome: n, ingredientes: i, porcoes: p || null, peso_g: g || null, criado: old.criado || new Date().toISOString() });
+      var doc = Object.assign({}, old, { nome: n, ingredientes: i, preparo: pr, tags: f.tags.slice(), tempo_min: tm || null, porcoes: p || null, peso_g: g || null, criado: old.criado || new Date().toISOString() });
       var fim = function () {
         Store.set('receitas', id, doc);
-        recForm = null;
+        recForm = null; recAberta = id;
         salvoOk(f.id ? 'Receita atualizada' : 'Receita salva');
         if (mudou || !doc.total) calcRec(id); else { renderRec(); renderRecPick(); }
       };
@@ -5942,56 +6095,133 @@ window.MOVES = (function () {
     return h('div', { class: 'rec-form' },
       h('h3', { text: f.id ? 'Editar receita' : 'Nova receita' }),
       h('div', { class: 'field' }, h('label', { for: 'rec-nome', text: 'Nome do prato' }), nome),
-      h('div', { class: 'field' }, h('label', { for: 'rec-ing', text: 'Ingredientes com quantidades e modo de preparo' }), ing),
+      h('div', { class: 'field' }, h('label', { for: 'rec-ing', text: 'Ingredientes com quantidades' }), ing),
       h('p', { class: 'tip', text: 'Pode colar a receita inteira, de outro app ou do ChatGPT. Se deixar nome ou porções em branco, eles saem do texto. Para ditar, use o microfone do teclado.' }),
+      h('div', { class: 'field' }, h('label', { for: 'rec-prep', text: 'Modo de preparo (opcional)' }), prep),
+      h('div', { class: 'field' }, h('span', { text: 'Categorias' }), tg),
       h('div', { class: 'photo-row' }, h('div', { class: 'pick-wrap' }, h('button', { type: 'button', class: 'howbtn', tabindex: '-1', text: atual ? 'Trocar foto' : 'Adicionar foto' }), fi), rm),
       fn, fp,
       h('p', { class: 'tip', text: 'A foto pode ser do prato pronto ou da receita escrita (um print, por exemplo). Ela também ajuda no cálculo.' }),
       h('div', { class: 'two' },
         h('div', { class: 'field' }, h('label', { for: 'rec-por', text: 'Rende quantas porções' }), por),
         h('div', { class: 'field' }, h('label', { for: 'rec-peso', text: 'Peso pronto (g)' }), pes)),
+      h('div', { class: 'field' }, h('label', { for: 'rec-tempo', text: 'Tempo de preparo (min)' }), tmp),
       h('p', { class: 'tip', text: 'Pese a panela pronta, sem a panela, para poder registrar por gramas depois. É a forma mais precisa.' }),
       go, msg, cancel);
   }
+  function recDetalhe(r, it) {
+    var v = r.v, porc = recPorc[r.id] || v.porcoes || 1, f = porc / (v.porcoes || 1);
+    // Porções: escala ingredientes e valores
+    var menos = h('button', { type: 'button', class: 'howbtn rec-pm', id: 'rec-menos-' + r.id, 'aria-label': 'Menos porções', text: '−' });
+    var mais = h('button', { type: 'button', class: 'howbtn rec-pm', id: 'rec-mais-' + r.id, 'aria-label': 'Mais porções', text: '+' });
+    menos.addEventListener('click', function () { recPorc[r.id] = Math.max(1, porc - 1); renderRec(); });
+    mais.addEventListener('click', function () { recPorc[r.id] = porc + 1; renderRec(); });
+    var pv = recPor(v, porc, 'porcao');
+    var reg = h('button', { type: 'button', class: 'go', id: 'rec-reg-' + r.id, text: 'Registrar 1 porção como refeição' });
+    reg.addEventListener('click', function () { recRegistrar(r.id, 1); });
+    it.appendChild(reg);
+    it.appendChild(h('p', { class: 'tip', text: 'Rende ' + (v.porcoes || 1) + (v.porcoes === 1 ? ' porção' : ' porções') + (v.peso_g ? ' (' + nInt(v.peso_g) + ' g pronta)' : '') + '. Abaixo, ajuste para quantas porções vai cozinhar.' }));
+    it.appendChild(h('div', { class: 'rec-porc' }, menos, h('div', {}, h('b', { text: 'Cozinhar ' + fmtN(porc, 1) + (porc === 1 ? ' porção' : ' porções') }), h('span', { text: 'total ' + nInt(pv.kcal) + ' kcal · ' + nInt(pv.proteina_g) + ' g de proteína' })), mais));
+    var coz = h('button', { type: 'button', class: 'howbtn', id: 'rec-coz-' + r.id, text: 'Modo cozinha' });
+    coz.addEventListener('click', function () { modoCozinha(v, porc); });
+    var cmp = h('button', { type: 'button', class: 'howbtn', id: 'rec-cmp-' + r.id, text: 'Lista de compras' });
+    cmp.addEventListener('click', function () { var n = compraAdd(v, porc); recCompraAberta = true; salvoOk(n ? n + ' ingredientes na lista' : 'Calcule a receita primeiro'); renderRec(); });
+    it.appendChild(h('div', { class: 'tr-acoes' }, coz, cmp));
+    if ((v.itens || []).length) {
+      var ul = h('ul', { class: 'rec-ing' });
+      v.itens.forEach(function (x) { ul.appendChild(h('li', {}, h('span', { text: (x.quantidade ? recEscala(x.quantidade, f) + ' · ' : '') + x.nome }), h('small', { text: nInt((Number(x.kcal) || 0) * f) + ' kcal' }))); });
+      it.appendChild(h('h4', { text: 'Ingredientes' })); it.appendChild(ul);
+    } else if (v.ingredientes) { it.appendChild(h('h4', { text: 'Ingredientes' })); it.appendChild(h('p', { class: 'rec-txt', text: v.ingredientes })); }
+    var ps = recPassos(v);
+    if (ps.length) { var ol = h('ol', { class: 'rec-passos' }); ps.forEach(function (x) { ol.appendChild(h('li', { text: x })); }); it.appendChild(h('h4', { text: 'Modo de preparo' })); it.appendChild(ol); }
+    if (v.observacao) it.appendChild(h('p', { class: 'tip', text: v.observacao }));
+    var ed = h('button', { type: 'button', class: 'howbtn', id: 'rec-ed-' + r.id, text: 'Editar' });
+    ed.addEventListener('click', function () { recForm = { id: r.id, nome: v.nome, ingredientes: v.ingredientes, preparo: v.preparo, tags: (v.tags || []).slice(), tempo_min: v.tempo_min, porcoes: v.porcoes, peso_g: v.peso_g }; renderRec(); });
+    var rc = h('button', { type: 'button', class: 'howbtn', id: 'rec-calc-' + r.id, text: 'Recalcular' });
+    if (recBusy[r.id]) rc.disabled = true;
+    rc.addEventListener('click', function () { calcRec(r.id); });
+    var del = h('button', { type: 'button', class: 'link', id: 'rec-del-' + r.id, text: 'Apagar' });
+    del.addEventListener('click', function () {
+      if (!del.dataset.sure) { del.dataset.sure = '1'; del.textContent = 'Confirmar exclusão'; return; }
+      dropAsset(v); Store.del('receitas', r.id); if (foodRec.id === r.id) foodRec = { id: '', qtd: 1, un: 'porcao' };
+      recAberta = null; renderRec(); renderRecPick();
+    });
+    it.appendChild(h('div', { class: 'photo-row' }, ed, rc, del));
+  }
   function renderRec() {
     var box = $('rec-box'); if (!box) return;
+    var foco = document.activeElement && document.activeElement.id === 'rec-busca';
     box.textContent = '';
     box.appendChild(h('h2', { text: 'Minhas receitas' }));
-    box.appendChild(h('p', { class: 'lede', text: 'Cadastre um prato uma vez. O cálculo fica salvo e entra pronto quando você usar a receita numa refeição.' }));
-    var rs = recLista();
-    if (!rs.length && !recForm) box.appendChild(h('p', { class: 'tip', text: 'Nenhuma receita ainda.' }));
+    if (recForm) { box.appendChild(recFormBox()); return; }
+    var nv = h('button', { type: 'button', class: 'go', id: 'rec-new', text: '+ Nova receita' });
+    nv.addEventListener('click', function () { recForm = { id: '', nome: '', ingredientes: '', preparo: '', tags: [], porcoes: '', peso_g: '' }; renderRec(); });
+    box.appendChild(nv);
+    var todas = recLista();
+    if (!todas.length) { box.appendChild(h('p', { class: 'lede', text: 'Cadastre um prato uma vez. O cálculo fica salvo e entra pronto quando você registrar a refeição. Também dá para salvar como receita uma refeição já registrada.' })); box.appendChild(comprasBox()); return; }
+    // Busca, filtros e ordem
+    var q = h('input', { id: 'rec-busca', type: 'search', placeholder: 'Buscar receita ou ingrediente', value: recBusca });
+    q.addEventListener('input', function () { recBusca = q.value; renderRec(); });
+    box.appendChild(q);
+    if (foco) { q.focus(); q.setSelectionRange(q.value.length, q.value.length); }
+    var fl = h('div', { class: 'durs rec-filtros', role: 'group', 'aria-label': 'Filtrar' });
+    [['', 'Todas'], ['fav', '★ Favoritas']].concat(REC_TAGS).forEach(function (t) {
+      var b = h('button', { type: 'button', class: 'dur', id: 'rec-f-' + (t[0] || 'todas'), 'aria-pressed': String(recFiltro === t[0]), text: t[1] });
+      b.addEventListener('click', function () { recFiltro = t[0]; renderRec(); });
+      fl.appendChild(b);
+    });
+    box.appendChild(fl);
+    var ord = h('select', { id: 'rec-ordem', 'aria-label': 'Ordenar' });
+    [['uso', 'Mais usadas'], ['nome', 'A a Z'], ['prot', 'Mais proteína por porção'], ['kcal', 'Menos calorias por porção'], ['novas', 'Mais recentes']].forEach(function (o) { var op = h('option', { value: o[0], text: o[1] }); if (o[0] === recOrdem) op.selected = true; ord.appendChild(op); });
+    ord.addEventListener('change', function () { recOrdem = ord.value; renderRec(); });
+    box.appendChild(h('div', { class: 'field rec-ord' }, h('label', { for: 'rec-ordem', text: 'Ordenar por' }), ord));
+    var bq = aliNorm(recBusca).trim();
+    var rs = todas.filter(function (r) {
+      var v = r.v;
+      if (recFiltro === 'fav' && !v.fav) return false;
+      if (recFiltro && recFiltro !== 'fav' && (v.tags || []).indexOf(recFiltro) < 0) return false;
+      return !bq || aliNorm((v.nome || '') + ' ' + (v.ingredientes || '')).indexOf(bq) > -1;
+    }).map(function (r) { r.u = recUsos(r.id); r.p1 = r.v.total ? recPor(r.v, 1, 'porcao') : { kcal: 9e9, proteina_g: 0 }; return r; });
+    rs.sort(function (a, b) {
+      if (recOrdem === 'uso') return (b.u.n - a.u.n) || (b.u.ult || '').localeCompare(a.u.ult || '');
+      if (recOrdem === 'prot') return b.p1.proteina_g - a.p1.proteina_g;
+      if (recOrdem === 'kcal') return a.p1.kcal - b.p1.kcal;
+      if (recOrdem === 'novas') return (b.v.criado || '').localeCompare(a.v.criado || '');
+      return (a.v.nome || '').localeCompare(b.v.nome || '', 'pt-BR');
+    });
+    if (!rs.length) box.appendChild(h('p', { class: 'tip', text: 'Nenhuma receita com esse filtro.' }));
     rs.forEach(function (r) {
-      var v = r.v, t = v.total, it = h('div', { class: 'rec-item' }, h('h3', { text: v.nome || 'Receita nova' }), v.foto && !(recForm && recForm.id === r.id) ? h('img', { src: v.foto, alt: 'Foto: ' + v.nome }) : null);
-      if (recBusy[r.id]) it.appendChild(h('p', { class: 'tip', text: 'Calculando...' }));
-      else if (t) {
-        var p1 = recPor(v, 1, 'porcao');
-        it.appendChild(h('strong', { text: 'Por porção: ' + nInt(p1.kcal) + ' kcal · ' + nInt(p1.proteina_g) + ' g de proteína' }));
-        it.appendChild(h('p', { class: 'macros', text: 'Gordura ' + nInt(p1.gordura_g) + ' g · Carboidrato ' + nInt(p1.carbo_g) + ' g · Rende ' + v.porcoes + (v.porcoes === 1 ? ' porção' : ' porções') + ' · Receita inteira ' + nInt(t.kcal) + ' kcal' }));
-        if (v.peso_g) { var g100 = recPor(v, 100, 'g'); it.appendChild(h('p', { class: 'macros', text: 'A cada 100 g: ' + nInt(g100.kcal) + ' kcal · ' + nInt(g100.proteina_g) + ' g de proteína' })); }
-        if (v.observacao) it.appendChild(h('p', { class: 'tip', text: v.observacao }));
-      } else it.appendChild(h('p', { class: 'tip', text: recMsg[r.id] || 'Ainda sem cálculo.' }));
-      if (recMsg[r.id] && t) it.appendChild(h('p', { class: 'tip', text: recMsg[r.id] }));
-      var ed = h('button', { type: 'button', class: 'howbtn', id: 'rec-ed-' + r.id, text: 'Editar' });
-      ed.addEventListener('click', function () { recForm = { id: r.id, nome: v.nome, ingredientes: v.ingredientes, porcoes: v.porcoes, peso_g: v.peso_g }; renderRec(); });
-      var rc = h('button', { type: 'button', class: 'howbtn', id: 'rec-calc-' + r.id, text: 'Recalcular' });
-      if (recBusy[r.id]) rc.disabled = true;
-      rc.addEventListener('click', function () { calcRec(r.id); });
-      var del = h('button', { type: 'button', class: 'link', id: 'rec-del-' + r.id, text: 'Apagar' });
-      del.addEventListener('click', function () {
-        if (!del.dataset.sure) { del.dataset.sure = '1'; del.textContent = 'Confirmar exclusão'; return; }
-        dropAsset(v); Store.del('receitas', r.id); if (foodRec.id === r.id) foodRec = { id: '', qtd: 1, un: 'porcao' };
-        renderRec(); renderRecPick();
-      });
-      if (recForm && recForm.id === r.id) it.appendChild(recFormBox());
-      else it.appendChild(h('div', { class: 'photo-row' }, ed, rc, del));
+      var v = r.v, t = v.total, aberta = recAberta === r.id;
+      var it = h('article', { class: 'rec-item' + (aberta ? ' aberta' : ''), id: 'rec-' + r.id });
+      var fav = h('button', { type: 'button', class: 'rec-fav', id: 'rec-fav-' + r.id, 'aria-pressed': String(!!v.fav), 'aria-label': v.fav ? 'Tirar das favoritas' : 'Marcar como favorita', text: v.fav ? '★' : '☆' });
+      fav.addEventListener('click', function (e) { e.stopPropagation(); Store.set('receitas', r.id, Object.assign({}, v, { fav: !v.fav })); renderRec(); });
+      var topo = h('button', { type: 'button', class: 'rec-topo', id: 'rec-abre-' + r.id, 'aria-expanded': String(aberta) },
+        v.foto ? h('img', { src: v.foto, alt: '' }) : h('span', { class: 'rec-sem', 'aria-hidden': 'true', text: '🍲' }),
+        h('span', { class: 'rec-info' }, h('b', { text: v.nome || 'Receita nova' }),
+          h('span', { text: recBusy[r.id] ? 'Calculando...' : t ? nInt(r.p1.kcal) + ' kcal · ' + nInt(r.p1.proteina_g) + ' g prot. por porção' : (recMsg[r.id] || 'Ainda sem cálculo') }),
+          h('small', { text: [v.tempo_min ? v.tempo_min + ' min' : '', r.u.n ? 'usada ' + r.u.n + (r.u.n === 1 ? ' vez' : ' vezes') + (r.u.ult ? ', última em ' + br(r.u.ult).slice(0, 5) : '') : 'ainda não usada', t && r.p1.kcal && r.p1.proteina_g * 4 / r.p1.kcal >= .3 ? 'proteína alta' : ''].filter(Boolean).join(' · ') })));
+      topo.addEventListener('click', function () { recAberta = aberta ? null : r.id; renderRec(); });
+      it.appendChild(h('div', { class: 'rec-head' }, topo, fav));
+      if (aberta) { if (t) recDetalhe(r, it); else { var rc0 = h('button', { type: 'button', class: 'howbtn', id: 'rec-calc-' + r.id, text: 'Calcular' }); rc0.addEventListener('click', function () { calcRec(r.id); }); it.appendChild(rc0); } }
       box.appendChild(it);
     });
-    if (recForm && !recForm.id) box.appendChild(recFormBox());
-    else if (!recForm) {
-      var nv = h('button', { type: 'button', class: 'howbtn', id: 'rec-new', text: 'Nova receita' });
-      nv.addEventListener('click', function () { recForm = { id: '', nome: '', ingredientes: '', porcoes: '', peso_g: '' }; renderRec(); });
-      box.appendChild(nv);
+    box.appendChild(comprasBox());
+  }
+  // Salva uma refeição registrada como receita (1 porção), para reaproveitar depois.
+  function refeicaoParaReceita(id) {
+    var m = Store.get('refeicoes', id); if (!m) return;
+    var rid = 'r' + Date.now();
+    var doc = { nome: '', ingredientes: m.relato || (m.itens || []).map(function (x) { return x.quantidade + ' de ' + x.nome; }).join(', '), porcoes: 1, tags: [], criado: new Date().toISOString() };
+    if (typeof m.kcal === 'number' && Array.isArray(m.itens) && m.itens.length) {
+      doc.total = { kcal: m.kcal, proteina_g: m.proteina_g || 0, gordura_g: m.gordura_g || 0, carbo_g: m.carbo_g || 0 };
+      doc.itens = m.itens.map(function (x) { return { nome: x.nome, quantidade: x.quantidade, kcal: x.kcal, proteina_g: x.proteina_g, gordura_g: x.gordura_g }; });
+      doc.observacao = 'Criada a partir da refeição de ' + br(m.data) + ', com os mesmos valores.';
     }
+    doc.nome = ((m.itens || [])[0] && m.itens.length <= 3 ? m.itens.map(function (x) { return x.nome; }).join(' com ') : tipoNome(m.tipo) + ' de ' + br(m.data).slice(0, 5)).slice(0, 60);
+    Store.set('receitas', rid, doc);
+    recAberta = rid; recForm = { id: rid, nome: doc.nome, ingredientes: doc.ingredientes, preparo: '', tags: [], porcoes: 1, peso_g: '' };
+    location.hash = 'receitas';
+    salvoOk('Receita criada; ajuste o nome e salve');
   }
   function buildFood() {
     function tipoChips() {
@@ -6581,10 +6811,12 @@ window.MOVES = (function () {
     if (VIEWS.indexOf(v) < 0) v = 'academia';
     var TREINO = ['academia', 'cardio', 'lombar', 'planos'], noTreino = TREINO.indexOf(v) >= 0;
     VIEWS.forEach(function (n) { $('v-' + n).hidden = n !== v; });
-    ['treino', 'refeicoes', 'peso', 'historico', 'desempenho'].forEach(function (t) {
+    ['treino', 'refeicoes', 'peso', 'historico', 'desempenho', 'receitas'].forEach(function (t) {
       var b = $('t-' + t); if (b) b.setAttribute('aria-current', (t === 'treino' ? noTreino : t === v) ? 'page' : 'false');
     });
     $('treino-seg-box').hidden = !noTreino;
+    // Alerta de sinais de urgência da lombar: só na tela do pilates.
+    var rod = document.querySelector('body > footer'); if (rod) rod.hidden = v !== 'lombar';
     TREINO.forEach(function (t) { $('ts-' + t).setAttribute('aria-selected', String(t === v)); });
     if (noTreino) { try { localStorage.setItem('dt-treino-ultimo', v); } catch (e) {} }
     $('week').hidden = v === 'cardio' || v === 'historico' || v === 'receitas' || v === 'desempenho' || v === 'planos';
@@ -6593,7 +6825,7 @@ window.MOVES = (function () {
     if (v === 'planos') renderPlanos();
   }
   function vai(n) { location.hash = n; show(); window.scrollTo(0, 0); }
-  ['refeicoes', 'peso', 'historico', 'desempenho'].forEach(function (n) { $('t-' + n).addEventListener('click', function () { vai(n); }); });
+  ['refeicoes', 'peso', 'historico', 'desempenho', 'receitas'].forEach(function (n) { $('t-' + n).addEventListener('click', function () { vai(n); }); });
   $('t-treino').addEventListener('click', function () {
     var u = 'academia'; try { u = localStorage.getItem('dt-treino-ultimo') || 'academia'; } catch (e) {}
     vai(['academia', 'cardio', 'lombar', 'planos'].indexOf(u) >= 0 ? u : 'academia');
@@ -6627,7 +6859,7 @@ window.MOVES = (function () {
   var firstData = true, lastImgs = '', retomou = false;
   var stravaAuto = false;
   Store.watch(function () {
-    aliSemente();
+    aliSemente(); medBadge();
     if (!stravaAuto && Object.keys(Store.all('strava')).length) { stravaAuto = true; syncStrava(true); }
     if (firstData && !$('gym').contains(document.activeElement)) { firstData = false; pickDefault(); }
     var a = document.activeElement;
