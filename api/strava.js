@@ -113,6 +113,8 @@ async function detalhe(uid, token, args) {
       fc: reduz(s('heartrate'), N), v: reduz(s('velocity_smooth'), N)?.map(r1),
       alt: reduz(s('altitude'), N)?.map(r1), w: reduz(s('watts'), N), cad: reduz(s('cadence'), N)
     },
+    // Tiros de um treino intervalado, achados na série completa de velocidade.
+    blocos: blocos(s('time'), s('distance'), s('velocity_smooth'), s('heartrate')),
     // Tempo em cada zona: calculado com a série completa de FC e tempo, não a reduzida.
     zonas_fc: (() => {
       // Sem permissão de perfil, usa as zonas padrão do Strava para FC máxima de 180.
@@ -128,6 +130,39 @@ async function detalhe(uid, token, args) {
       return z.map((zz, i) => ({ min: zz.min, max: zz.max, seg: seg[i], padrao: !(zonas && zonas.heart_rate) }));
     })()
   };
+}
+
+// Divide a corrida em trechos rápidos (tiros) e lentos (recuperação) pela velocidade.
+// Só devolve quando parece intervalado: 3 ou mais tiros de 30 s a 8 min separados por trechos lentos.
+function blocos(t, d, v, hr) {
+  if (!t || !d || !v || v.length < 60) return null;
+  const ord = v.filter((x) => x > 0.3).sort((a, b) => a - b);
+  if (ord.length < 60) return null;
+  const q = (p) => ord[Math.floor((ord.length - 1) * p)];
+  const lento = q(0.15), rapido = q(0.9);
+  if (rapido - lento < 0.8) return null;
+  const lim = lento + 0.6 * (rapido - lento);
+  // Média móvel de 15 s para não picotar.
+  const sm = v.map((_, i) => { let s = 0, n = 0; for (let j = i; j >= 0 && t[i] - t[j] <= 15; j--) { s += v[j]; n++; } return s / n; });
+  const segs = []; let ini = null;
+  for (let i = 0; i < sm.length; i++) {
+    const r = sm[i] >= lim;
+    if (r && ini === null) ini = i;
+    if ((!r || i === sm.length - 1) && ini !== null) { segs.push([ini, i]); ini = null; }
+  }
+  const junt = [];
+  segs.forEach((sg) => { const u = junt[junt.length - 1]; if (u && t[sg[0]] - t[u[1]] < 12) u[1] = sg[1]; else junt.push(sg.slice()); });
+  const tiros = junt.filter((sg) => { const dur = t[sg[1]] - t[sg[0]]; return dur >= 30 && dur <= 480; }).map((sg) => {
+    const dur = t[sg[1]] - t[sg[0]], dist = d[sg[1]] - d[sg[0]];
+    let fm = 0, fs = 0, fn = 0; if (hr) for (let i = sg[0]; i <= sg[1]; i++) { if (hr[i] > fm) fm = hr[i]; fs += hr[i]; fn++; }
+    return { ini: t[sg[0]], seg: dur, m: Math.round(dist), pace: dist > 0 ? Math.round(dur / (dist / 1000)) : null, fcmax: fm || null, fc: fn ? Math.round(fs / fn) : null };
+  });
+  if (tiros.length < 3) return null;
+  const tTiros = tiros.reduce((a, x) => a + x.seg, 0), total = t[t.length - 1] - t[0];
+  if (tTiros > total * 0.75) return null;
+  const rec = [];
+  for (let i = 1; i < tiros.length; i++) rec.push(tiros[i].ini - (tiros[i - 1].ini + tiros[i - 1].seg));
+  return { tiros, rec };
 }
 
 export default rota(async (req, res) => {

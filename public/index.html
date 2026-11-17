@@ -3284,7 +3284,31 @@ window.MOVES = (function () {
     Store.sample().then(function (s) { if (s && s.local) return s.local(tipo); }).catch(function () {});
   }
   function pctTxt(p) { return fmtN(Math.abs(p) * 100, 0) + '%'; }
+  // Corrida com tiros: analisa os tiros, não a média da atividade inteira.
+  function anaTiros(m) {
+    var ts = m.tiros.tiros, n = ts.length, s = trSessaoDe(m.data), faixa = s ? trPaceFaixa(s.pace) : null, teto = s && s.fc_max;
+    var p1 = ts[0].pace, pn = ts[n - 1].pace, med = Math.round(ts.reduce(function (a, x) { return a + x.pace; }, 0) / n);
+    var queda = p1 ? (pn - p1) / p1 : 0, fcm = Math.max.apply(null, ts.map(function (x) { return x.fcmax || 0; }));
+    var rec = m.tiros.rec || [], recM = rec.length ? Math.round(rec.reduce(function (a, x) { return a + x; }, 0) / rec.length) : null;
+    var mm = Math.round(ts.reduce(function (a, x) { return a + x.m; }, 0) / n / 50) * 50;
+    var acimaFc = teto && fcm > teto + 3, ve;
+    if (acimaFc || queda > .12) ve = 'atencao';
+    else if (faixa && ts.every(function (x) { return x.pace >= faixa[0] - 5 && x.pace <= faixa[1] + 5; })) ve = 'evolucao';
+    else ve = 'estavel';
+    var titulo = ve === 'atencao' ? (acimaFc ? 'Tiros acima da FC combinada' : 'Tiros perderam ritmo no fim') : ve === 'evolucao' ? 'Tiros no ritmo do plano' : 'Intervalado de ' + n + ' tiros';
+    var dg = n + ' tiros de cerca de ' + mm + ' m: o 1º a ' + clock(p1) + '/km e o último a ' + clock(pn) + '/km (média de ' + clock(med) + '/km' + (faixa ? '; plano ' + s.pace : '') + ').' +
+      (recM ? ' Recuperação média de ' + clock(recM) + '.' : '') + (fcm ? ' FC máxima nos tiros: ' + fcm + ' bpm' + (teto ? ' (teto ' + teto + ').' : '.') : '') +
+      ' O pace da atividade inteira (' + clock(m.pace) + '/km) mistura tiros e recuperação e não se compara às corridas contínuas.';
+    var dest = ts.map(function (x, i) { return 'Tiro ' + (i + 1) + ': ' + clock(x.pace) + '/km · ' + x.m + ' m' + (x.fcmax ? ' · FC máx ' + x.fcmax : ''); });
+    var sug;
+    if (faixa && p1 < faixa[0] - 10) sug = 'O 1º tiro saiu a ' + clock(p1) + '/km, mais rápido que o plano (' + s.pace + '). Segure o começo: tiros parelhos rendem mais que um 1º tiro forte.';
+    else if (acimaFc) sug = 'Quando a FC passar de ' + teto + ' bpm, encerre o tiro ou estique a recuperação.';
+    else if (queda > .12) sug = 'Os últimos tiros caíram ' + pctTxt(queda) + ': comece um pouco mais devagar ou faça 1 tiro a menos.';
+    else sug = 'Bom controle. Mantenha o mesmo ritmo e recuperação no próximo intervalado.';
+    return { veredito: ve, titulo: titulo, diagnostico: dg, destaques: dest, sugestao: sug };
+  }
   function anaLocal(m, ant) {
+    if (m.tiros && m.tiros.tiros && m.tiros.tiros.length >= 3) return anaTiros(m);
     var n = ant.length, corr = m.grupo === 'corrida', lib = trMeta().liberado, viz = anaVizinhas(m);
     var mesmoDia = viz.filter(function (v) { return v.indexOf('mesmo dia') === 0; }).length;
     var ve = null, motivo = '', p = null, base = null, v = null;
@@ -3346,6 +3370,11 @@ window.MOVES = (function () {
   }
   function analisaLocal(id) {
     var m = anaMet(id); if (!m) return;
+    var sd = Store.get('strava', id);
+    if (sd && ehCorrida(sd.tipo)) {
+      m.tiros = sd.tiros || null;
+      if (!sd.tirosLido && !tirosTent[id]) { tirosTent[id] = 1; carregaDet(id); }
+    }
     var ant = anaAnteriores(m, 6), r = anaLocal(m, ant), velho = Store.get('analises', id);
     var conta = !(velho && velho.origem === 'local' && velho.chave === anaChave(m));
     Store.set('analises', id, { data: m.data, grupo: m.grupo, nome: m.nome, veredito: r.veredito, titulo: r.titulo, diagnostico: r.diagnostico,
@@ -3397,7 +3426,9 @@ window.MOVES = (function () {
     var v = x ? VERED[x.veredito] || VERED.estavel : null;
     card.appendChild(h('div', { class: 'lift-head' }, h('h3', { text: SEMANA[new Date(a.data + 'T12:00:00').getDay()] + ', ' + br(a.data) + ' · ' + (a.nome || anaGrupoNome(m.grupo)) }),
       v ? h('span', { class: 'vtag ' + v[1], text: v[0] }) : null));
-    var inds = anaInd(m, ant), g = h('div', { class: 'ana-ind' });
+    // Intervalado: as médias da atividade misturam tiros e recuperação, então os indicadores não comparam nada.
+    var sdI = Store.get('strava', id), intervalado = sdI && sdI.tiros && sdI.tiros.tiros && sdI.tiros.tiros.length >= 3;
+    var inds = intervalado ? [] : anaInd(m, ant), g = h('div', { class: 'ana-ind' });
     inds.forEach(function (o) {
       g.appendChild(h('div', {}, h('span', { text: o.rot }), h('b', { text: o.txt + o.seta, class: o.dir > 0 ? 'up' : o.dir < 0 ? 'down' : '' }), o.base ? h('small', { text: o.base }) : null));
     });
@@ -3879,6 +3910,7 @@ window.MOVES = (function () {
     box.appendChild(ab);
   }
   /* ===== Aba Desempenho: atividades do Strava em detalhe, esforço semanal, condicionamento e mapa muscular ===== */
+  var tirosTent = {};
   var dSel = null, dDet = {}, dBusy = {}, dErro = {}, mapaPer = 7, mapaReg = null;
   var DCACHE = 'dt-strava-det';
   try { dDet = JSON.parse(localStorage.getItem(DCACHE) || '{}') || {}; } catch (e) { dDet = {}; }
@@ -4237,6 +4269,9 @@ window.MOVES = (function () {
     }).then(function (r) {
       var p = r && r.payload; if (!p) throw new Error('vazio');
       p._lido = Date.now(); dDet[id] = p; guardaDet();
+      // Guarda os tiros (intervalado) na atividade, para a análise e o treinador usarem.
+      var sa = Store.get('strava', id);
+      if (sa && !sa.tirosLido) { Store.set('strava', id, Object.assign({}, sa, { tiros: p.blocos || null, tirosLido: 1 })); if (ehCorrida(sa.tipo)) { analisaLocal(id); renderAtiv(); renderCardio(); } }
     }).catch(function (e) {
       dErro[id] = e && e.code === 'limite' ? 'O Strava limitou as consultas; tente em 15 minutos.' : e && e.code === 'strava_desconectado' ? 'Reconecte o Strava pelo menu Conta.' : 'Não consegui buscar os detalhes no Strava agora.';
     }).then(function () { dBusy[id] = false; if (dSel === id) renderDesempenho(); });
@@ -6246,7 +6281,16 @@ window.MOVES = (function () {
   function trRetornoDe(r) {
     var s = trSessaoDe(r.data), it = [], nivel = 'bom';
     if (!s) return { nivel: 'ok', titulo: 'Corrida fora do plano', itens: ['Não havia sessão planejada para ' + dsem(r.data) + '. Tudo bem, só não some intensidade extra na semana.'] };
-    var f = trPaceFaixa(s.pace);
+    var f = trPaceFaixa(s.pace), sd = Store.get('strava', r.id), tb = sd && sd.tiros && sd.tiros.tiros;
+    if (tb && tb.length >= 3) {
+      // Intervalado: compara o ritmo dos tiros, não a média com as recuperações.
+      var med = Math.round(tb.reduce(function (a, x) { return a + x.pace; }, 0) / tb.length), fm = Math.max.apply(null, tb.map(function (x) { return x.fcmax || 0; }));
+      it.push(tb.length + ' tiros, de ' + clock(tb[0].pace) + ' a ' + clock(tb[tb.length - 1].pace) + '/km (média ' + clock(med) + '/km' + (f ? '; plano ' + s.pace : '') + ').');
+      if (f && (med < f[0] - 10 || med > f[1] + 10)) nivel = 'ok';
+      if (s.fc_max && fm) { if (fm > s.fc_max + 3) { it.push('FC chegou a ' + fm + ' bpm nos tiros, acima do teto de ' + s.fc_max + '.'); nivel = 'atencao'; } else it.push('FC máxima de ' + fm + ' bpm nos tiros, dentro do teto de ' + s.fc_max + '.'); }
+      return { nivel: nivel, titulo: (s.titulo || s.tipo) + ': ' + ({ bom: 'como planejado', ok: 'com desvios', atencao: 'acima do combinado' })[nivel], itens: it };
+    }
+    if (TR_INTENSO[s.tipo] && sd && !sd.tirosLido) return { nivel: 'ok', titulo: (s.titulo || s.tipo) + ': lendo os tiros...', itens: ['Buscando os detalhes no Strava para separar tiros e recuperação.'] };
     if (f) {
       if (r.pace < f[0] - 5) { it.push('Pace ' + clock(r.pace) + '/km, mais rápido que o planejado (' + s.pace + ').' + (TR_INTENSO[s.tipo] ? '' : ' Em treino leve, correr rápido demais atrapalha a recuperação.')); if (!TR_INTENSO[s.tipo]) nivel = 'ok'; }
       else if (r.pace > f[1] + 5) { it.push('Pace ' + clock(r.pace) + '/km, mais lento que o planejado (' + s.pace + ').'); if (TR_INTENSO[s.tipo]) nivel = 'ok'; }
@@ -6321,6 +6365,7 @@ window.MOVES = (function () {
     // Retorno da última corrida contra o plano (app)
     var ultR = rs[rs.length - 1];
     if (p && ultR && ultR.data >= addDias(hoje, -3)) {
+      var sdU = Store.get('strava', ultR.id); if (sdU && ehCorrida(sdU.tipo) && !sdU.tirosLido && !tirosTent[ultR.id]) { tirosTent[ultR.id] = 1; carregaDet(ultR.id); }
       var rt = trRetornoDe(ultR), rb = h('div', { class: 'verdict ' + rt.nivel }, h('b', { text: 'Corrida de ' + dsem(ultR.data) + ' · ' + rt.titulo }));
       var rul = h('ul'); rt.itens.forEach(function (x) { rul.appendChild(h('li', { text: x })); }); rb.appendChild(rul);
       box.appendChild(rb);
