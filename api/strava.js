@@ -150,8 +150,11 @@ function blocos(t, d, v, hr) {
     if (r && ini === null) ini = i;
     if ((!r || i === sm.length - 1) && ini !== null) { segs.push([ini, i]); ini = null; }
   }
-  const junt = [];
-  segs.forEach((sg) => { const u = junt[junt.length - 1]; if (u && t[sg[0]] - t[u[1]] < 12) u[1] = sg[1]; else junt.push(sg.slice()); });
+  const juntar = (lista, gap) => { const o = []; lista.forEach((sg) => { const u = o[o.length - 1]; if (u && t[sg[0]] - t[u[1]] < gap) u[1] = sg[1]; else o.push(sg.slice()); }); return o; };
+  let junt = juntar(segs, 12);
+  // Uma pausa curta no meio do tiro (bem menor que a recuperação típica) não divide o tiro em dois.
+  const gaps = []; for (let i = 1; i < junt.length; i++) gaps.push(t[junt[i][0]] - t[junt[i - 1][1]]);
+  if (gaps.length >= 3) { const g = gaps.slice().sort((a, b) => a - b)[Math.floor(gaps.length / 2)]; junt = juntar(junt, Math.min(60, g * 0.5)); }
   const tiros = junt.filter((sg) => { const dur = t[sg[1]] - t[sg[0]]; return dur >= 30 && dur <= 480; }).map((sg) => {
     const dur = t[sg[1]] - t[sg[0]], dist = d[sg[1]] - d[sg[0]];
     let fm = 0, fs = 0, fn = 0; if (hr) for (let i = sg[0]; i <= sg[1]; i++) { if (hr[i] > fm) fm = hr[i]; fs += hr[i]; fn++; }

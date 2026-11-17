@@ -3445,7 +3445,13 @@ window.MOVES = (function () {
     if (anaMsg[id] && x) card.appendChild(h('p', { class: 'tip', text: anaMsg[id] }));
     var bt = h('button', { type: 'button', class: 'howbtn', id: 'ana-' + id, text: x ? 'Refazer análise' : 'Analisar' });
     if (anaBusy[id]) bt.disabled = true;
-    bt.addEventListener('click', function () { anaMsg[id] = ''; analisaLocal(id); renderAtiv(); renderCardio(); });
+    bt.addEventListener('click', function () {
+      anaMsg[id] = '';
+      // Corrida: busca de novo os detalhes no Strava (tiros) antes de refazer.
+      var sdR = Store.get('strava', id);
+      if (sdR && ehCorrida(sdR.tipo)) { delete tirosTent[id]; Store.set('strava', id, Object.assign({}, sdR, { tirosLido: 0 })); anaMsg[id] = 'Buscando os detalhes no Strava...'; }
+      analisaLocal(id); renderAtiv(); renderCardio(); salvoOk('Análise refeita');
+    });
     var bi = h('button', { type: 'button', class: 'link', id: 'ana-ia-' + id, text: anaBusy[id] ? 'Pedindo à IA...' : 'Pedir leitura da IA' });
     if (anaBusy[id]) bi.disabled = true;
     bi.addEventListener('click', function () { analisar(id); });
@@ -4271,10 +4277,10 @@ window.MOVES = (function () {
       p._lido = Date.now(); dDet[id] = p; guardaDet();
       // Guarda os tiros (intervalado) na atividade, para a análise e o treinador usarem.
       var sa = Store.get('strava', id);
-      if (sa && !sa.tirosLido) { Store.set('strava', id, Object.assign({}, sa, { tiros: p.blocos || null, tirosLido: 1 })); if (ehCorrida(sa.tipo)) { analisaLocal(id); renderAtiv(); renderCardio(); } }
+      if (sa && !sa.tirosLido) { Store.set('strava', id, Object.assign({}, sa, { tiros: p.blocos || null, tirosLido: 1 })); if (ehCorrida(sa.tipo)) { anaMsg[id] = ''; analisaLocal(id); renderAtiv(); renderCardio(); } }
     }).catch(function (e) {
       dErro[id] = e && e.code === 'limite' ? 'O Strava limitou as consultas; tente em 15 minutos.' : e && e.code === 'strava_desconectado' ? 'Reconecte o Strava pelo menu Conta.' : 'Não consegui buscar os detalhes no Strava agora.';
-    }).then(function () { dBusy[id] = false; if (dSel === id) renderDesempenho(); });
+    }).then(function () { dBusy[id] = false; if (dErro[id] && anaMsg[id]) { anaMsg[id] = dErro[id]; renderAtiv(); } if (dSel === id) renderDesempenho(); });
   }
   function parecidas(a) {
     var g = anaGrupo(a);
