@@ -93,7 +93,7 @@ export default rota(async (req, res) => {
         'anthropic-version': '2023-06-01',
         'content-type': 'application/json'
       },
-      body: JSON.stringify({ model: esc.modelo, max_tokens: esc.max, messages: msgs, tools: [/Trechos do relato/.test(String(prompt)) ? FERR_ITENS : FERRAMENTA], tool_choice: { type: 'tool', name: 'responder' } })
+      body: JSON.stringify({ model: esc.modelo, max_tokens: esc.max, messages: msgs, tools: [/Trechos do relato/.test(String(prompt)) ? FERR_ITENS : FERRAMENTA], tool_choice: /haiku/i.test(esc.modelo) ? { type: 'tool', name: 'responder' } : { type: 'auto' } })
     });
     const j = await r.json();
     if (!r.ok) {
