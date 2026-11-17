@@ -2,6 +2,9 @@
 //   list_activities          -> { activities: [{ id, name, sport_type, start_local, summary: {...} }] }
 //   get_activity_performance -> { has_heartrate, average_heartrate, max_heartrate, average_watts, calories, laps: [...] }
 import { env, responde, corpo, usuario, banco, rota } from './_lib.js';
+// A partir de 01/06/2027 os ids do Strava podem passar de 2^53 e perder precisão como número no JavaScript:
+// usa o id_str (texto) quando vier, e o id numérico só como reserva.
+const idDe = (x) => (x && x.id_str) || String(x && x.id);
 
 export const config = { maxDuration: 60 };
 
@@ -30,24 +33,24 @@ async function strava(token, caminho) {
 
 async function guardaCalorias(uid, linhas) {
   if (!linhas.length) return;
-  await banco('strava_cache', { method: 'POST', body: JSON.stringify(linhas.map((l) => ({ user_id: uid, activity_id: String(l.id), calorias: Math.round(l.calories || 0) }))) });
+  await banco('strava_cache', { method: 'POST', body: JSON.stringify(linhas.map((l) => ({ user_id: uid, activity_id: idDe(l), calorias: Math.round(l.calories || 0) }))) });
 }
 
 async function listar(uid, token, args) {
   const ini = args.range_start ? Math.floor(new Date(args.range_start + 'Z').getTime() / 1000) - 86400 : Math.floor(Date.now() / 1000) - 60 * 86400;
   const lista = await strava(token, '/athlete/activities?per_page=' + Math.min(Number(args.first) || 100, 100) + '&after=' + ini);
-  const ids = lista.map((a) => String(a.id));
+  const ids = lista.map((a) => idDe(a));
   const cache = ids.length ? await banco('strava_cache?select=activity_id,calorias&user_id=eq.' + uid + '&activity_id=in.(' + ids.join(',') + ')') : [];
   const kcal = Object.fromEntries(cache.map((c) => [c.activity_id, c.calorias]));
   // Calorias só vêm no detalhe da atividade: busca as que faltam, até 25 por vez.
-  const faltam = lista.filter((a) => kcal[String(a.id)] === undefined).slice(0, 25);
-  const det = await Promise.all(faltam.map((a) => strava(token, '/activities/' + a.id).catch(() => null)));
+  const faltam = lista.filter((a) => kcal[idDe(a)] === undefined).slice(0, 25);
+  const det = await Promise.all(faltam.map((a) => strava(token, '/activities/' + idDe(a)).catch(() => null)));
   const novos = det.filter(Boolean);
-  novos.forEach((d) => { kcal[String(d.id)] = Math.round(d.calories || 0); });
+  novos.forEach((d) => { kcal[idDe(d)] = Math.round(d.calories || 0); });
   await guardaCalorias(uid, novos);
   return {
     activities: lista.map((a) => ({
-      id: String(a.id),
+      id: idDe(a),
       name: a.name,
       sport_type: a.sport_type || a.type,
       start_local: String(a.start_date_local || '').replace('Z', ''),
@@ -55,7 +58,7 @@ async function listar(uid, token, args) {
         distance: a.distance, moving_time: a.moving_time, elapsed_time: a.elapsed_time,
         elevation_gain: a.total_elevation_gain, avg_speed: a.average_speed, max_speed: a.max_speed,
         avg_cadence: a.average_cadence, relative_effort: a.suffer_score, pr_count: a.pr_count,
-        total_calories: kcal[String(a.id)] ?? null
+        total_calories: kcal[idDe(a)] ?? null
       },
       weather: null
     }))
@@ -100,7 +103,7 @@ async function detalhe(uid, token, args) {
   const N = 240;
   const r1 = (v) => (v == null ? null : Math.round(v * 10) / 10);
   return {
-    id: String(d.id), nome: d.name, tipo: d.sport_type || d.type, inicio: String(d.start_date_local || '').replace('Z', ''),
+    id: idDe(d), nome: d.name, tipo: d.sport_type || d.type, inicio: String(d.start_date_local || '').replace('Z', ''),
     km: d.distance ? Math.round(d.distance) / 1000 : 0, mov: d.moving_time, dec: d.elapsed_time, elev: d.total_elevation_gain,
     vmed: d.average_speed, vmax: d.max_speed, fc: d.average_heartrate || null, fcmax: d.max_heartrate || null,
     watts: d.average_watts || null, wmax: d.max_watts || null, kj: d.kilojoules || null, cad: d.average_cadence || null,

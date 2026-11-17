@@ -16,7 +16,7 @@ export default rota(async (req, res) => {
   if (!r.ok) { res.writeHead(302, { Location: base + '/?strava=erro#historico' }); return res.end(); }
   await banco('strava_tokens', {
     method: 'POST',
-    body: JSON.stringify({ user_id: uid, access_token: t.access_token, refresh_token: t.refresh_token, expires_at: t.expires_at, athlete_id: t.athlete && t.athlete.id })
+    body: JSON.stringify({ user_id: uid, access_token: t.access_token, refresh_token: t.refresh_token, expires_at: t.expires_at, athlete_id: t.athlete && (t.athlete.id_str || t.athlete.id) })
   });
   res.writeHead(302, { Location: base + '/?strava=ok#historico' });
   res.end();
