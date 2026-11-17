@@ -3424,7 +3424,7 @@ window.MOVES = (function () {
     if (x && !x.veredito) x = null;
     var card = h('article', { class: 'ana' });
     var v = x ? VERED[x.veredito] || VERED.estavel : null;
-    card.appendChild(h('div', { class: 'lift-head' }, h('h3', { text: SEMANA[new Date(a.data + 'T12:00:00').getDay()] + ', ' + br(a.data) + ' · ' + (a.nome || anaGrupoNome(m.grupo)) }),
+    var anaHead = card.appendChild(h('div', { class: 'lift-head' }, h('h3', { text: SEMANA[new Date(a.data + 'T12:00:00').getDay()] + ', ' + br(a.data) + ' · ' + (a.nome || anaGrupoNome(m.grupo)) }),
       v ? h('span', { class: 'vtag ' + v[1], text: v[0] }) : null));
     // Intervalado: as médias da atividade misturam tiros e recuperação, então os indicadores não comparam nada.
     var sdI = Store.get('strava', id), intervalado = sdI && sdI.tiros && sdI.tiros.tiros && sdI.tiros.tiros.length >= 3;
@@ -3455,7 +3455,7 @@ window.MOVES = (function () {
     var bi = h('button', { type: 'button', class: 'link', id: 'ana-ia-' + id, text: anaBusy[id] ? 'Pedindo à IA...' : 'Pedir leitura da IA' });
     if (anaBusy[id]) bi.disabled = true;
     bi.addEventListener('click', function () { analisar(id); });
-    card.appendChild(h('div', { class: 'tr-acoes' }, bt, bi));
+    depois(anaHead, h('div', { class: 'tr-acoes', style: 'margin:6px 0 10px' }, bt, bi));
     return card;
   }
   function renderAtiv() {
@@ -3817,12 +3817,14 @@ window.MOVES = (function () {
     histMostra('analises');
     setTimeout(function () { var p = $('a-fech'); if (p) p.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 250);
   }
+  // Coloca um elemento logo depois de outro (ações no topo do bloco).
+  function depois(ref, el) { if (ref && ref.parentNode && el) ref.parentNode.insertBefore(el, ref.nextSibling); return el; }
   function renderFech() {
     var box = $('a-fech'); if (!box) return;
     box.textContent = '';
     var seg = segDe(histSel), r = semanaResumo(seg), f = Store.get('fechamentos', seg), hoje = Store.day();
     box.appendChild(h('h2', { text: 'Fechamento da semana' }));
-    box.appendChild(h('p', { class: 'g-sub', text: DSEMF[0] + ' ' + br(seg) + ' a ' + DSEMF[6] + ' ' + br(r.dom) + (r.dom > hoje ? ' · em andamento' : '') + '. Mude a semana pelo calendário do Registro.' }));
+    var fSub = box.appendChild(h('p', { class: 'g-sub', text: DSEMF[0] + ' ' + br(seg) + ' a ' + DSEMF[6] + ' ' + br(r.dom) + (r.dom > hoje ? ' · em andamento' : '') + '. Mude a semana pelo calendário do Registro.' }));
     if (!r.nReg) { box.appendChild(h('p', { class: 'tip', text: 'Nenhum dia com refeições registradas nesta semana.' })); return; }
     // Resumo em números
     var fx = function (v) { return (v > 0 ? '+' : v < 0 ? '−' : '') + nInt(Math.abs(v)); };
@@ -3913,7 +3915,9 @@ window.MOVES = (function () {
       ab.appendChild(bt);
     }
     if (fechMsg) ab.appendChild(h('p', { class: 'tip', 'aria-live': 'polite', text: fechMsg }));
-    box.appendChild(ab);
+    // Análise e botão no topo, logo abaixo do título da semana.
+    var abT = ab.querySelector('h3'); if (abT) { var btF = ab.querySelector('#fech-go'); if (btF) depois(abT, btF); }
+    depois(fSub, ab);
   }
   /* ===== Aba Desempenho: atividades do Strava em detalhe, esforço semanal, condicionamento e mapa muscular ===== */
   var tirosTent = {};
@@ -5265,7 +5269,7 @@ window.MOVES = (function () {
     var t = dayTotals(foodDate);
     if (!t.n) return;
     var v = Store.get('dias', foodDate);
-    var wrap = h('section', { class: 'dayclose' }, h('h2', { text: 'Fechar o dia' }));
+    var dcT = h('h2', { text: 'Fechar o dia' }), wrap = h('section', { class: 'dayclose' }, dcT);
     if (v && v.resumo) {
       var AV = { bom: 'Dia no caminho certo', ok: 'Dá para ajustar', atencao: 'Atenção' };
       var bx = h('div', { class: 'verdict ' + v.nivel }, h('b', { text: AV[v.nivel] || AV.ok }), h('p', { text: v.resumo }));
@@ -5283,7 +5287,7 @@ window.MOVES = (function () {
     var btn = h('button', { type: 'button', class: 'go', id: 'day-close', text: dayBusy ? 'Avaliando...' : (v && v.resumo ? 'Avaliar de novo' : 'Avaliar o dia') });
     if (dayBusy) btn.disabled = true;
     btn.addEventListener('click', closeDay);
-    wrap.appendChild(btn);
+    depois(dcT, btn);
     // Domingo com o dia fechado: convite para fechar a semana.
     if (weekday(foodDate) === 0 && v && v.resumo) {
       var sg = segDe(foodDate), fz = Store.get('fechamentos', sg);
@@ -5376,7 +5380,7 @@ window.MOVES = (function () {
     }).then(function () { semBusy = false; renderSaude(); renderAnaSemana(); });
   }
   function blocoSemana(box, dPes, titulo) {
-    box.appendChild(h('h3', { text: titulo || 'Análise da pesagem' }));
+    var semT = box.appendChild(h('h3', { text: titulo || 'Análise da pesagem' }));
     var a = Store.get('semanas', dPes);
     if (a && a.resumo) {
       var NV = { bom: 'No caminho certo', ok: 'Dá para ajustar', atencao: 'Atenção' };
@@ -5390,8 +5394,8 @@ window.MOVES = (function () {
     } else box.appendChild(h('p', { class: 'tip', text: 'Junta pesagem, composição, cintura, refeições, treinos e passos dos 7 dias até a pesagem de ' + br(dPes) + '.' }));
     var bt = h('button', { type: 'button', class: 'howbtn', id: 'sem-go', text: a && a.resumo ? 'Analisar de novo' : 'Analisar a semana' });
     bt.addEventListener('click', function () { analisaSemana(dPes, false); });
-    box.appendChild(bt);
-    if (semMsg) box.appendChild(h('p', { class: 'tip', 'aria-live': 'polite', text: semMsg }));
+    depois(semT, bt);
+    if (semMsg) depois(bt, h('p', { class: 'tip', 'aria-live': 'polite', text: semMsg }));
   }
 
   /* Balança e relógio: dados que chegam do Health Connect (Zepp) */
@@ -6406,8 +6410,9 @@ window.MOVES = (function () {
     bt.addEventListener('click', function () { trAtualiza(false); });
     var be = h('button', { type: 'button', class: 'link', id: 'tr-editar', text: trEdita ? 'Fechar' : 'Editar meta e dias' });
     be.addEventListener('click', function () { trEdita = !trEdita; renderTreinador(); });
-    ac.appendChild(bt); ac.appendChild(be); box.appendChild(ac);
-    if (trMsg) box.appendChild(h('p', { class: 'tip', 'aria-live': 'polite', text: trMsg }));
+    ac.appendChild(bt); ac.appendChild(be); depois(head, ac);
+    var acFim = ac;
+    if (trMsg) acFim = depois(acFim, h('p', { class: 'tip', 'aria-live': 'polite', text: trMsg }));
     if (!p && !trBusy) box.appendChild(h('p', { class: 'tip', text: 'O plano detalha a semana atual e é refeito sozinho toda segunda. Cada corrida que chega do Strava é comparada com o planejado na hora.' }));
     if (trEdita) {
       var fN = h('input', { id: 'tr-nome', value: m.nome }), fD = h('input', { id: 'tr-data', type: 'date', value: m.prova });
@@ -6431,7 +6436,7 @@ window.MOVES = (function () {
         Store.set('treinador', 'meta', { nome: fN.value.trim() || 'Prova', prova: fD.value, km: Number(fK.value), pace: pace, liberado: fL.checked, dias: dias, perna: fPer.value === '' ? '' : Number(fPer.value), nota_dias: fObs.value.trim() });
         trEdita = false; trMsg = ''; trAtualiza(false);
       });
-      box.appendChild(h('div', { class: 'finish tr-meta' },
+      depois(acFim, h('div', { class: 'finish tr-meta' },
         h('div', { class: 'field' }, h('label', { for: 'tr-nome', text: 'Prova' }), fN),
         h('div', { class: 'two' }, h('div', { class: 'field' }, h('label', { for: 'tr-data', text: 'Data' }), fD), h('div', { class: 'field' }, h('label', { for: 'tr-km', text: 'Distância (km)' }), fK)),
         h('div', { class: 'field' }, h('label', { for: 'tr-pace', text: 'Pace alvo (min:seg por km)' }), fP),
