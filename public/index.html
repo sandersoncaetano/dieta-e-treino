@@ -1960,6 +1960,18 @@ window.MOVES = (function () {
       return true;
     });
   }
+  // Treino extra: o menos feito nas últimas 4 semanas; no empate, o feito há mais tempo.
+  function sugestaoExtra() {
+    var ini = addDias(gymDate, -28), cont = {}, ult = {}, all = Store.all('treinos') || {};
+    Object.keys(TREINOS).forEach(function (k) { cont[k] = 0; });
+    Object.keys(all).forEach(function (k) {
+      var t = all[k]; if (!t || !TREINOS[t.treino] || t.data >= gymDate) return;
+      if (t.data >= ini) cont[t.treino]++;
+      if (!ult[t.treino] || t.data > ult[t.treino]) ult[t.treino] = t.data;
+    });
+    var ord = Object.keys(TREINOS).sort(function (a, b) { return (cont[a] - cont[b]) || (ult[a] || '').localeCompare(ult[b] || ''); });
+    return { sug: ord[0], ord: ord, cont: cont, ult: ult };
+  }
   function diaSemTreino() { var wd = weekday(gymDate); return wd === 0 || wd === 6; }
   function pickDefault() {
     var found = Object.keys(TREINOS).filter(function (k) { return Store.get('treinos', gymDate + '_' + k); });
@@ -1968,11 +1980,7 @@ window.MOVES = (function () {
     if (diaSemTreino()) {
       var f = treinosFaltando();
       if (f.length) sel = f[0];
-      else {
-        var ult = {}, all = Store.all('treinos') || {};
-        Object.keys(all).forEach(function (k) { var t = all[k]; if (t && t.treino && t.data < gymDate && (!ult[t.treino] || t.data > ult[t.treino])) ult[t.treino] = t.data; });
-        sel = Object.keys(TREINOS).sort(function (a, b) { return (ult[a] || '').localeCompare(ult[b] || ''); })[0];
-      }
+      else sel = sugestaoExtra().sug;
     }
   }
   function sid() { return gymDate + '_' + sel; }
@@ -2397,14 +2405,12 @@ window.MOVES = (function () {
         fb.appendChild(fr); box.appendChild(fb);
       } else if (!Store.get('treinos', sid())) {
         // Semana completa: treino extra opcional (no lugar da bike, por exemplo). Sugere o que foi feito há mais tempo.
-        var ult = {}, all = Store.all('treinos') || {};
-        Object.keys(all).forEach(function (k) { var t = all[k]; if (t && t.treino && t.data < gymDate && (!ult[t.treino] || t.data > ult[t.treino])) ult[t.treino] = t.data; });
-        var sug = Object.keys(TREINOS).sort(function (a, b2) { return (ult[a] || '').localeCompare(ult[b2] || ''); })[0];
+        var sx = sugestaoExtra(), sug = sx.sug;
         var eb = h('div', { class: 'verdict bom', id: 'gym-extra' }, h('b', { text: 'Semana completa ✓' }),
-          h('p', { text: 'Se quiser treinar hoje, no lugar da bike por exemplo, escolha um treino. O que você fez há mais tempo foi o ' + sug + (ult[sug] ? ', em ' + dsem(ult[sug]) : '') + '.' }));
+          h('p', { text: 'Se quiser treinar hoje, no lugar da bike por exemplo, escolha um treino. Nas últimas 4 semanas, o que você menos fez foi o ' + sug + ' (' + TREINOS[sug].name + ', ' + sx.cont[sug] + (sx.cont[sug] === 1 ? ' vez' : ' vezes') + ').' }));
         var er = h('div', { class: 'tr-acoes' });
-        Object.keys(TREINOS).forEach(function (k) {
-          var b = h('button', { type: 'button', class: k === sel ? 'go' : 'howbtn', id: 'gym-extra-' + k, text: (k === sel ? '✓ ' : '') + k + (k === sug ? ' (sugerido)' : '') });
+        sx.ord.forEach(function (k) {
+          var b = h('button', { type: 'button', class: k === sel ? 'go' : 'howbtn', id: 'gym-extra-' + k, text: (k === sel ? '✓ ' : '') + k + ' · ' + sx.cont[k] + 'x' + (k === sug ? ' (sugerido)' : '') });
           b.addEventListener('click', function () { sel = k; renderGym(); });
           er.appendChild(b);
         });
