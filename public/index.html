@@ -4964,6 +4964,8 @@ window.MOVES = (function () {
       delete doc._id; doc.origem = 'local';
       Store.set('refeicoes', id, doc); usoLocal('refeicao'); renderFood(); return;
     }
+    // Com foto, o texto costuma ser comentário ("438 g é o peso do prato"), não uma lista de itens: a IA calcula tudo pela foto.
+    if (cal && doc.foto) cal = null;
     if (cal && forca) cal = { trechos: cal.trechos, itens: cal.itens.map(function () { return null; }), faltam: cal.trechos.map(function (t, i) { return i; }) };
     foodBusy[id] = true; foodMsg[id] = ''; renderFood();
     if (cal) {
