@@ -31,7 +31,8 @@ const POR_TIPO = {
 };
 function escolhe(tipo, temFoto) {
   const c = POR_TIPO[tipo] || POR_TIPO.outro;
-  return { modelo: c.leve && !temFoto ? HAIKU : SONNET, max: c.max };
+  // Com foto (Sonnet), a resposta descreve vários itens e costuma ser mais longa: limite maior.
+  return { modelo: c.leve && !temFoto ? HAIKU : SONNET, max: temFoto ? Math.max(c.max, 3000) : c.max };
 }
 // Ferramenta única e obrigatória: a resposta chega como objeto JSON já validado pela API.
 const FERRAMENTA = { name: 'responder', description: 'Devolve a resposta no formato JSON pedido no texto.', input_schema: { type: 'object', additionalProperties: true } };
