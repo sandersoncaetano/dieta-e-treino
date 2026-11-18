@@ -272,6 +272,13 @@ input[type="date"] { height: 46px; }
 .st-bar span { font-size: .8rem; color: var(--muted); }
 .st-bar button { flex: none; min-height: 44px; padding: 0 16px; border-radius: 12px; border: 0; background: #fc4c02; color: #fff; font: inherit; font-weight: 800; cursor: pointer; }
 .st-bar button:disabled { opacity: .7; }
+.gym-extra-tit { margin: 18px 0 6px; font-size: 1rem; }
+.gym-extra-de { margin: 0 0 4px; font-weight: 700; }
+.gym-pend { border: 1px dashed var(--line); border-radius: 14px; padding: 10px 12px; margin: 14px 0; }
+.gym-pend summary { font-weight: 800; cursor: pointer; }
+.gym-pend-it { display: flex; gap: 10px; align-items: center; justify-content: space-between; border-top: 1px solid var(--line); padding: 8px 0; }
+.gym-pend-it div { display: grid; min-width: 0; }
+.gym-pend-it button { flex: none; }
 .tr-box { display: grid; gap: 12px; margin: 0 0 18px; }
 .tr-head { border-radius: 14px; padding: 14px; background: color-mix(in srgb, var(--accent) 14%, var(--surface)); display: grid; gap: 4px; }
 .tr-head h2 { margin: 0; font-size: 1.1rem; }
@@ -1964,6 +1971,29 @@ window.MOVES = (function () {
   function repsTxt(it) { var r = repsDe(it); return r.length && r.some(function (x) { return x !== r[0]; }) ? r.join('/') : r.length + 'x' + (r[0] || 0); }
   function plan(e, it) { return it && it.planejadas > 0 ? it.planejadas : e.sets; }
   function commit(s) { s.atualizado = new Date().toISOString(); Store.set('treinos', sid(), s); }
+  // Exercícios de outros treinos acrescentados ao treino do dia (pendentes da semana).
+  function exPorId(id) { var x = null; Object.keys(TREINOS).forEach(function (k) { TREINOS[k].ex.forEach(function (e) { if (e.id === id) x = Object.assign({ de: k }, e); }); }); return x; }
+  function extrasDe(s) { return (s.extras || []).map(function (x) { return exPorId(x.id); }).filter(Boolean); }
+  function exDoDia(s) { var ids = {}; TREINOS[sel].ex.forEach(function (e) { ids[e.id] = 1; }); return TREINOS[sel].ex.concat(extrasDe(s || session()).filter(function (e) { return !ids[e.id]; })); }
+  // Pendentes: exercícios de treinos feitos nesta semana, antes do dia, que ficaram sem fazer ou incompletos
+  // (puladas contam como não feitas) e que ainda não foram compensados em outro dia da semana.
+  function pendentesSemana() {
+    var seg = segDe(gymDate), feitas = {}, plano = {}, origem = {};
+    var all = Store.all('treinos') || {};
+    Object.keys(all).forEach(function (k) {
+      var t = all[k]; if (!t || !t.data || t.data < seg || t.data > addDias(seg, 6) || t.data === gymDate) return;
+      Object.keys(t.itens || {}).forEach(function (id) { feitas[id] = (feitas[id] || 0) + (t.itens[id].series || 0); });
+      if (t.data > gymDate || !TREINOS[t.treino]) return;
+      TREINOS[t.treino].ex.forEach(function (e) {
+        var it = (t.itens || {})[e.id];
+        if (!plano[e.id]) { plano[e.id] = plan(e, it); origem[e.id] = { letra: t.treino, data: t.data }; }
+      });
+    });
+    var hoje = session(), naHoje = {}; exDoDia(hoje).forEach(function (e) { naHoje[e.id] = 1; });
+    return Object.keys(plano).filter(function (id) { return !naHoje[id] && (feitas[id] || 0) < plano[id]; }).map(function (id) {
+      var e = exPorId(id); return e ? Object.assign(e, { faltam: plano[id] - (feitas[id] || 0), origem: origem[id] }) : null;
+    }).filter(Boolean);
+  }
 
   function shrink(file, side, quality) {
     return new Promise(function (ok, no) {
@@ -2138,7 +2168,7 @@ window.MOVES = (function () {
     }
     function nextEx() {
       window.goNext(document.querySelector('.lift[data-ex="' + ex.id + '"]'), function (card) {
-        var e = TREINOS[sel].ex.filter(function (o) { return o.id === card.dataset.ex; })[0];
+        var e = exDoDia().filter(function (o) { return o.id === card.dataset.ex; })[0];
         var it = session().itens[card.dataset.ex];
         return !!(e && it && it.series + (it.puladas || 0) >= plan(e, it));
       });
@@ -2300,7 +2330,7 @@ window.MOVES = (function () {
     var cur = nowId && document.querySelector('.lift[data-ex="' + nowId + '"]');
     if (cur && !cur.classList.contains('feito')) { setNow(nowId); return; }
     var itens = session().itens || {};
-    var part = TREINOS[sel].ex.filter(function (e) {
+    var part = exDoDia().filter(function (e) {
       var it = itens[e.id], d = it ? it.series + (it.puladas || 0) : 0;
       return d > 0 && d < plan(e, it);
     })[0];
@@ -2319,7 +2349,7 @@ window.MOVES = (function () {
   });
   function updateCount() {
     var total = 0, done = 0, pul = 0, s = session();
-    TREINOS[sel].ex.forEach(function (e) { var it = s.itens[e.id]; total += plan(e, it); if (it) { done += it.series; pul += it.puladas || 0; } });
+    exDoDia(s).forEach(function (e) { var it = s.itens[e.id]; total += plan(e, it); if (it) { done += it.series; pul += it.puladas || 0; } });
     var c = $('gym-count'); if (c) c.textContent = done + ' de ' + total + ' séries' + (pul ? ' · ' + pul + ' puladas' : '');
     var dl = $('gym-del'); if (dl) dl.hidden = !Store.get('treinos', sid());
   }
@@ -2335,6 +2365,38 @@ window.MOVES = (function () {
     box.appendChild(irBtn('ir-atual-topo'));
     var cards = [];
     tr.ex.forEach(function (ex) { var c = exCard(ex); cards.push(c); box.appendChild(c); });
+    // Extras: exercícios pendentes de outros dias da semana, acrescentados a este treino.
+    var ext = extrasDe(s).filter(function (e) { return !tr.ex.some(function (x) { return x.id === e.id; }); });
+    if (ext.length) {
+      box.appendChild(h('h3', { class: 'gym-extra-tit', text: 'Pendentes da semana acrescentados' }));
+      ext.forEach(function (ex) {
+        var c = exCard(ex); cards.push(c);
+        var it = s.itens[ex.id];
+        if (!it || !it.series) {
+          var rmx = h('button', { type: 'button', class: 'link', id: 'rmx-' + ex.id, text: 'Tirar do treino de hoje' });
+          rmx.addEventListener('click', function () { var c2 = session(); c2.extras = (c2.extras || []).filter(function (x) { return x.id !== ex.id; }); if (c2.itens[ex.id] && !c2.itens[ex.id].series) delete c2.itens[ex.id]; commit(c2); renderGym(); });
+          c.appendChild(rmx);
+        }
+        c.insertBefore(h('p', { class: 'tip gym-extra-de', text: 'Do treino ' + ex.de + ' (' + TREINOS[ex.de].name + ')' }), c.firstChild);
+        box.appendChild(c);
+      });
+    }
+    var pend = pendentesSemana();
+    if (pend.length) {
+      var pb = h('details', { class: 'gym-pend', id: 'gym-pend' }, h('summary', { text: 'Pendentes da semana (' + pend.length + ')' }));
+      pb.appendChild(h('p', { class: 'tip', text: 'Exercícios que ficaram sem fazer ou incompletos em dias anteriores desta semana. Acrescente ao treino de hoje os que fizerem sentido.' }));
+      pend.forEach(function (e) {
+        var add = h('button', { type: 'button', class: 'howbtn', id: 'addx-' + e.id, text: '+ Acrescentar' });
+        add.addEventListener('click', function () { var c2 = session(); c2.extras = (c2.extras || []).concat([{ id: e.id, de: e.de }]); commit(c2); renderGym(); var el = document.querySelector('.lift[data-ex="' + e.id + '"]'); if (el) el.scrollIntoView({ block: 'start' }); });
+        pb.appendChild(h('div', { class: 'gym-pend-it' }, h('div', {}, h('b', { text: e.name }), h('span', { class: 'tip', text: 'Treino ' + e.origem.letra + ' de ' + dsem(e.origem.data) + ' · faltaram ' + e.faltam + (e.faltam === 1 ? ' série' : ' séries') })), add));
+      });
+      if (pend.length > 1) {
+        var todos = h('button', { type: 'button', class: 'link', id: 'addx-todos', text: 'Acrescentar todos' });
+        todos.addEventListener('click', function () { var c2 = session(); c2.extras = (c2.extras || []).concat(pend.map(function (e) { return { id: e.id, de: e.de }; })); commit(c2); renderGym(); });
+        pb.appendChild(todos);
+      }
+      box.appendChild(pb);
+    }
     box.appendChild(irBtn('ir-atual-fim'));
     var min = h('input', { id: 'gym-min', type: 'number', inputmode: 'numeric', min: '0', placeholder: 'Do Zepp' });
     if (s.minutos) min.value = s.minutos;
@@ -2359,7 +2421,7 @@ window.MOVES = (function () {
     }
     function pendingList() {
       var c = session();
-      return tr.ex.filter(function (e) {
+      return exDoDia(c).filter(function (e) {
         var it = c.itens[e.id];
         return !it || it.series + (it.puladas || 0) < plan(e, it);
       });
