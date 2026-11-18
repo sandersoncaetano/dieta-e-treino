@@ -2614,13 +2614,23 @@ window.MOVES = (function () {
     while (cur <= fim) { lista.push(cur); var x = new Date(cur + 'T12:00:00'); x.setDate(x.getDate() + 7); cur = Store.day(x); }
     return lista;
   }
+  // Média do que foi registrado por dia nos últimos 14 dias com refeições (sem hoje).
+  function balMediaIng(b) {
+    var hoje = Store.day(), ds = Object.keys(b.ing).filter(function (d) { return d < hoje && b.ing[d] > 0; }).sort().slice(-14);
+    return ds.length ? ds.reduce(function (a, d) { return a + b.ing[d]; }, 0) / ds.length : 0;
+  }
+  var BAL_MARGEM = 0.10;
   function balAjuste(b, segs) {
     var ok = segs.map(function (s) { return balSemana(b, s, 0); }).filter(function (r) { return r.n >= 5 && r.real !== null; }).slice(-6);
-    if (ok.length < 2) return { kcal: 0, n: ok.length };
+    var med = balMediaIng(b);
+    // Sem dados da balança ainda: margem provisória de +10% nas calorias registradas
+    // (o que se anota costuma ficar abaixo do real). Entra no saldo como gasto menor, na mesma medida.
+    if (ok.length < 2) return { kcal: -BAL_MARGEM * med, n: ok.length, margem: BAL_MARGEM, media: med };
     var soma = 0;
     ok.forEach(function (r) { soma += (r.comeu / r.n - r.real * BAL.kcalKg / 7) - (r.base + r.ex) / r.n; });
     var v = soma / ok.length * (ok.length / (ok.length + 3));
-    return { kcal: Math.max(-500, Math.min(500, v)), n: ok.length };
+    v = Math.max(-500, Math.min(500, v));
+    return { kcal: v, n: ok.length, media: med, pct: med ? -v / med : null };
   }
   var stravaBusy = false, stravaMsg = '';
   function stravaErro(e) {
@@ -2826,7 +2836,9 @@ window.MOVES = (function () {
       var rows = h('div', { class: 'bal-rows' });
       function row(a, v, c) { rows.appendChild(h('span', { class: c || '', text: a })); rows.appendChild(h('b', { class: c || '', text: v })); }
       row('Consumido', nInt(cur.comeu) + ' kcal');
-      row('Gasto estimado', nInt(cur.gasto) + ' kcal');
+      // A margem provisória aparece do lado do consumo, que é onde ela faz sentido.
+      if (aj.margem) row('Margem de registro (+' + Math.round(aj.margem * 100) + '%)', '+' + nInt(-aj.kcal * cur.n) + ' kcal');
+      row('Gasto estimado', nInt(aj.margem ? cur.gasto - aj.kcal * cur.n : cur.gasto) + ' kcal');
       row('Saldo', sinal(Math.round(cur.saldo), nInt) + ' kcal', 'tot');
       row('Peso previsto', sinal(cur.prev, kg2) + ' kg');
       row('Peso real', cur.real === null ? 'Aguardando pesagens' : sinal(cur.real, kg2) + ' kg');
@@ -2851,9 +2863,9 @@ window.MOVES = (function () {
       }
     }
     box.appendChild(h('p', { class: 'tip', text: 'Gasto fora do exercício: TMB ' + nInt(tmb) + ' kcal' + (compAte(hoje, 'tmb_kcal') ? ' (da balança)' : ' (por fórmula)') + ', mais 10% de rotina e os passos do dia; sem passos, TMB × 1,25. Exercício: calorias do Strava ou do relógio, sem a TMB do período, × 0,7.' }));
-    box.appendChild(h('p', { class: 'tip', text: aj.n >= 2
-      ? 'Ajuste pelos seus resultados: ' + sinal(Math.round(aj.kcal), nInt) + ' kcal/dia, com base em ' + aj.n + ' semanas.'
-      : 'O ajuste pelos seus resultados começa com 2 semanas de pelo menos 5 dias registrados e uma pesagem por semana, incluindo a semana anterior. Pesagens semanais oscilam com água e sal, por isso o ajuste é gradual.' }));
+    box.appendChild(h('div', { class: 'verdict ok', id: 'bal-margem' }, aj.margem
+      ? h('p', { text: 'Margem de registro provisória: +' + Math.round(aj.margem * 100) + '% nas calorias registradas (cerca de +' + nInt(-aj.kcal) + ' kcal/dia), porque o que se anota costuma ficar abaixo do que se come. Ela vale até a balança ter 2 semanas com pelo menos 5 dias registrados e uma pesagem por semana; aí a correção medida assume no lugar.' })
+      : h('p', { text: 'Correção medida pela balança: ' + sinal(Math.round(aj.kcal), nInt) + ' kcal/dia, com base em ' + aj.n + ' semanas' + (aj.pct != null ? '. Equivale a registrar ' + fmtN(Math.abs(aj.pct) * 100, 0) + '% ' + (aj.pct > 0 ? 'a menos' : 'a mais') + ' do que você come (somando também o erro das calorias do relógio).' : '.') + ' Pesagens semanais oscilam com água e sal, por isso a correção é gradual.' })));
     var sb = h('button', { type: 'button', class: 'howbtn', id: 'strava-sync', text: stravaBusy ? 'Atualizando...' : 'Atualizar do Strava' });
     if (stravaBusy) sb.disabled = true;
     sb.addEventListener('click', function () { syncStrava(false); });
