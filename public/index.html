@@ -1965,7 +1965,15 @@ window.MOVES = (function () {
     var found = Object.keys(TREINOS).filter(function (k) { return Store.get('treinos', gymDate + '_' + k); });
     if (found.length) { sel = found[0]; return; }
     // Sábado ou domingo: já abre no treino que faltou na semana, se houver.
-    if (diaSemTreino()) { var f = treinosFaltando(); if (f.length) sel = f[0]; }
+    if (diaSemTreino()) {
+      var f = treinosFaltando();
+      if (f.length) sel = f[0];
+      else {
+        var ult = {}, all = Store.all('treinos') || {};
+        Object.keys(all).forEach(function (k) { var t = all[k]; if (t && t.treino && t.data < gymDate && (!ult[t.treino] || t.data > ult[t.treino])) ult[t.treino] = t.data; });
+        sel = Object.keys(TREINOS).sort(function (a, b) { return (ult[a] || '').localeCompare(ult[b] || ''); })[0];
+      }
+    }
   }
   function sid() { return gymDate + '_' + sel; }
   function session() {
@@ -2387,6 +2395,20 @@ window.MOVES = (function () {
           fr.appendChild(b);
         });
         fb.appendChild(fr); box.appendChild(fb);
+      } else if (!Store.get('treinos', sid())) {
+        // Semana completa: treino extra opcional (no lugar da bike, por exemplo). Sugere o que foi feito há mais tempo.
+        var ult = {}, all = Store.all('treinos') || {};
+        Object.keys(all).forEach(function (k) { var t = all[k]; if (t && t.treino && t.data < gymDate && (!ult[t.treino] || t.data > ult[t.treino])) ult[t.treino] = t.data; });
+        var sug = Object.keys(TREINOS).sort(function (a, b2) { return (ult[a] || '').localeCompare(ult[b2] || ''); })[0];
+        var eb = h('div', { class: 'verdict bom', id: 'gym-extra' }, h('b', { text: 'Semana completa ✓' }),
+          h('p', { text: 'Se quiser treinar hoje, no lugar da bike por exemplo, escolha um treino. O que você fez há mais tempo foi o ' + sug + (ult[sug] ? ', em ' + dsem(ult[sug]) : '') + '.' }));
+        var er = h('div', { class: 'tr-acoes' });
+        Object.keys(TREINOS).forEach(function (k) {
+          var b = h('button', { type: 'button', class: k === sel ? 'go' : 'howbtn', id: 'gym-extra-' + k, text: (k === sel ? '✓ ' : '') + k + (k === sug ? ' (sugerido)' : '') });
+          b.addEventListener('click', function () { sel = k; renderGym(); });
+          er.appendChild(b);
+        });
+        eb.appendChild(er); box.appendChild(eb);
       }
     }
     box.appendChild(irBtn('ir-atual-topo'));
