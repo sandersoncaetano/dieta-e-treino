@@ -5145,11 +5145,13 @@ window.MOVES = (function () {
     }).then(function (r) {
       var cur = Store.get('refeicoes', id);
       if (!cur) return;
-      cur.kcal = Math.round(Number(r.kcal) || 0);
-      cur.proteina_g = Math.round(Number(r.proteina_g) || 0);
-      cur.gordura_g = Math.round(Number(r.gordura_g) || 0);
-      cur.carbo_g = Math.round(Number(r.carbo_g) || 0);
-      cur.itens = Array.isArray(r.itens) ? r.itens.slice(0, 20) : [];
+      // Totais: os do topo da resposta, os de "total" ou, se vierem zerados, a soma dos itens.
+      var lst = r.itens || r.items; if (typeof lst === 'string') { try { lst = JSON.parse(lst); } catch (e) { lst = []; } }
+      cur.itens = Array.isArray(lst) ? lst.slice(0, 20) : [];
+      var tt = r.total && typeof r.total === 'object' ? r.total : r, soma = { kcal: 0, proteina_g: 0, gordura_g: 0, carbo_g: 0 };
+      cur.itens.forEach(function (x) { ['kcal', 'proteina_g', 'gordura_g', 'carbo_g'].forEach(function (c) { soma[c] += Number(x[c]) || 0; }); });
+      ['kcal', 'proteina_g', 'gordura_g', 'carbo_g'].forEach(function (c) { var v = Number(tt[c]) || 0; cur[c] = Math.round(v > 0 ? v : soma[c]); });
+      if (!cur.kcal && !cur.itens.length) throw new Error('itens');
       if (cur.receita) {
         var rc = cur.receita;
         cur.itens.unshift({ nome: 'Receita: ' + rc.nome, quantidade: rc.quantidade, kcal: rc.kcal, proteina_g: rc.proteina_g, gordura_g: rc.gordura_g });
