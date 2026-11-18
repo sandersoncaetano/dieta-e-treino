@@ -1951,9 +1951,21 @@ window.MOVES = (function () {
   var gymDate = today;
   var howMode = {}, gymFlash = '';
   var sel = 'ABCDE'.charAt(Math.min(Math.max(weekday(today), 1), 5) - 1);
+  // Treinos da semana que ficaram sem fazer (o dia deles já passou e não houve registro).
+  function treinosFaltando() {
+    var seg = segDe(gymDate), wd = weekday(gymDate), dw = wd === 0 ? 7 : wd;
+    return Object.keys(TREINOS).filter(function (k) {
+      if (TREINOS[k].day >= dw) return false;
+      for (var i = 0; i < 7; i++) { var d = addDias(seg, i); if (d < gymDate && Store.get('treinos', d + '_' + k)) return false; }
+      return true;
+    });
+  }
+  function diaSemTreino() { var wd = weekday(gymDate); return wd === 0 || wd === 6; }
   function pickDefault() {
     var found = Object.keys(TREINOS).filter(function (k) { return Store.get('treinos', gymDate + '_' + k); });
-    if (found.length) sel = found[0];
+    if (found.length) { sel = found[0]; return; }
+    // Sábado ou domingo: já abre no treino que faltou na semana, se houver.
+    if (diaSemTreino()) { var f = treinosFaltando(); if (f.length) sel = f[0]; }
   }
   function sid() { return gymDate + '_' + sel; }
   function session() {
@@ -2361,6 +2373,21 @@ window.MOVES = (function () {
     if (gymDate === today) box.appendChild(sessionBar('gym', { get: session, set: commit, after: renderGym }));
     function irBtn(id) {
       return h('button', { type: 'button', class: 'howbtn ir-atual', id: id, text: '▶ Ir para o exercício atual', on: { click: irAtual } });
+    }
+    // Fim de semana: oferece os treinos que faltaram na semana.
+    if (diaSemTreino() && !Object.keys(TREINOS).some(function (k) { return k !== sel && Store.get('treinos', gymDate + '_' + k); })) {
+      var falt = treinosFaltando();
+      if (falt.length) {
+        var fb = h('div', { class: 'verdict ok', id: 'gym-faltou' }, h('b', { text: 'Faltou nesta semana' }),
+          h('p', { text: falt.map(function (k) { return 'Treino ' + k + ' (' + TREINOS[k].name + ')'; }).join(', ') + '. Se quiser repor hoje, escolha abaixo.' }));
+        var fr = h('div', { class: 'tr-acoes' });
+        falt.forEach(function (k) {
+          var b = h('button', { type: 'button', class: k === sel ? 'go' : 'howbtn', id: 'gym-repor-' + k, text: (k === sel ? '✓ ' : '') + 'Fazer o ' + k });
+          b.addEventListener('click', function () { sel = k; renderGym(); });
+          fr.appendChild(b);
+        });
+        fb.appendChild(fr); box.appendChild(fb);
+      }
     }
     box.appendChild(irBtn('ir-atual-topo'));
     var cards = [];
