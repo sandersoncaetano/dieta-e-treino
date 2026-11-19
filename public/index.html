@@ -288,6 +288,13 @@ input[type="date"] { height: 46px; }
 .agua-rec button { min-height: 58px; border-radius: 14px; border: 1px solid color-mix(in srgb, #3aa0ff 40%, var(--line)); background: color-mix(in srgb, #3aa0ff 10%, var(--surface)); color: inherit; font: inherit; cursor: pointer; display: grid; gap: 1px; padding: 6px; text-align: center; }
 .agua-rec button b { font-size: .95rem; }
 .agua-rec button span { font-size: .8rem; color: var(--muted); }
+.agua { padding-top: 10px; padding-bottom: 10px; }
+.agua-chips { display: flex; gap: 6px; overflow-x: auto; padding: 2px 0 4px; margin-top: 2px; }
+.agua-chips button { flex: none; min-height: 44px; border-radius: 12px; border: 1px solid color-mix(in srgb, #3aa0ff 40%, var(--line)); background: color-mix(in srgb, #3aa0ff 10%, var(--surface)); color: inherit; font: inherit; cursor: pointer; display: grid; gap: 0; padding: 4px 10px; text-align: center; line-height: 1.15; }
+.agua-chips button b { font-size: .85rem; }
+.agua-chips button span { font-size: .72rem; color: var(--muted); }
+.agua-chips .agua-mais { display: block; background: none; font-size: .85rem; color: var(--muted); }
+.agua .agua-barra { height: 8px; margin: 6px 0; }
 .agua-hist { font-size: .85rem; color: var(--muted); }
 .agua-ed { display: grid; grid-template-columns: 1fr 90px auto; gap: 6px; align-items: center; margin: 4px 0; }
 .agua-ed input { min-width: 0; }
@@ -5991,7 +5998,7 @@ window.MOVES = (function () {
     { id: 'stanley', nome: 'Copo Stanley', ml: 600, conferir: true },
     { id: 'marzo', nome: 'Garrafa Marzo', ml: 400 }
   ];
-  var aguaEdita = false;
+  var aguaEdita = false, aguaMais = false;
   function aguaRecs() { var c = Store.get('agua', '_recipientes'); return c && Array.isArray(c.itens) ? c.itens : AGUA_REC0; }
   function aguaDia(d) { return Store.get('agua', d) || { data: d, registros: [] }; }
   function aguaTotal(d) { return aguaDia(d).registros.reduce(function (a, x) { return a + (x.ml || 0); }, 0); }
@@ -6009,16 +6016,21 @@ window.MOVES = (function () {
     var d = foodDate, tot = aguaTotal(d), meta = aguaMeta(d), regs = aguaDia(d).registros, recs = aguaRecs();
     if (aguaEdita && box.contains(document.activeElement) && document.activeElement.tagName === 'INPUT') return;
     box.textContent = '';
-    box.appendChild(h('div', { class: 'agua-topo' }, h('h2', { text: '💧 Água' + (d === today ? '' : ' em ' + br(d).slice(0, 5)) }), h('b', { text: fmtN(tot / 1000, 2) + ' de ' + fmtN(meta / 1000, 1) + ' L' })));
+    box.appendChild(h('div', { class: 'agua-topo' }, h('h2', { text: '💧 Água' + (d === today ? '' : ' em ' + br(d).slice(0, 5)) }), h('b', { text: fmtN(tot / 1000, 1) + ' de ' + fmtN(meta / 1000, 1) + ' L' })));
     box.appendChild(h('div', { class: 'agua-barra', role: 'progressbar', 'aria-valuemin': '0', 'aria-valuemax': String(meta), 'aria-valuenow': String(tot) }, h('span', { style: 'width:' + Math.min(100, Math.round(tot / meta * 100)) + '%' })));
     if (!aguaEdita) {
-      var g = h('div', { class: 'agua-rec' });
+      // Compacto: uma linha de botões que rola para o lado; o resto fica em "Mais".
+      var g = h('div', { class: 'agua-chips' });
       recs.forEach(function (r) {
-        var b = h('button', { type: 'button', id: 'agua-' + r.id, 'aria-label': 'Bebi ' + r.nome + ', ' + r.ml + ' ml' }, h('b', { text: r.nome }), h('span', { text: r.ml + ' ml' + (r.conferir ? ' (confirmar)' : '') }));
+        var b = h('button', { type: 'button', id: 'agua-' + r.id, 'aria-label': 'Bebi ' + r.nome + ', ' + r.ml + ' ml' }, h('b', { text: '+ ' + r.nome.replace(/^(Copo|Garrafa) (de cozinha|térmica da academia)$/, function (x, a, b2) { return b2 === 'de cozinha' ? 'Copo' : 'Térmica'; }).replace(/^Copo Stanley$/, 'Stanley').replace(/^Garrafa Marzo$/, 'Marzo') }), h('span', { text: r.ml + ' ml' + (r.conferir ? '?' : '') }));
         b.addEventListener('click', function () { aguaAdd(d, r.nome, r.ml); renderAgua(); salvoOk('+' + r.ml + ' ml'); });
         g.appendChild(b);
       });
+      var mx = h('button', { type: 'button', class: 'agua-mais', id: 'agua-maisbtn', 'aria-expanded': String(aguaMais), text: aguaMais ? 'Menos' : 'Mais' });
+      mx.addEventListener('click', function () { aguaMais = !aguaMais; renderAgua(); });
+      g.appendChild(mx);
       box.appendChild(g);
+      if (!aguaMais) return;
       var ml = h('input', { id: 'agua-ml', type: 'number', inputmode: 'numeric', min: '1', placeholder: 'Outro (ml)' });
       var mb = h('button', { type: 'button', class: 'howbtn', id: 'agua-ml-go', text: 'Adicionar' });
       mb.addEventListener('click', function () { var v = Math.round(num(ml.value) || 0); if (v > 0) { aguaAdd(d, 'Outro', v); renderAgua(); salvoOk('+' + v + ' ml'); } else ml.focus(); });
