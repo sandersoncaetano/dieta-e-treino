@@ -26,7 +26,7 @@ const POR_TIPO = {
   atividade: { leve: false, max: 1000 },
   semana: { leve: true, max: 500 },
   fechamento: { leve: true, max: 500 },
-  treinador: { leve: false, max: 2500 },
+  treinador: { leve: false, max: 6000 },
   outro: { leve: false, max: 2000 }
 };
 function escolhe(tipo, temFoto) {
@@ -82,7 +82,7 @@ export default rota(async (req, res) => {
 
   const conteudo = [
     ...imagens.map((i) => ({ type: 'image', source: { type: 'base64', media_type: i.tipo || 'image/jpeg', data: i.base64 } })),
-    { type: 'text', text: prompt + '\n\nEntregue a resposta chamando a ferramenta responder com o objeto JSON pedido. Dentro dos textos, use aspas simples em vez de aspas duplas.' }
+    { type: 'text', text: prompt + '\n\nEntregue a resposta chamando a ferramenta responder com o objeto JSON pedido, sem escrever nada antes nem fora dela. Dentro dos textos, use aspas simples em vez de aspas duplas.' }
   ];
   const tipo = tipoDe(String(prompt)), esc = escolhe(tipo, imagens.length > 0);
 
