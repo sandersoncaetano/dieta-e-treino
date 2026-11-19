@@ -279,6 +279,18 @@ input[type="date"] { height: 46px; }
 .gym-pend-it { display: flex; gap: 10px; align-items: center; justify-content: space-between; border-top: 1px solid var(--line); padding: 8px 0; }
 .gym-pend-it div { display: grid; min-width: 0; }
 .gym-pend-it button { flex: none; }
+.agua h2 { margin: 0; font-size: 1.1rem; }
+.agua-topo { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.agua-topo b { font-size: 1.3rem; color: #3aa0ff; white-space: nowrap; }
+.agua-barra { height: 12px; border-radius: 999px; background: var(--mat); overflow: hidden; margin: 8px 0; }
+.agua-barra span { display: block; height: 100%; background: linear-gradient(90deg, #3aa0ff, #64c8ff); border-radius: 999px; }
+.agua-rec { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 8px 0; }
+.agua-rec button { min-height: 58px; border-radius: 14px; border: 1px solid color-mix(in srgb, #3aa0ff 40%, var(--line)); background: color-mix(in srgb, #3aa0ff 10%, var(--surface)); color: inherit; font: inherit; cursor: pointer; display: grid; gap: 1px; padding: 6px; text-align: center; }
+.agua-rec button b { font-size: .95rem; }
+.agua-rec button span { font-size: .8rem; color: var(--muted); }
+.agua-hist { font-size: .85rem; color: var(--muted); }
+.agua-ed { display: grid; grid-template-columns: 1fr 90px auto; gap: 6px; align-items: center; margin: 4px 0; }
+.agua-ed input { min-width: 0; }
 .tr-box { display: grid; gap: 12px; margin: 0 0 18px; }
 .tr-head { border-radius: 14px; padding: 14px; background: color-mix(in srgb, var(--accent) 14%, var(--surface)); display: grid; gap: 4px; }
 .tr-head h2 { margin: 0; font-size: 1.1rem; }
@@ -670,6 +682,7 @@ footer .col { display: grid; gap: 10px; }
 
   <section class="view" id="v-refeicoes" hidden>
     <section class="panel" id="food-sum"></section>
+    <section class="panel agua" id="agua-box"></section>
     <form class="finish" id="food-form">
       <h2>Nova refeição</h2>
       <div id="food-tipo"></div>
@@ -820,7 +833,7 @@ footer .col { display: grid; gap: 10px; }
 
 <script>
 var Store = (function () {
-  var COLLS = ['treinos', 'cardio', 'lombar', 'cargas', 'imagens', 'refeicoes', 'descansos', 'dias', 'peso', 'strava', 'receitas', 'analises', 'medidas', 'composicao', 'saude_dia', 'semanas', 'fechamentos', 'treinador', 'alimentos'];
+  var COLLS = ['treinos', 'cardio', 'lombar', 'cargas', 'imagens', 'refeicoes', 'descansos', 'dias', 'peso', 'strava', 'receitas', 'analises', 'medidas', 'composicao', 'saude_dia', 'semanas', 'fechamentos', 'treinador', 'alimentos', 'agua'];
   var KEY = 'caderno-treino';
   var cache = {}; COLLS.forEach(function (c) { cache[c] = {}; });
   var subs = [], db = null, mode = 'loading';
@@ -5481,6 +5494,8 @@ window.MOVES = (function () {
       sug.push(k < piso ? 'Se tiver fome, um lanche com proteína magra cabe; não precisa comer sem fome.' : 'Não precisa comer mais hoje.');
     } else if (!hoje && faltaP > 0) sug.push('Amanhã reforce a proteína: inclua uma porção magra em cada refeição.');
     if (rest < 0) sug.push(fds ? 'Fim de semana tem cerveja e sobremesa no plano; o que importa é a semana. Amanhã siga o plano normal, sem compensar.' : 'Amanhã siga o plano normal, sem compensar com jejum ou cortes.');
+    var ag = aguaTotal(d), agm = aguaMeta(d);
+    if (ag && ag < agm * 0.7 && (!hoje || hora >= 17)) sug.push('Água: ' + fmtN(ag / 1000, 1) + ' de ' + fmtN(agm / 1000, 1) + ' L.' + (hoje ? ' Ainda dá para tomar mais uns ' + nInt(Math.round((agm - ag) / 100) * 100) + ' ml até a hora de dormir.' : ' Amanhã, deixe a garrafa à vista desde cedo.'));
     if (abaixo >= 3) sug.push('Já são ' + abaixo + ' dias abaixo de 1.900 kcal nesta semana; comer pouco por muitos dias atrapalha a preservação do músculo.');
     if (weekday(d) === 0) sug.push('A semana fechou em ' + nInt(wk) + ' de 15.600 kcal' + (wk > 15600 ? ', ' + nInt(wk - 15600) + ' acima.' : '.'));
     return { nivel: nivel, resumo: r1 + ' ' + r2, sugestoes: sug.slice(0, 3) };
@@ -5969,7 +5984,88 @@ window.MOVES = (function () {
     sorted('refeicoes').forEach(function (r) { if (r.v.data >= from) { wk += r.v.kcal || 0; days[r.v.data] = 1; } });
     box.appendChild(h('p', { class: 'tip', text: 'Semana: ' + nInt(wk) + ' de 15.600 kcal, com ' + Object.keys(days).length + ' dia(s) registrado(s).' }));
   }
+  /* Água: registro por recipiente, com meta pelo peso */
+  var AGUA_REC0 = [
+    { id: 'copo', nome: 'Copo de cozinha', ml: 350 },
+    { id: 'termica', nome: 'Garrafa térmica da academia', ml: 700, conferir: true },
+    { id: 'stanley', nome: 'Copo Stanley', ml: 600, conferir: true },
+    { id: 'marzo', nome: 'Garrafa Marzo', ml: 400 }
+  ];
+  var aguaEdita = false;
+  function aguaRecs() { var c = Store.get('agua', '_recipientes'); return c && Array.isArray(c.itens) ? c.itens : AGUA_REC0; }
+  function aguaDia(d) { return Store.get('agua', d) || { data: d, registros: [] }; }
+  function aguaTotal(d) { return aguaDia(d).registros.reduce(function (a, x) { return a + (x.ml || 0); }, 0); }
+  // Meta: 35 ml por kg de peso, entre 2,5 e 4,5 L; +500 ml em dia com atividade.
+  function aguaMeta(d) {
+    var base = Math.round(35 * pesoAte(d) / 100) * 100, ativ = atividadesDe(d).length;
+    return Math.max(2500, Math.min(4500, base)) + (ativ ? 500 : 0);
+  }
+  function aguaAdd(d, rec, ml) {
+    var a = aguaDia(d); a = { data: d, registros: a.registros.concat([{ t: new Date().toISOString(), ml: ml, rec: rec }]) };
+    Store.set('agua', d, a);
+  }
+  function renderAgua() {
+    var box = $('agua-box'); if (!box) return;
+    var d = foodDate, tot = aguaTotal(d), meta = aguaMeta(d), regs = aguaDia(d).registros, recs = aguaRecs();
+    if (aguaEdita && box.contains(document.activeElement) && document.activeElement.tagName === 'INPUT') return;
+    box.textContent = '';
+    box.appendChild(h('div', { class: 'agua-topo' }, h('h2', { text: '💧 Água' + (d === today ? '' : ' em ' + br(d).slice(0, 5)) }), h('b', { text: fmtN(tot / 1000, 2) + ' de ' + fmtN(meta / 1000, 1) + ' L' })));
+    box.appendChild(h('div', { class: 'agua-barra', role: 'progressbar', 'aria-valuemin': '0', 'aria-valuemax': String(meta), 'aria-valuenow': String(tot) }, h('span', { style: 'width:' + Math.min(100, Math.round(tot / meta * 100)) + '%' })));
+    if (!aguaEdita) {
+      var g = h('div', { class: 'agua-rec' });
+      recs.forEach(function (r) {
+        var b = h('button', { type: 'button', id: 'agua-' + r.id, 'aria-label': 'Bebi ' + r.nome + ', ' + r.ml + ' ml' }, h('b', { text: r.nome }), h('span', { text: r.ml + ' ml' + (r.conferir ? ' (confirmar)' : '') }));
+        b.addEventListener('click', function () { aguaAdd(d, r.nome, r.ml); renderAgua(); salvoOk('+' + r.ml + ' ml'); });
+        g.appendChild(b);
+      });
+      box.appendChild(g);
+      var ml = h('input', { id: 'agua-ml', type: 'number', inputmode: 'numeric', min: '1', placeholder: 'Outro (ml)' });
+      var mb = h('button', { type: 'button', class: 'howbtn', id: 'agua-ml-go', text: 'Adicionar' });
+      mb.addEventListener('click', function () { var v = Math.round(num(ml.value) || 0); if (v > 0) { aguaAdd(d, 'Outro', v); renderAgua(); salvoOk('+' + v + ' ml'); } else ml.focus(); });
+      box.appendChild(h('div', { class: 'agua-ed', style: 'grid-template-columns:1fr auto' }, ml, mb));
+      var ac = h('div', { class: 'tr-acoes' });
+      if (regs.length) {
+        var un = h('button', { type: 'button', class: 'link', id: 'agua-desfaz', text: 'Desfazer o último' });
+        un.addEventListener('click', function () { var a = aguaDia(d); a.registros = a.registros.slice(0, -1); Store.set('agua', d, a); renderAgua(); });
+        ac.appendChild(un);
+      }
+      var ed = h('button', { type: 'button', class: 'link', id: 'agua-editar', text: 'Editar recipientes' });
+      ed.addEventListener('click', function () { aguaEdita = true; renderAgua(); });
+      ac.appendChild(ed);
+      box.appendChild(ac);
+      if (regs.length) box.appendChild(h('p', { class: 'agua-hist', text: regs.map(function (x) { return new Date(x.t).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) + ' ' + x.ml + ' ml'; }).join(' · ') }));
+      box.appendChild(h('p', { class: 'tip', text: 'Meta de ' + fmtN(meta / 1000, 1) + ' L: cerca de 35 ml por kg' + (atividadesDe(d).length ? ', mais 500 ml pelo treino do dia' : '') + '. Café, chá e suco contam; refrigerante e cerveja não entram.' }));
+      return;
+    }
+    // Edição dos recipientes
+    var lista = recs.map(function (r) { return Object.assign({}, r); });
+    var wrap = h('div');
+    function linha(r, i) {
+      var n = h('input', { id: 'agua-n-' + i, value: r.nome, 'aria-label': 'Nome do recipiente' });
+      var m = h('input', { id: 'agua-m-' + i, type: 'number', inputmode: 'numeric', value: String(r.ml), 'aria-label': 'Mililitros' });
+      var x = h('button', { type: 'button', class: 'link', id: 'agua-x-' + i, text: 'Tirar' });
+      n.addEventListener('input', function () { r.nome = n.value; });
+      m.addEventListener('input', function () { r.ml = Math.round(num(m.value) || 0); r.conferir = false; });
+      x.addEventListener('click', function () { lista.splice(i, 1); desenha(); });
+      return h('div', { class: 'agua-ed' }, n, m, x);
+    }
+    function desenha() { wrap.textContent = ''; lista.forEach(function (r, i) { wrap.appendChild(linha(r, i)); }); }
+    desenha();
+    box.appendChild(h('p', { class: 'tip', text: 'Nome e quantos ml cabem. Ao mudar o ml, o aviso de confirmar some.' }));
+    box.appendChild(wrap);
+    var novo = h('button', { type: 'button', class: 'howbtn', id: 'agua-novo', text: '+ Recipiente' });
+    novo.addEventListener('click', function () { lista.push({ id: 'r' + Date.now(), nome: '', ml: 300 }); desenha(); var ul = wrap.lastChild; if (ul) ul.querySelector('input').focus(); });
+    var sv = h('button', { type: 'button', class: 'go', id: 'agua-salvar', text: 'Salvar recipientes' });
+    sv.addEventListener('click', function () {
+      var ok = lista.filter(function (r) { return r.nome.trim() && r.ml > 0; }).map(function (r) { return { id: r.id, nome: r.nome.trim(), ml: r.ml, conferir: !!r.conferir }; });
+      Store.set('agua', '_recipientes', { itens: ok }); aguaEdita = false; renderAgua(); salvoOk('Recipientes salvos');
+    });
+    var cc = h('button', { type: 'button', class: 'link', id: 'agua-cancela', text: 'Cancelar' });
+    cc.addEventListener('click', function () { aguaEdita = false; renderAgua(); });
+    box.appendChild(h('div', { class: 'tr-acoes' }, novo, sv, cc));
+  }
   function renderFood() {
+    renderAgua();
     renderAli();
     if (!recForm && !document.querySelector('#rec-box :focus')) renderRec();
     if (!document.querySelector('#food-rec :focus')) renderRecPick();
