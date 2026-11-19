@@ -298,6 +298,13 @@ input[type="date"] { height: 46px; }
 .agua-hist { font-size: .85rem; color: var(--muted); }
 .agua-ed { display: grid; grid-template-columns: 1fr 90px auto; gap: 6px; align-items: center; margin: 4px 0; }
 .agua-ed input { min-width: 0; }
+.gauge-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.gauge-mini .gauge-top { display: grid; gap: 1px; }
+.gauge-mini .gauge-top strong { font-size: .92rem; }
+.gauge-mini .gauge-top span { font-size: .78rem; }
+.gauge-mini .track { position: relative; }
+.gauge-min { position: absolute; top: -2px; bottom: -2px; width: 2px; background: var(--fg); opacity: .55; border-radius: 1px; }
+.gauge-faixa { color: var(--muted); font-size: .74rem; }
 .tr-box { display: grid; gap: 12px; margin: 0 0 18px; }
 .tr-head { border-radius: 14px; padding: 14px; background: color-mix(in srgb, var(--accent) 14%, var(--surface)); display: grid; gap: 4px; }
 .tr-head h2 { margin: 0; font-size: 1.1rem; }
@@ -791,6 +798,7 @@ footer .col { display: grid; gap: 10px; }
     <div id="h-sec-graficos" role="tabpanel" aria-labelledby="hs-graficos" hidden>
       <p class="tip g-dica">Toque no gráfico para ver os valores. Toque em ⤢ para ampliar e mudar o período.</p>
       <section class="panel" id="g-calorias"></section>
+      <section class="panel" id="g-macros"></section>
       <section class="panel" id="h-peso"></section>
       <section class="panel" id="h-comp"></section>
       <section class="panel" id="g-cintura"></section>
@@ -2694,6 +2702,20 @@ window.MOVES = (function () {
     if (!c) return { min: 160, max: 180, mm: null };
     return { min: Math.round(c.massa_magra_kg * 2.3 / 5) * 5, max: Math.round(c.massa_magra_kg * 2.6 / 5) * 5, mm: c.massa_magra_kg };
   }
+  // Metas de gordura e carboidrato (g), a partir da meta de calorias e da proteína do dia.
+  // Gordura: no mínimo cerca de 0,5 g por kg (hormônios) e no máximo 30% das calorias.
+  // Carboidrato: o que sobra da meta depois do mínimo de proteína e de gordura; piso de 100 g,
+  // ou 150 g em dia com treino (combustível para a corrida e a musculação).
+  function macroMeta(d) {
+    d = d || Store.day();
+    var meta = metaDia(d), pm = protMeta(d), peso = pesoAte(d), ativ = atividadesDe(d).length > 0;
+    var gMax = Math.round(meta * 0.30 / 9), gMin = Math.min(Math.max(45, Math.round(peso * 0.5)), gMax - 10);
+    var cMax = Math.round((meta - pm.min * 4 - gMin * 9) / 4), cMin = Math.min(ativ ? 150 : 100, cMax - 20);
+    return { gord: { min: gMin, max: gMax }, carbo: { min: cMin, max: cMax }, treino: ativ };
+  }
+  // Carboidrato da refeição: o informado ou, nas antigas, estimado pelo que sobra das calorias.
+  function carboDe(v) { return v.carbo_g != null ? Number(v.carbo_g) || 0 : Math.max(0, ((v.kcal || 0) - 4 * (v.proteina_g || 0) - 9 * (v.gordura_g || 0)) / 4); }
+  function macrosDia(d) { var t = { g: 0, c: 0, n: 0 }; mealsOf(d).forEach(function (r) { t.n++; t.g += r.v.gordura_g || 0; t.c += carboDe(r.v); }); return t; }
   function protTxt(d) { var m = protMeta(d); return m.min + ' a ' + m.max; }
   function baseDia(d) {
     var tmb = tmbDe(d), sd = Store.get('saude_dia', d), r = { tmb: tmb, tmbBalanca: !!compAte(d, 'tmb_kcal') };
@@ -3830,7 +3852,7 @@ window.MOVES = (function () {
     if (histSec !== 'graficos' || $('h-sec-graficos').hidden) return;
     if (gModal) return;
     var b = balDados(), aj = balAjuste(b, balSemanas(b)).kcal;
-    grafCalorias(b, aj); renderPesoH(); renderCompH(); grafCintura($('g-cintura'), 'cintura'); renderPassosH(); grafCorrida(); renderEvo();
+    grafCalorias(b, aj); grafMacros(); renderPesoH(); renderCompH(); grafCintura($('g-cintura'), 'cintura'); renderPassosH(); grafCorrida(); renderEvo();
   }
 
   function grafCalorias(b, aj) {
@@ -3856,6 +3878,30 @@ window.MOVES = (function () {
           },
           options: { scales: { y: { beginAtZero: true, ticks: { callback: function (v) { return fmtN0(v / 1000, 1) + ' mil'; } } } } },
           dicas: { label: function (it) { return ' ' + it.dataset.label + ': ' + nInt(it.raw) + ' kcal'; } }
+        };
+      }
+    });
+  }
+  function grafMacros() {
+    grafico($('g-macros'), {
+      id: 'macros', titulo: 'Gordura e carboidrato', sub: 'Gramas por dia e faixa da meta (tracejado)', periodos: ['1M', '3M', '6M'], per: '1M',
+      dados: function (per) {
+        var hoje = Store.day(), d0 = desde(per), ds = [], prim = sorted('refeicoes').map(function (r) { return r.v.data; }).sort()[0];
+        if (!prim) return { vazio: 'Registre refeições para ver o gráfico.' };
+        if (d0 < prim) d0 = prim;
+        for (var d = d0; d <= hoje; d = addDias(d, 1)) ds.push(d);
+        var md = ds.map(macrosDia), mt = ds.map(macroMeta), cg = cor('hi'), cc = cor('accent');
+        var lin = function (lab, arr, c) { return { type: 'line', label: lab, data: arr, borderColor: alfa(c, 0.7), borderWidth: 1.5, borderDash: [4, 4], pointRadius: 0, stepped: 'middle', semDica: true, semLegenda: true }; };
+        return {
+          type: 'bar',
+          data: { labels: ds.map(ddmm), datasets: [
+            { type: 'bar', label: 'Carboidrato', data: md.map(function (x) { return x.n ? Math.round(x.c) : null; }), backgroundColor: alfa(cc, 0.85), borderRadius: 4, barPercentage: 0.8 },
+            { type: 'bar', label: 'Gordura', data: md.map(function (x) { return x.n ? Math.round(x.g) : null; }), backgroundColor: alfa(cg, 0.85), borderRadius: 4, barPercentage: 0.8 },
+            lin('Carboidrato máx.', mt.map(function (m) { return m.carbo.max; }), cc), lin('Carboidrato mín.', mt.map(function (m) { return m.carbo.min; }), cc),
+            lin('Gordura máx.', mt.map(function (m) { return m.gord.max; }), cg), lin('Gordura mín.', mt.map(function (m) { return m.gord.min; }), cg)
+          ] },
+          options: { scales: { y: { beginAtZero: true, ticks: { callback: function (v) { return v + ' g'; } } } } },
+          dicas: { label: function (it) { return ' ' + it.dataset.label + ': ' + nInt(it.raw) + ' g'; } }
         };
       }
     });
@@ -5501,6 +5547,9 @@ window.MOVES = (function () {
       sug.push(k < piso ? 'Se tiver fome, um lanche com proteína magra cabe; não precisa comer sem fome.' : 'Não precisa comer mais hoje.');
     } else if (!hoje && faltaP > 0) sug.push('Amanhã reforce a proteína: inclua uma porção magra em cada refeição.');
     if (rest < 0) sug.push(fds ? 'Fim de semana tem cerveja e sobremesa no plano; o que importa é a semana. Amanhã siga o plano normal, sem compensar.' : 'Amanhã siga o plano normal, sem compensar com jejum ou cortes.');
+    var mmD = macroMeta(d), mdD = macrosDia(d);
+    if (mdD.g > mmD.gord.max) sug.push('Gordura em ' + nInt(mdD.g) + ' g, acima do máximo de ' + mmD.gord.max + ' g: nas próximas refeições, prefira preparo grelhado ou cozido e menos óleo, queijo e frituras.');
+    if (!cedo && mdD.n && mdD.c < mmD.carbo.min) sug.push('Carboidrato em ' + nInt(mdD.c) + ' g, abaixo do mínimo de ' + mmD.carbo.min + ' g' + (mmD.treino ? ' para um dia de treino' : '') + '. Se for treinar cedo amanhã, inclua arroz, batata, aveia ou fruta no jantar.');
     var ag = aguaTotal(d), agm = aguaMeta(d);
     if (ag && ag < agm * 0.7 && (!hoje || hora >= 17)) sug.push('Água: ' + fmtN(ag / 1000, 1) + ' de ' + fmtN(agm / 1000, 1) + ' L.' + (hoje ? ' Ainda dá para tomar mais uns ' + nInt(Math.round((agm - ag) / 100) * 100) + ' ml até a hora de dormir.' : ' Amanhã, deixe a garrafa à vista desde cedo.'));
     if (abaixo >= 3) sug.push('Já são ' + abaixo + ' dias abaixo de 1.900 kcal nesta semana; comer pouco por muitos dias atrapalha a preservação do músculo.');
@@ -5986,6 +6035,18 @@ window.MOVES = (function () {
     box.appendChild(h('div', { class: 'gauge' },
       h('div', { class: 'gauge-top' }, h('strong', { text: nInt(p) + ' g de proteína' }), h('span', { text: p >= pm.min ? 'Meta atingida' : 'Faltam ' + nInt(pm.min - p) + ' a ' + nInt(pm.max - p) + ' g' })),
       bar(p / pm.min * 100, false)));
+    // Gordura e carboidrato: faixa mínima e máxima; a barra mostra onde está dentro do máximo.
+    var mm = macroMeta(foodDate), md = macrosDia(foodDate), hj = foodDate === today;
+    function faixa(nome, v, f) {
+      var txt = v > f.max ? nInt(v - f.max) + ' g acima do máximo' : v >= f.min ? 'Dentro da faixa' : hj ? 'Faltam ' + nInt(f.min - v) + ' g para o mínimo' : 'Abaixo do mínimo';
+      var i = h('i', { class: v > f.max ? 'over' : '' }); i.style.width = Math.min(100, v / f.max * 100) + '%';
+      var mk = h('b', { class: 'gauge-min', 'aria-hidden': 'true' }); mk.style.left = (f.min / f.max * 100) + '%';
+      return h('div', { class: 'gauge gauge-mini' },
+        h('div', { class: 'gauge-top' }, h('strong', { text: nInt(v) + ' g de ' + nome }), h('span', { text: txt })),
+        h('div', { class: 'track' }, i, mk),
+        h('small', { class: 'gauge-faixa', text: 'Faixa: ' + f.min + ' a ' + f.max + ' g' }));
+    }
+    box.appendChild(h('div', { class: 'gauge-2' }, faixa('gordura', md.g, mm.gord), faixa('carboidrato', md.c, mm.carbo)));
     var mon = new Date(today + 'T12:00:00'); mon.setDate(mon.getDate() - ((mon.getDay() + 6) % 7));
     var from = Store.day(mon), wk = 0, days = {};
     sorted('refeicoes').forEach(function (r) { if (r.v.data >= from) { wk += r.v.kcal || 0; days[r.v.data] = 1; } });
