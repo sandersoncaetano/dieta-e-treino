@@ -4809,6 +4809,8 @@ window.MOVES = (function () {
     return 'Você é um nutricionista estimando uma refeição de um adulto brasileiro. ' +
       'Use as quantidades informadas no relato. Quando faltar quantidade, estime pela foto ou por uma porção comum. ' +
       'Use valores típicos da tabela TACO. ' +
+      'Bebidas: use o valor da marca quando houver; cerveja pilsen comum (Heineken, Brahma, Skol, Amstel) tem cerca de 42 kcal, 3,2 g de carboidrato e 0,4 g de proteína por 100 ml (lata 350 ml = 150 kcal; latão 473 ml = 200 kcal); vinho cerca de 85 kcal por 100 ml; destilado cerca de 230 kcal por 100 ml. ' +
+      'Se o usuário diz que estava sem balança ou dá só o peso do prato, distribua esse peso entre os alimentos da foto. ' +
       'Referências deste usuário: whey Black Skull 100% HD, 1 dosador ou scoop de 35 g = 129 kcal e 21 g de proteína. ' +
       'Café 1 = 1 ovo com óleo borrifado e 40 g de queijo minas padrão = 210 kcal e 15 g de proteína. ' +
       'Responda somente com um objeto JSON neste formato: ' +
@@ -4888,11 +4890,17 @@ window.MOVES = (function () {
   }
   function aliNumero(t) { return ALI_NUM[t] != null ? ALI_NUM[t] : Number(String(t).replace(',', '.')); }
   // Separa o relato em trechos, sem quebrar números decimais (1,5 kg) nem nomes como "pele e osso".
+  // Observações que não são alimento ("vide foto", "não tinha balança", "peso do prato 450g").
+  var ALI_NOTA = /^(vide|ver|veja|olha|conforme|segue|na|pela) (a )?foto|^foto\b|balanca|^peso (aproximado |total |estimado )?(do |de )?prato|^prato (todo|inteiro|cheio)|^a olho|^(tudo )?estimad|^aproximad/;
+  var ALI_ESTIMA = /balanca|vide (a )?foto|ver (a )?foto|pela foto|a olho|estim(e|ar|ado)/;
+  function aliNota(x) { return ALI_NOTA.test(aliNorm(x).replace(/^[^a-z]+/, '').trim()); }
+  function aliNotas(relato) { return String(relato || '').replace(/\r/g, '').split(/\n|;|(?<!\d)[.,]|[.,](?!\d)/).map(function (x) { return x.trim(); }).filter(function (x) { return x && aliNota(x); }); }
+  function aliEstima(relato) { return ALI_ESTIMA.test(aliNorm(relato)); }
   function aliTrechos(relato) {
     var partes = String(relato || '').replace(/\r/g, '').split(/\n|;|\+|(?<!\d)[.,]|[.,](?!\d)/);
     var out = [];
     partes.forEach(function (p) {
-      p = p.trim(); if (!p) return;
+      p = p.trim(); if (!p || aliNota(p)) return;
       // Dois pesos no mesmo trecho ligados por "e": separa.
       // "Arroz 100g e feijão 50g": separa no "e" só quando cada lado tem a sua quantidade.
       var lados = p.split(/ e /i);
@@ -4913,8 +4921,8 @@ window.MOVES = (function () {
   function aliLe(txt) {
     var n = aliNorm(txt).replace(/(\d+)\s*%/g, '$1pct').replace(/[()\[\]:"'!?]/g, ' ').replace(/\s+/g, ' ').trim();
     var r = { txt: txt, g: null, n: null, un: null, amb: false };
-    var gs = [], re = /(\d+(?:[.,]\d+)?)\s*(kg|g|gr|gramas?|ml|l|litros?)\b/g, m;
-    while ((m = re.exec(n))) gs.push(aliNumero(m[1]) * (/^(kg|l|litro)/.test(m[2]) ? 1000 : 1));
+    var gs = [], ehMl = false, re = /(\d+(?:[.,]\d+)?)\s*(kg|g|gr|gramas?|ml|l|litros?)\b/g, m;
+    while ((m = re.exec(n))) if (/^(ml|l|litro)/.test(m[2]) && (ehMl = true)) gs.push(aliNumero(m[1]) * (/^(l|litro)/.test(m[2]) ? 1000 : 1)); else gs.push(aliNumero(m[1]) * (/^(kg|l|litro)/.test(m[2]) ? 1000 : 1));
     n = n.replace(re, ' ');
     var mu = n.match(new RegExp('\\b(\\d+(?:[.,]\\d+)?|um|uma|dois|duas|tres|quatro|cinco|meio|meia)\\s+' + ALI_UN.source));
     if (mu) { r.n = aliNumero(mu[1]); r.un = aliUnid(mu[2]); n = n.replace(mu[0], ' '); }
@@ -4924,7 +4932,9 @@ window.MOVES = (function () {
       else { var mf = n.match(/\s(\d+(?:[.,]\d+)?)\s*(unidades?)?\s*$/); if (mf) { r.n = aliNumero(mf[1]); r.un = 'un'; n = n.replace(mf[0], ' '); } }
     }
     if (gs.length > 1) r.amb = true;
-    if (gs.length === 1) { if (r.n && r.n > 1 && r.un !== 'un') r.amb = true; else if (r.n && r.n > 1) r.amb = true; else { r.g = gs[0]; r.n = null; r.un = null; } }
+    // "Cerveja 473 ml 2 latas": ml por embalagem vezes a contagem.
+    if (gs.length === 1 && ehMl && r.n > 1 && r.un !== 'un') { r.g = gs[0] * r.n; r.n = null; r.un = null; }
+    else if (gs.length === 1) { if (r.n && r.n > 1 && r.un !== 'un') r.amb = true; else if (r.n && r.n > 1) r.amb = true; else { r.g = gs[0]; r.n = null; r.un = null; } }
     if (/(^|\s)\d+([.,]\d+)?(\s|$)/.test(n)) r.amb = true;
     n = n.replace(ALI_FILL, ' ').replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
     var w = n.split(' ').filter(Boolean);
@@ -5054,6 +5064,8 @@ window.MOVES = (function () {
     }).join('\n');
     return 'Você é um nutricionista estimando uma refeição de um adulto brasileiro. ' +
       'Use as quantidades informadas e valores típicos da tabela TACO; quando faltar quantidade, estime pela foto ou por uma porção comum. ' +
+      'Bebidas: use o valor da marca quando houver; cerveja pilsen comum (Heineken, Brahma, Skol, Amstel) tem cerca de 42 kcal, 3,2 g de carboidrato e 0,4 g de proteína por 100 ml (lata 350 ml = 150 kcal; latão 473 ml = 200 kcal); vinho cerca de 85 kcal por 100 ml; destilado cerca de 230 kcal por 100 ml. ' +
+      (aliNotas(doc.relato).length ? 'Observações do usuário: ' + aliNotas(doc.relato).join('; ') + '. ' : '') +
       'Referências deste usuário: whey Black Skull 100% HD, 1 scoop de 35 g = 129 kcal e 21 g de proteína. ' +
       'Trechos do relato (' + tipoNome(doc.tipo) + '):\n' + lista + '\n' +
       'Calcule SÓ os trechos sem valor. Para cada um, devolva um item com o número do trecho, um nome curto e claro do alimento, a quantidade, os gramas considerados e os valores totais desse trecho. ' +
@@ -6677,9 +6689,9 @@ window.MOVES = (function () {
     function aoEscolher(f) {
       foodFile = null; foodErro = ''; prev.hidden = true;
       if (foodUrl) { URL.revokeObjectURL(foodUrl); foodUrl = ''; }
-      if (!f) { name.textContent = ''; return; }
+      if (!f) { name.textContent = ''; renderPre(); return; }
       var info = photoInfo(f), vez = ++foodVez;
-      foodLendo = true; name.textContent = 'Carregando a foto...';
+      foodLendo = true; name.textContent = 'Carregando a foto...'; $('food-msg').textContent = ''; renderPre();
       f.arrayBuffer().then(function (buf) {
         if (vez === foodVez && isHeic(f, buf)) name.textContent = 'Convertendo a foto...';
         return toJpeg(f, buf);
@@ -6709,9 +6721,12 @@ window.MOVES = (function () {
       var cal = aliCalcula(v);
       if (!cal.trechos.length) { el.hidden = true; return; }
       el.hidden = false; semQtdOk = false;
+      var est = foodFile || foodLendo || aliEstima(v);
       el.appendChild(h('b', { text: 'Antes de calcular' }));
+      if (est) el.appendChild(h('div', { class: 'fp-it ia' }, h('span', { text: foodFile || foodLendo ? '📷 Sem quantidade, a IA estima pela foto.' : '≈ Sem balança: a IA estima as porções.' })));
       cal.trechos.forEach(function (t, i) {
         var k = cal.itens[i], ex = preExclui[t.nome];
+        if (!t.g && !t.n && !t.amb && (!k || ex) && est) { el.appendChild(h('div', { class: 'fp-it ia' }, h('span', { text: 'A IA vai estimar: ' + t.txt }))); return; }
         if (!t.g && !t.n && !t.amb && (!k || ex)) { el.appendChild(h('div', { class: 'fp-it falta' }, h('span', { text: '⚠ Falta a quantidade: ' + t.txt }))); return; }
         if (k && !ex) {
           var b = h('button', { type: 'button', class: 'link', text: 'Não é este' });
@@ -6792,12 +6807,12 @@ window.MOVES = (function () {
       e.preventDefault();
       var relato = $('food-relato').value.trim(), msg = $('food-msg'), f = foodFile;
       // Sem quantidade em algum alimento: avisa antes de calcular (com foto, a IA pode estimar pela imagem).
-      if (relato && !f && !semQtdOk && !foodRec.id) {
+      if (relato && !f && !foodLendo && !semQtdOk && !foodRec.id && !aliEstima(relato)) {
         var falta = semQtd(aliCalcula(relato));
         if (falta.length) {
           msg.textContent = '';
-          msg.appendChild(document.createTextNode('Falta a quantidade de: ' + falta.map(function (t) { return t.txt.trim(); }).join(', ') + '. Informe em gramas ou unidades (ex.: "frango assado 150g"). '));
-          var mesmo = h('button', { type: 'button', class: 'link', id: 'food-mesmo', text: 'Calcular mesmo assim' });
+          msg.appendChild(document.createTextNode('Falta a quantidade de: ' + falta.map(function (t) { return t.txt.trim(); }).join(', ') + '. Informe em gramas ou unidades (ex.: "frango assado 150g"), tire uma foto do prato ou, sem balança, deixe a IA estimar. '));
+          var mesmo = h('button', { type: 'button', class: 'link', id: 'food-mesmo', text: 'Sem balança: estimar' });
           mesmo.addEventListener('click', function () { semQtdOk = true; $('food-form').requestSubmit(); });
           msg.appendChild(mesmo); renderPre();
           return;
