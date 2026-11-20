@@ -247,6 +247,11 @@ input[type="date"] { height: 46px; }
 .seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; padding: 4px; margin: 4px 0 14px; background: var(--mat); border-radius: 12px; }
 .food-pre { border: 1px solid var(--line); border-radius: 12px; padding: 8px 10px; margin: 6px 0; display: grid; gap: 4px; font-size: .9rem; }
 .food-pre > b { font-size: .8rem; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.ev-box { margin: -4px 0 10px; }
+.ev-row { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; }
+.ev-tag { font-size: .85rem; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: color-mix(in srgb, var(--accent, #3b82f6) 16%, transparent); }
+.ev-box input#ev-txt { width: 100%; margin: 4px 0 6px; }
+.ev-chk { display: flex; gap: 8px; align-items: center; font-size: .9rem; margin-bottom: 6px; }
 .fp-it { display: flex; gap: 8px; align-items: baseline; justify-content: space-between; }
 .fp-it span { min-width: 0; }
 .fp-it.falta { color: var(--stop, #b3261e); font-weight: 700; }
@@ -848,7 +853,7 @@ footer .col { display: grid; gap: 10px; }
 
 <script>
 var Store = (function () {
-  var COLLS = ['treinos', 'cardio', 'lombar', 'cargas', 'imagens', 'refeicoes', 'descansos', 'dias', 'peso', 'strava', 'receitas', 'analises', 'medidas', 'composicao', 'saude_dia', 'semanas', 'fechamentos', 'treinador', 'alimentos', 'agua'];
+  var COLLS = ['treinos', 'cardio', 'lombar', 'cargas', 'imagens', 'refeicoes', 'descansos', 'dias', 'peso', 'strava', 'receitas', 'analises', 'medidas', 'composicao', 'saude_dia', 'semanas', 'fechamentos', 'treinador', 'alimentos', 'agua', 'eventos'];
   var KEY = 'caderno-treino';
   var cache = {}; COLLS.forEach(function (c) { cache[c] = {}; });
   var subs = [], db = null, mode = 'loading';
@@ -4046,6 +4051,8 @@ window.MOVES = (function () {
       'Dias úteis: ' + sn(r.saldoUteis) + ' kcal; fim de semana: ' + sn(r.saldoFds) + ' kcal' + (r.devolveu ? ' (devolveu ' + r.devolveu + '% do déficit dos dias úteis).' : '.'),
       'Exercício: ' + nInt(r.gEx) + ' kcal considerados; sem os treinos, o saldo seria ' + sn(r.semTreino) + '. Proteína média de ' + nInt(r.prot) + ' g/dia (meta ' + protTxt(r.dom) + ').'
     ];
+    var esp = diasEspeciais(r.seg, r.dom);
+    if (esp.length) pontos.push('Dias especiais: ' + esp.join('; ') + '.');
     // Pesagem feita nesta semana (normalmente na sexta): liga o fechamento à balança.
     var pes = Object.keys(Object.assign({}, Store.all('peso') || {}, Store.all('composicao') || {})).sort().filter(function (d) { return d >= r.seg && d <= r.dom && pesoDe(d); });
     if (pes.length) {
@@ -4059,7 +4066,7 @@ window.MOVES = (function () {
     return 'Feche a semana de ' + br(r.seg) + ' a ' + br(r.dom) + ' de um homem que quer emagrecer preservando músculo (metas: 2.000 kcal nos dias úteis, 2.800 no fim de semana, ' + protTxt(r.dom) + ' g de proteína por dia). ' +
       'Números já calculados pelo app: ' + L.pontos.join(' ') + ' Comeu ' + nInt(r.comeu) + ' de 15.600 kcal. Avaliação do app: ' + L.nivel + '. ' +
       'Escreva só: um resumo de até 2 frases curtas que interprete esses números (sem repeti-los todos) e uma ação principal para a próxima semana. ' +
-      'Trate exceções sociais do fim de semana como normais se a semana segue no caminho; não sugira jejum, compensação nem cortes radicais; se faltam registros, diga isso. ' +
+      'Trate exceções sociais do fim de semana, de feriados e de eventos como normais se a semana segue no caminho; não sugira jejum, compensação nem cortes radicais; se faltam registros, diga isso. ' +
       'Responda com JSON: {"resumo":"texto","ajuste":"texto"}';
   }
   function fechaSemana(seg) {
@@ -4777,6 +4784,69 @@ window.MOVES = (function () {
   var foodDate = today, foodTipo = null, foodFile = null;
   var foodBusy = {}, foodBlobs = {}, foodMsg = {};
   function metaDia(d) { var w = weekday(d); return w === 0 || w === 6 ? 2800 : 2000; }
+  /* Feriados nacionais e eventos do dia: mudam a leitura (exceção prevista), não as calorias contadas. */
+  var FER_FIXOS = { '01-01': 'Confraternização Universal', '04-21': 'Tiradentes', '05-01': 'Dia do Trabalho', '09-07': 'Independência', '10-12': 'Nossa Senhora Aparecida', '11-02': 'Finados', '11-15': 'Proclamação da República', '11-20': 'Consciência Negra', '12-25': 'Natal' };
+  function pascoa(y) {
+    var a = y % 19, b = Math.floor(y / 100), c = y % 100, d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25), g = Math.floor((b - f + 1) / 3);
+    var hh = (19 * a + b - d - g + 15) % 30, i = Math.floor(c / 4), k = c % 4, l = (32 + 2 * e + 2 * i - hh - k) % 7, m = Math.floor((a + 11 * hh + 22 * l) / 451);
+    var mes = Math.floor((hh + l - 7 * m + 114) / 31), dia = ((hh + l - 7 * m + 114) % 31) + 1;
+    return y + '-' + String(mes).padStart(2, '0') + '-' + String(dia).padStart(2, '0');
+  }
+  function feriadoDe(d) {
+    if (!d) return null;
+    var f = FER_FIXOS[d.slice(5)]; if (f) return f;
+    var p = pascoa(Number(d.slice(0, 4)));
+    if (d === addDias(p, -48) || d === addDias(p, -47)) return 'Carnaval';
+    if (d === addDias(p, -2)) return 'Sexta-feira Santa';
+    if (d === addDias(p, 60)) return 'Corpus Christi';
+    return null;
+  }
+  function eventoDe(d) { var e = Store.get('eventos', d); return e && e.texto ? e : null; }
+  function diaFolga(d) { var w = weekday(d), e = eventoDe(d); return w === 0 || w === 6 || !!feriadoDe(d) || !!e; }
+  function diaRotulo(d) {
+    var w = weekday(d), f = feriadoDe(d), e = eventoDe(d);
+    var s = f ? 'feriado (' + f + ')' : w === 0 || w === 6 ? 'fim de semana' : e && e.folga ? 'folga do trabalho' : 'dia útil';
+    return e ? s + ', com evento: ' + e.texto : s;
+  }
+  function diasEspeciais(de, ate) {
+    var out = [];
+    for (var d = de; d <= ate; d = addDias(d, 1)) { var f = feriadoDe(d), e = eventoDe(d); if (f || e) out.push(dsem(d) + ' ' + br(d) + ': ' + [f ? 'feriado (' + f + ')' : '', e ? e.texto : ''].filter(Boolean).join(', ')); }
+    return out;
+  }
+  var EV_FILOSOFIA = 'Feriados, folgas e eventos (aniversário, festa, confraternização) valem como o fim de semana: a exceção é prevista, não indica rotina e não pede compensação; as calorias contam normalmente. ';
+  var evEdita = false;
+  function eventoBox() {
+    var d = foodDate, f = feriadoDe(d), e = eventoDe(d), box = h('div', { class: 'ev-box', id: 'ev-box' });
+    if (evEdita) {
+      var tx = h('input', { id: 'ev-txt', value: e ? e.texto : '', placeholder: 'Ex.: aniversário da sogra, churrasco, viagem', maxlength: '80' });
+      var fo = h('input', { type: 'checkbox', id: 'ev-folga' }); fo.checked = !!(e && e.folga);
+      var sv = h('button', { type: 'button', class: 'howbtn', id: 'ev-salvar', text: 'Salvar' });
+      var cx = h('button', { type: 'button', class: 'link', text: 'Cancelar' });
+      box.appendChild(h('label', { for: 'ev-txt', class: 'tip', text: 'Evento do dia (entra na análise; as calorias continuam contando)' }));
+      box.appendChild(tx);
+      if (!f && [0, 6].indexOf(weekday(d)) < 0) box.appendChild(h('label', { class: 'ev-chk' }, fo, h('span', { text: 'Não trabalhei (folga ou feriado local)' })));
+      var ac = h('div', { class: 'tr-acoes' }, sv, cx);
+      if (e) { var rm = h('button', { type: 'button', class: 'link', text: 'Remover evento' }); rm.addEventListener('click', function () { Store.del('eventos', d); evEdita = false; renderFood(); }); ac.appendChild(rm); }
+      box.appendChild(ac);
+      sv.addEventListener('click', function () {
+        var t = tx.value.trim();
+        if (!t) { tx.focus(); return; }
+        Store.set('eventos', d, { data: d, texto: t, folga: fo.checked, atualizado: new Date().toISOString() });
+        evEdita = false; renderFood(); salvoOk('Evento salvo');
+      });
+      cx.addEventListener('click', function () { evEdita = false; renderFood(); });
+      setTimeout(function () { tx.focus(); }, 0);
+      return box;
+    }
+    var row = h('div', { class: 'ev-row' });
+    if (f) row.appendChild(h('span', { class: 'ev-tag', text: '🇧🇷 Feriado: ' + f }));
+    if (e) row.appendChild(h('span', { class: 'ev-tag', text: '🎉 ' + e.texto + (e.folga ? ' (folga)' : '') }));
+    var bt = h('button', { type: 'button', class: 'link', id: 'ev-btn', text: e ? 'Editar evento' : '+ Evento do dia' });
+    bt.addEventListener('click', function () { evEdita = true; renderFood(); });
+    row.appendChild(bt);
+    box.appendChild(row);
+    return box;
+  }
   function nInt(v) { return Math.round(v || 0).toLocaleString('pt-BR'); }
   function tipoNome(t) { var x = FOOD_TIPOS.filter(function (o) { return o[0] === t; })[0]; return x ? x[1] : t; }
   function mealsOf(d) {
@@ -4784,7 +4854,7 @@ window.MOVES = (function () {
       .sort(function (a, b) { return (a.v.criado || '') < (b.v.criado || '') ? -1 : 1; });
   }
   function contextoLivre(doc, id) {
-    var dt = new Date(doc.data + 'T12:00:00'), fds = dt.getDay() === 0 || dt.getDay() === 6;
+    var dt = new Date(doc.data + 'T12:00:00'), fds = diaFolga(doc.data);
     var ini = new Date(dt); ini.setDate(ini.getDate() - 7);
     var de = Store.day(ini);
     var livres = sorted('refeicoes').filter(function (r) {
@@ -4792,10 +4862,9 @@ window.MOVES = (function () {
       if (r.id === id || m.data < de || m.data > doc.data) return false;
       return m.tipo === 'sobremesa' || m.tipo === 'outro' || /cervej|chopp|vinho|drink|sorvete|doce|chocolate|bolo|pizza|hamb[uú]rguer|salgad|refrigerante/i.test(m.relato || '');
     }).map(function (r) {
-      var d = new Date(r.v.data + 'T12:00:00').getDay();
-      return r.v.data.slice(8, 10) + '/' + r.v.data.slice(5, 7) + (d === 0 || d === 6 ? ' (fim de semana)' : ' (dia útil)') + ': ' + (r.v.relato || tipoNome(r.v.tipo)).slice(0, 60);
+      return r.v.data.slice(8, 10) + '/' + r.v.data.slice(5, 7) + ' (' + diaRotulo(r.v.data) + '): ' + (r.v.relato || tipoNome(r.v.tipo)).slice(0, 60);
     }).slice(-12);
-    return 'Hoje é ' + (fds ? 'fim de semana' : 'dia útil') + '. ' +
+    return 'Hoje é ' + diaRotulo(doc.data) + '. ' + EV_FILOSOFIA +
       'Filosofia do plano: o usuário aceita exceções com moderação, como 2 a 4 cervejas e uma sobremesa no fim de semana, desde que caibam na meta do dia. Exceções fazem parte do processo; o problema é quando viram regra. ' +
       'Se esta refeição for uma exceção de lazer (bebida alcoólica, sobremesa, doce, petisco), avalie pelo orçamento do dia e da semana, e não pelo valor nutricional: ' +
       'não sugira trocas, não sugira beber menos e não cobre proteína dela. ' +
@@ -5525,14 +5594,14 @@ window.MOVES = (function () {
       'Confira a conta: a sugestão não pode passar de ' + meta + ' kcal. Se o dia ficou abaixo de ' + piso + ' kcal, trate o complemento como opcional: sugira comer apenas se houver fome, diga que não é preciso comer sem fome e não elogie a economia. Se a proteína foi atingida, um dia isolado abaixo do piso pode ter nivel "bom". Só alerte se a semana mostrar vários dias abaixo do piso. ' +
       'Se passou da meta, diga em quanto e o que mais pesou, e não sugira jejum nem cortar comida no dia seguinte: o certo é seguir o plano normal. ' +
       'Não use tom de culpa e não elogie sem motivo. ' +
-      ([0, 6].indexOf(new Date(d + 'T12:00:00').getDay()) > -1 ? 'É fim de semana: cervejas e sobremesa com moderação fazem parte do plano. Se o dia ficou dentro da meta, a avaliação é "bom", sem sugerir cortes nessas exceções. Se passou um pouco, diga em quanto e lembre que a semana é o que importa, sem compensar com jejum. ' : '') +
+      (diaFolga(d) ? 'É ' + diaRotulo(d) + '. ' + EV_FILOSOFIA + 'Cervejas e sobremesa com moderação fazem parte do plano. Se o dia ficou dentro da meta, a avaliação é "bom", sem sugerir cortes nessas exceções. Se passou um pouco, diga em quanto e lembre que a semana é o que importa, sem compensar com jejum. ' : '') +
       'Responda somente com um objeto JSON neste formato: {"nivel":"bom","resumo":"texto","sugestoes":["texto"]}. ' +
       'Em nivel, use "bom" se o dia cumpriu ou está a caminho de cumprir as metas, "ok" se precisa de ajuste e "atencao" se ficou claramente fora. ' +
       'Em resumo, escreva até duas frases curtas em português. Em sugestoes, dê de zero a três ações concretas, uma frase cada.';
   }
   // Avaliação do dia feita pelo app, com as mesmas regras que antes iam no prompt da IA.
   function dayLocal(d, t) {
-    var meta = metaDia(d), piso = 1900, pm = protMeta(d), fds = [0, 6].indexOf(weekday(d)) > -1, hoje = d === Store.day();
+    var meta = metaDia(d), piso = 1900, pm = protMeta(d), fds = diaFolga(d), hoje = d === Store.day();
     var k = Math.round(t.k), p = Math.round(t.p), rest = meta - k, faltaP = pm.min - p;
     var hora = new Date().getHours(), cedo = hoje && hora < 19;
     var seg = segDe(d), wk = 0, dias = {}, abaixo = 0;
@@ -5543,6 +5612,7 @@ window.MOVES = (function () {
     else if (rest < 0 || faltaP > 0) nivel = 'ok';
     else nivel = 'bom';
     if (fds && rest >= 0 && faltaP <= 5) nivel = 'bom';
+    if (fds && (feriadoDe(d) || eventoDe(d)) && nivel === 'atencao' && rest >= -600) nivel = 'ok';
     var maior = mealsOf(d).slice().sort(function (a, b) { return (b.v.kcal || 0) - (a.v.kcal || 0); })[0];
     var r1 = 'Você comeu ' + nInt(k) + ' kcal e ' + nInt(p) + ' g de proteína.';
     if (rest >= 0) r1 += hoje ? ' Ainda cabem ' + nInt(rest) + ' kcal até a meta de ' + nInt(meta) + '.' : ' Ficou ' + nInt(rest) + ' kcal abaixo da meta de ' + nInt(meta) + '.';
@@ -5558,7 +5628,8 @@ window.MOVES = (function () {
     } else if (hoje && rest >= 0 && faltaP <= 0) {
       sug.push(k < piso ? 'Se tiver fome, um lanche com proteína magra cabe; não precisa comer sem fome.' : 'Não precisa comer mais hoje.');
     } else if (!hoje && faltaP > 0) sug.push('Amanhã reforce a proteína: inclua uma porção magra em cada refeição.');
-    if (rest < 0) sug.push(fds ? 'Fim de semana tem cerveja e sobremesa no plano; o que importa é a semana. Amanhã siga o plano normal, sem compensar.' : 'Amanhã siga o plano normal, sem compensar com jejum ou cortes.');
+    if (rest < 0 && fds && (feriadoDe(d) || eventoDe(d))) sug.push('Dia de ' + diaRotulo(d).replace(', com evento: ', ' e ') + ': exceção prevista, e as calorias contam normalmente. O que importa é a semana; amanhã siga o plano normal, sem compensar.');
+    else if (rest < 0) sug.push(fds ? 'Fim de semana tem cerveja e sobremesa no plano; o que importa é a semana. Amanhã siga o plano normal, sem compensar.' : 'Amanhã siga o plano normal, sem compensar com jejum ou cortes.');
     var mmD = macroMeta(d), mdD = macrosDia(d);
     if (mdD.g > mmD.gord.max) sug.push('Gordura em ' + nInt(mdD.g) + ' g, acima do máximo de ' + mmD.gord.max + ' g: nas próximas refeições, prefira preparo grelhado ou cozido e menos óleo, queijo e frituras.');
     if (!cedo && mdD.n && mdD.c < mmD.carbo.min) sug.push('Carboidrato em ' + nInt(mdD.c) + ' g, abaixo do mínimo de ' + mmD.carbo.min + ' g' + (mmD.treino ? ' para um dia de treino' : '') + '. Se for treinar cedo amanhã, inclua arroz, batata, aveia ou fruta no jantar.');
@@ -6036,6 +6107,7 @@ window.MOVES = (function () {
     meals.forEach(function (r) { k += r.v.kcal || 0; p += r.v.proteina_g || 0; });
     var meta = metaDia(foodDate);
     var box = $('food-sum'); box.textContent = '';
+    box.appendChild(eventoBox());
     function bar(pct, over) {
       var i = h('i', { class: over ? 'over' : '' }); i.style.width = Math.min(100, pct) + '%';
       return h('div', { class: 'track' }, i);
@@ -6899,6 +6971,7 @@ window.MOVES = (function () {
       'Corridas dos últimos 60 dias (pace em segundos por km; pkm = pace de cada km; fckm = FC média de cada km): ' + JSON.stringify(rs),
       'Pedaladas das últimas 4 semanas: ' + JSON.stringify(bikes),
       'Dias com musculação nos últimos 14 dias: ' + JSON.stringify(gym),
+      (function () { var e = diasEspeciais(addDias(hoje, -14), m.prova); return e.length ? 'Feriados e eventos (passados e previstos): ' + e.join('; ') + '. Num feriado ou evento ele pode não correr: não trate como falha; nos próximos, prefira não marcar sessão-chave ou marque opcional.' : ''; })(),
       antSes.length ? 'Sessões que você planejou para os últimos 14 dias (compare com o que foi feito): ' + JSON.stringify(antSes) : 'Ainda não havia plano anterior.',
       'Tarefas: 1) Analise a semana que passou e a tendência (pace, FC, deriva cardíaca, regularidade dos parciais) em relação à meta e ao que foi planejado. 2) Estime o tempo que ele faria hoje nos ' + m.km + ' km em esforço de prova, se houver base. 3) Detalhe as sessões SÓ de ' + trPeriodo().ini + ' a ' + trPeriodo().fim + ', seguindo a disponibilidade por dia acima (corridas de manhã). ' + (trPeriodo().fim === m.prova ? 'A prova cai nesse período: inclua-a como última sessão. ' : '') + '4) Para cada semana seguinte até a prova, dê só o título e o foco em uma frase (progressão de no máximo cerca de 10% de volume por semana e semana final mais leve). Seja realista: se a meta parecer difícil para o prazo, diga e sugira uma meta intermediária, mas mantenha o plano voltado à meta.',
       'Use português do Brasil, frases curtas e diretas (descrição de cada sessão com no máximo 140 caracteres; análise com no máximo 3 frases). Paces no formato m:ss. Não use aspas duplas dentro dos textos.',
