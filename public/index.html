@@ -5056,7 +5056,7 @@ window.MOVES = (function () {
     Object.keys(all).forEach(function (k) { var r = all[k]; if (k.charAt(0) !== '_' && r && r.total && r.nome && aliLe(r.nome).nome === t.nome) ach = r; });
     if (!ach) return null;
     var T = ach.total, base = { kcal: T.kcal || 0, p: T.proteina_g || 0, g: T.gordura_g || 0, c: T.carbo_g || 0 };
-    if (t.g) return ach.peso_g ? { nome: ach.nome, v: aliMult(base, t.g / ach.peso_g) } : null;
+    if (t.g) { var pp = recPeso(ach); return pp ? { nome: ach.nome, v: aliMult(base, t.g / pp.g) } : null; }
     var n = t.n || 1; if (t.un && t.un !== 'un' && t.un !== 'porcao') return null;
     return { nome: ach.nome, v: aliMult(base, n / (ach.porcoes || 1)) };
   }
@@ -6237,14 +6237,31 @@ window.MOVES = (function () {
   /* Receitas */
   var foodRec = { id: '', qtd: 1, un: 'porcao' }, recForm = null, recBusy = {}, recMsg = {}, recBlobs = {};
   function fmtN(v, d) { return (Math.round(v * Math.pow(10, d || 0)) / Math.pow(10, d || 0)).toLocaleString('pt-BR'); }
+  // Peso pronto da receita: o pesado pelo usuário; senão a estimativa da IA; senão a soma crua dos ingredientes.
+  function recPesoCru(r) {
+    var s = 0;
+    (r.itens || []).forEach(function (x) {
+      var q = aliNorm(x.quantidade || ''), m = q.match(/(\d+(?:[.,]\d+)?)\s*(kg|g|ml|l)\b/);
+      if (m) s += aliNumero(m[1]) * (m[2] === 'kg' || m[2] === 'l' ? 1000 : 1);
+    });
+    return s >= 50 ? Math.round(s) : null;
+  }
+  function recPeso(r) {
+    if (!r) return null;
+    if (r.peso_g) return { g: r.peso_g, est: false };
+    if (r.peso_est_g) return { g: r.peso_est_g, est: 'ia' };
+    var c = recPesoCru(r); return c ? { g: c, est: 'cru' } : null;
+  }
+  // Receita de panela (sem rendimento em porções): registra por gramas.
+  function recPorPeso(r) { return !!recPeso(r) && (r.peso_g || (r.porcoes || 1) === 1); }
   function recPor(r, qtd, un) {
-    var t = r.total || {}, f = un === 'g' ? qtd / r.peso_g : qtd / (r.porcoes || 1);
+    var pp = recPeso(r), t = r.total || {}, f = un === 'g' ? (pp ? qtd / pp.g : 0) : qtd / (r.porcoes || 1);
     return { kcal: Math.round((t.kcal || 0) * f), proteina_g: Math.round((t.proteina_g || 0) * f), gordura_g: Math.round((t.gordura_g || 0) * f), carbo_g: Math.round((t.carbo_g || 0) * f) };
   }
   function recEscolha() {
     var r = foodRec.id && Store.get('receitas', foodRec.id), q = num(foodRec.qtd);
     if (!r || !r.total || !q || q <= 0) return null;
-    var un = foodRec.un === 'g' && r.peso_g ? 'g' : 'porcao';
+    var un = foodRec.un === 'g' && recPeso(r) ? 'g' : 'porcao';
     var v = recPor(r, q, un);
     v.nome = r.nome; v.id = foodRec.id;
     v.quantidade = un === 'g' ? fmtN(q) + ' g' : fmtN(q, 2) + (q === 1 ? ' porção' : ' porções');
@@ -6270,7 +6287,7 @@ window.MOVES = (function () {
     var sel = h('select', { id: 'food-rec-sel', 'aria-label': 'Usar uma receita salva' });
     sel.appendChild(h('option', { value: '', text: 'Nenhuma receita' }));
     rs.forEach(function (r) { var o = h('option', { value: r.id, text: r.v.nome }); if (r.id === foodRec.id) o.selected = true; sel.appendChild(o); });
-    sel.addEventListener('change', function () { foodRec = { id: sel.value, qtd: 1, un: 'porcao' }; renderRecPick(); $('food-msg').textContent = ''; });
+    sel.addEventListener('change', function () { var rr = sel.value && Store.get('receitas', sel.value); foodRec = rr && recPorPeso(rr) ? { id: sel.value, qtd: 200, un: 'g' } : { id: sel.value, qtd: 1, un: 'porcao' }; renderRecPick(); $('food-msg').textContent = ''; });
     var wrap = h('div', { class: 'rec-pick' }, h('label', { for: 'food-rec-sel', text: 'Usar receita salva (opcional)' }), sel);
     wrap.appendChild(h('a', { href: '#receitas', class: 'link', text: 'Cadastrar ou editar receitas' }));
     var r = foodRec.id && Store.get('receitas', foodRec.id);
@@ -6283,7 +6300,7 @@ window.MOVES = (function () {
         res.textContent = e ? e.quantidade + ' = ' + nInt(e.kcal) + ' kcal · ' + nInt(e.proteina_g) + ' g de proteína' : 'Informe a quantidade.';
       }
       q.addEventListener('input', function () { foodRec.qtd = q.value; atual(); });
-      var uns = [['porcao', 'Porções']].concat(r.peso_g ? [['g', 'Gramas']] : []);
+      var uns = [['porcao', 'Porções']].concat(recPeso(r) ? [['g', 'Gramas']] : []);
       var ch = chips('food-rec-un', uns, foodRec.un, function (v) {
         if (!v) { $('food-rec-un-' + foodRec.un).setAttribute('aria-pressed', 'true'); return; }
         foodRec.un = v; foodRec.qtd = v === 'g' ? 200 : 1; q.value = foodRec.qtd; atual();
@@ -6299,7 +6316,8 @@ window.MOVES = (function () {
     return 'Você é um nutricionista calculando uma receita caseira de um usuário brasileiro, com valores típicos da tabela TACO e dos rótulos comuns. ' +
       'Considere as quantidades cruas ou como informadas em cada ingrediente, e o óleo ou azeite usado no preparo. ' +
       'O texto pode ter sido colado de outro app, com emojis e frases soltas; ignore o que não for receita. ' +
-      'Responda somente com um objeto JSON neste formato: {"nome":"texto","porcoes":0,"itens":[{"nome":"texto","quantidade":"texto","kcal":0,"proteina_g":0,"gordura_g":0,"carbo_g":0}],"total":{"kcal":0,"proteina_g":0,"gordura_g":0,"carbo_g":0},"observacao":"texto"}. ' +
+      'Responda somente com um objeto JSON neste formato: {"nome":"texto","porcoes":0,"itens":[{"nome":"texto","quantidade":"texto","kcal":0,"proteina_g":0,"gordura_g":0,"carbo_g":0}],"total":{"kcal":0,"proteina_g":0,"gordura_g":0,"carbo_g":0},"peso_pronto_g":0,"observacao":"texto"}. ' +
+      'Em peso_pronto_g, estime o peso da receita inteira pronta, em gramas, considerando a perda de água no cozimento (carnes perdem cerca de 25 a 35%) e o que é escorrido. ' +
       'Em porcoes, informe o rendimento: use o informado pelo usuário; se ele não informou, use o rendimento do texto ou da foto; sem nenhuma pista, use 1. Em nome, um nome curto para o prato. ' +
       'O total é a receita inteira. Em observacao, escreva no máximo uma frase dizendo o que precisou ser estimado. ' +
       (r.foto ? 'Há uma foto anexada: pode ser do prato pronto ou da receita escrita. Use-a para completar ou conferir ingredientes e quantidades, mas o texto tem prioridade. ' : '') +
@@ -6323,6 +6341,7 @@ window.MOVES = (function () {
       c.itens = Array.isArray(x.itens) ? x.itens.slice(0, 30) : [];
       c.observacao = String(x.observacao || '');
       c.calculado = new Date().toISOString();
+      c.peso_est_g = Math.round(Number(x.peso_pronto_g) || 0) || null;
       if (!c.porcoes) c.porcoes = Math.max(1, Math.round(Number(x.porcoes) || 1));
       if (!c.nome) c.nome = String(x.nome || 'Receita').slice(0, 80);
       Store.set('receitas', id, c);
@@ -6529,9 +6548,21 @@ window.MOVES = (function () {
     mais.addEventListener('click', function () { recPorc[r.id] = porc + 1; renderRec(); });
     var pv = recPor(v, porc, 'porcao');
     // Registro: por gramas quando a receita tem o peso pronto; senão, por porção.
-    if (v.peso_g) {
+    var pp = recPeso(v);
+    if (pp && v.total) {
       var g100 = recPor(v, 100, 'g');
-      it.appendChild(h('p', { class: 'rec-100', text: 'A cada 100 g: ' + nInt(g100.kcal) + ' kcal · ' + fmtN(v.total.proteina_g * 100 / v.peso_g, 1) + ' g de proteína' }));
+      it.appendChild(h('p', { class: 'rec-100', text: 'A cada 100 g: ' + nInt(g100.kcal) + ' kcal · ' + fmtN(v.total.proteina_g * 100 / pp.g, 1) + ' g de proteína' + (pp.est ? ' (estimado)' : '') }));
+      if (pp.est) {
+        var pi = h('input', { type: 'number', inputmode: 'numeric', id: 'rec-pronto-' + r.id, placeholder: String(pp.g), 'aria-label': 'Peso da receita pronta em gramas' });
+        var ps0 = h('button', { type: 'button', class: 'howbtn', id: 'rec-pronto-ok-' + r.id, text: 'Salvar peso' });
+        ps0.addEventListener('click', function () {
+          var g = num(pi.value); if (!(g > 50)) { pi.focus(); return; }
+          var c = Object.assign({}, Store.get('receitas', r.id) || v, { peso_g: Math.round(g) });
+          Store.set('receitas', r.id, c); salvoOk('Peso pronto salvo'); renderRec();
+        });
+        it.appendChild(h('p', { class: 'tip', text: pp.est === 'cru' ? 'Estimado pela soma crua dos ingredientes (' + nInt(pp.g) + ' g); carne perde água no cozimento, então o valor real por 100 g é maior. Pese a receita pronta (sem a panela) para o valor certo:' : 'Peso pronto estimado em ' + nInt(pp.g) + ' g. Pese a receita pronta (sem a panela) para o valor certo:' }));
+        it.appendChild(h('div', { class: 'rec-regg' }, h('label', { for: pi.id, text: 'Pronta (g)' }), pi, ps0));
+      }
       var gi = h('input', { type: 'number', inputmode: 'decimal', id: 'rec-reg-g-' + r.id, value: String(recGramas[r.id] || 200), 'aria-label': 'Quantos gramas' });
       var gs = h('span', { class: 'tip' });
       var atualizaG = function () { var g = num(gi.value) || 0; recGramas[r.id] = g; var x = recPor(v, g, 'g'); gs.textContent = g ? '= ' + nInt(x.kcal) + ' kcal · ' + nInt(x.proteina_g) + ' g de proteína' : ''; };
@@ -6540,13 +6571,15 @@ window.MOVES = (function () {
       regG.addEventListener('click', function () { var g = num(gi.value); if (!(g > 0)) { gi.focus(); return; } recRegistrar(r.id, g, 'g'); });
       it.appendChild(h('div', { class: 'rec-regg' }, h('label', { for: gi.id, text: 'Comi (g)' }), gi, regG));
       it.appendChild(gs);
+      if (!recPorPeso(v)) { var reg1 = h('button', { type: 'button', class: 'howbtn', id: 'rec-reg1-' + r.id, text: 'Registrar 1 porção' }); reg1.addEventListener('click', function () { recRegistrar(r.id, 1); }); it.appendChild(reg1); }
     } else {
       var reg = h('button', { type: 'button', class: 'go', id: 'rec-reg-' + r.id, text: 'Registrar 1 porção como refeição' });
       reg.addEventListener('click', function () { recRegistrar(r.id, 1); });
       it.appendChild(reg);
     }
-    it.appendChild(h('p', { class: 'tip', text: 'Rende ' + (v.porcoes || 1) + (v.porcoes === 1 ? ' porção' : ' porções') + (v.peso_g ? ' (' + nInt(v.peso_g) + ' g pronta)' : '') + '. Abaixo, ajuste para quantas porções vai cozinhar.' }));
-    it.appendChild(h('div', { class: 'rec-porc' }, menos, h('div', {}, h('b', { text: 'Cozinhar ' + fmtN(porc, 1) + (porc === 1 ? ' porção' : ' porções') }), h('span', { text: 'total ' + nInt(pv.kcal) + ' kcal · ' + nInt(pv.proteina_g) + ' g de proteína' })), mais));
+    var porPeso = recPorPeso(v);
+    it.appendChild(h('p', { class: 'tip', text: porPeso ? 'Receita de panela: você registra pelo peso que comer.' + (v.peso_g ? ' Rendeu ' + nInt(v.peso_g) + ' g pronta.' : '') + ' Abaixo, multiplique a receita para cozinhar mais.' : 'Rende ' + (v.porcoes || 1) + (v.porcoes === 1 ? ' porção' : ' porções') + (v.peso_g ? ' (' + nInt(v.peso_g) + ' g pronta)' : '') + '. Abaixo, ajuste para quantas porções vai cozinhar.' }));
+    it.appendChild(h('div', { class: 'rec-porc' }, menos, h('div', {}, h('b', { text: porPeso ? 'Cozinhar ' + fmtN(porc, 1) + 'x a receita' : 'Cozinhar ' + fmtN(porc, 1) + (porc === 1 ? ' porção' : ' porções') }), h('span', { text: 'total ' + nInt(pv.kcal) + ' kcal · ' + nInt(pv.proteina_g) + ' g de proteína' })), mais));
     var coz = h('button', { type: 'button', class: 'howbtn', id: 'rec-coz-' + r.id, text: 'Modo cozinha' });
     coz.addEventListener('click', function () { modoCozinha(v, porc); });
     var cmp = h('button', { type: 'button', class: 'howbtn', id: 'rec-cmp-' + r.id, text: 'Lista de compras' });
@@ -6644,7 +6677,7 @@ window.MOVES = (function () {
       var topo = h('button', { type: 'button', class: 'rec-topo', id: 'rec-abre-' + r.id, 'aria-expanded': String(aberta) },
         v.foto ? h('img', { src: v.foto, alt: '' }) : h('span', { class: 'rec-sem', 'aria-hidden': 'true', text: '🍲' }),
         h('span', { class: 'rec-info' }, h('b', { text: v.nome || 'Receita nova' }),
-          h('span', { text: recBusy[r.id] ? 'Calculando...' : t ? (v.peso_g ? nInt(t.kcal * 100 / v.peso_g) + ' kcal · ' + fmtN(t.proteina_g * 100 / v.peso_g, 1) + ' g prot. por 100 g' : nInt(r.p1.kcal) + ' kcal · ' + nInt(r.p1.proteina_g) + ' g prot. por porção') : (recMsg[r.id] || 'Ainda sem cálculo') }),
+          h('span', { text: recBusy[r.id] ? 'Calculando...' : t ? (recPorPeso(v) ? nInt(t.kcal * 100 / recPeso(v).g) + ' kcal · ' + fmtN(t.proteina_g * 100 / recPeso(v).g, 1) + ' g prot. por 100 g' + (recPeso(v).est ? ' (estimado)' : '') : nInt(r.p1.kcal) + ' kcal · ' + nInt(r.p1.proteina_g) + ' g prot. por porção') : (recMsg[r.id] || 'Ainda sem cálculo') }),
           h('small', { text: [v.tempo_min ? v.tempo_min + ' min' : '', r.u.n ? 'usada ' + r.u.n + (r.u.n === 1 ? ' vez' : ' vezes') + (r.u.ult ? ', última em ' + br(r.u.ult).slice(0, 5) : '') : 'ainda não usada', t && r.p1.kcal && r.p1.proteina_g * 4 / r.p1.kcal >= .3 ? 'proteína alta' : ''].filter(Boolean).join(' · ') })));
       topo.addEventListener('click', function () { recAberta = aberta ? null : r.id; renderRec(); });
       it.appendChild(h('div', { class: 'rec-head' }, topo, fav));
