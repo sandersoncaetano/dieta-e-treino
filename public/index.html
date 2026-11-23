@@ -4918,8 +4918,19 @@ window.MOVES = (function () {
   function normTxt(s) {
     return String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
   }
+  // "Idem ao café da manhã": copia a refeição desse tipo do MESMO dia, não um registro antigo.
+  var IDEM_RE = /^\s*(idem|igual|mesm[oa]s?|repet\w*|o mesmo)\b[^a-z]*(?:(?:a|ao|o|do|da|que|de|no|na)\s+)*(cafe(?: da manha)?|almoco|lanche|jantar|sobremesa)\b/;
+  var IDEM_TIPO = { cafe: 'cafe', 'cafe da manha': 'cafe', almoco: 'almoco', lanche: 'lanche', jantar: 'jantar', sobremesa: 'sobremesa' };
+  function mealIdem(relato) {
+    var n = aliNorm(relato), m = n.match(IDEM_RE); if (!m) return null;
+    var resto = String(relato).slice(m[0].length).replace(/^[\s.,;:+-]+/, '').replace(/^(de hoje|hoje)\b[\s.,;:+-]*/i, '').trim();
+    return { tipo: IDEM_TIPO[m[2]], resto: resto };
+  }
+  function mealIdemFonte(data, tipo, exceto) {
+    return mealsOf(data).filter(function (r) { return r.id !== exceto && r.v.tipo === tipo && typeof r.v.kcal === 'number' && !mealIdem(r.v.relato || ''); });
+  }
   function mealReuso(m) {
-    return m && m.relato && !m.foto && !m.receita && !(m.ajustes || []).length && typeof m.kcal === 'number' && m.origem !== 'receita';
+    return m && m.relato && !mealIdem(m.relato) && !m.foto && !m.receita && !(m.ajustes || []).length && typeof m.kcal === 'number' && m.origem !== 'receita';
   }
   function mealIgual(relato, exceto) {
     var n = normTxt(relato); if (!n) return null;
@@ -5228,6 +5239,21 @@ window.MOVES = (function () {
     var doc = Store.get('refeicoes', id);
     if (!doc) return;
     if (doc.receita && !doc.relato && !doc.foto && !(doc.ajustes || []).length) { aplicaReceitaSo(id); renderFood(); return; }
+    var idem = doc.relato && !doc.foto && !(doc.ajustes || []).length ? mealIdem(doc.relato) : null;
+    if (idem) {
+      var fonte = mealIdemFonte(doc.data, idem.tipo, id);
+      if (!fonte.length) { foodMsg[id] = 'Não achei ' + tipoNome(idem.tipo).toLowerCase() + ' registrado em ' + ddmm(doc.data) + ' para copiar. Registre ' + (idem.tipo === 'cafe' ? 'o café' : 'essa refeição') + ' primeiro ou escreva o que comeu.'; renderFood(); return; }
+      if (fonte.length === 1 && !idem.resto) {
+        copiaValores(doc, fonte[0].v);
+        doc.observacao = 'Igual ao ' + tipoNome(idem.tipo).toLowerCase() + ' de hoje (' + (fonte[0].v.relato || '').slice(0, 80) + ').';
+        doc.avaliacao = null; doc.origem = 'idem';
+        Store.set('refeicoes', id, doc); usoLocal('refeicao'); renderFood(); return;
+      }
+      // Mais de um registro desse tipo, ou algo a mais ("idem ao café + banana"): monta o relato e calcula normalmente.
+      doc.relato_original = doc.relato;
+      doc.relato = fonte.map(function (r) { return r.v.relato; }).filter(Boolean).join('. ') + (idem.resto ? '. ' + idem.resto : '');
+      Store.set('refeicoes', id, doc);
+    }
     if (!forca && doc.relato && !doc.foto && !doc.receita && !(doc.ajustes || []).length) {
       var igual = mealIgual(doc.relato, id);
       if (igual) { copiaValores(doc, igual.v); Store.set('refeicoes', id, doc); renderFood(); return; }
@@ -6826,6 +6852,15 @@ window.MOVES = (function () {
       var el = $('food-pre'), v = relEl.value.trim();
       el.textContent = '';
       if (!v) { el.hidden = true; return; }
+      var idm = mealIdem(v);
+      if (idm) {
+        var fz = mealIdemFonte(foodDate, idm.tipo), kz = fz.reduce(function (a, r) { return a + (r.v.kcal || 0); }, 0);
+        el.hidden = false;
+        el.appendChild(h('b', { text: 'Antes de calcular' }));
+        el.appendChild(h('div', { class: 'fp-it' + (fz.length ? '' : ' falta') }, h('span', { text: fz.length ? '↺ Copia o ' + tipoNome(idm.tipo).toLowerCase() + ' de hoje: ' + fz.map(function (r) { return r.v.relato; }).join(' + ').slice(0, 90) + ' · ' + nInt(kz) + ' kcal' : '⚠ Não há ' + tipoNome(idm.tipo).toLowerCase() + ' registrado neste dia para copiar.' })));
+        if (idm.resto) el.appendChild(h('div', { class: 'fp-it ia' }, h('span', { text: 'E mais: ' + idm.resto })));
+        return;
+      }
       var cal = aliCalcula(v);
       if (!cal.trechos.length) { el.hidden = true; return; }
       el.hidden = false; semQtdOk = false;
@@ -6915,7 +6950,7 @@ window.MOVES = (function () {
       e.preventDefault();
       var relato = $('food-relato').value.trim(), msg = $('food-msg'), f = foodFile;
       // Sem quantidade em algum alimento: avisa antes de calcular (com foto, a IA pode estimar pela imagem).
-      if (relato && !f && !foodLendo && !semQtdOk && !foodRec.id && !aliEstima(relato)) {
+      if (relato && !f && !foodLendo && !semQtdOk && !foodRec.id && !aliEstima(relato) && !mealIdem(relato)) {
         var falta = semQtd(aliCalcula(relato));
         if (falta.length) {
           msg.textContent = '';
