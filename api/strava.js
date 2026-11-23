@@ -164,6 +164,11 @@ function blocos(t, d, v, hr) {
     return { ini: t[sg[0]], seg: dur, m: Math.round(dist), pace: dist > 0 ? Math.round(dur / (dist / 1000)) : null, fcmax: fm || null, fc: fn ? Math.round(fs / fn) : null };
   });
   if (tiros.length < 3) return null;
+  // Começo do aquecimento ou trecho lento que passou do limite: bem mais lento que os outros tiros, fica de fora.
+  const med = (a) => a.slice().sort((x, y) => x - y)[Math.floor(a.length / 2)];
+  const pm = med(tiros.map((x) => x.pace || 9999)), mm = med(tiros.map((x) => x.m));
+  const bons = tiros.filter((x) => x.pace && x.pace <= pm * 1.1 && x.m >= mm * 0.5);
+  if (bons.length >= 3 && bons.length < tiros.length) tiros.splice(0, tiros.length, ...bons);
   const tTiros = tiros.reduce((a, x) => a + x.seg, 0), total = t[t.length - 1] - t[0];
   if (tTiros > total * 0.75) return null;
   const rec = [];

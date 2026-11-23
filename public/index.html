@@ -3529,7 +3529,7 @@ window.MOVES = (function () {
     else ve = 'estavel';
     var titulo = ve === 'atencao' ? (acimaFc ? 'Tiros acima da FC combinada' : 'Tiros perderam ritmo no fim') : ve === 'evolucao' ? 'Tiros no ritmo do plano' : 'Intervalado de ' + n + ' tiros';
     var dg = n + ' tiros de cerca de ' + mm + ' m: o 1º a ' + clock(p1) + '/km e o último a ' + clock(pn) + '/km (média de ' + clock(med) + '/km' + (faixa ? '; plano ' + s.pace : '') + ').' +
-      (recM ? ' Recuperação média de ' + clock(recM) + '.' : '') + (fcm ? ' FC máxima nos tiros: ' + fcm + ' bpm' + (teto ? ' (teto ' + teto + ').' : '.') : '') +
+      (recM ? ' Recuperação média de ' + clock(recM) + '.' : '') + (m.tiros.descartados ? ' ' + (m.tiros.descartados === 1 ? 'Um trecho mais lento (início do aquecimento) foi descartado' : m.tiros.descartados + ' trechos mais lentos foram descartados') + ' da contagem.' : '') + (fcm ? ' FC máxima nos tiros: ' + fcm + ' bpm' + (teto ? ' (teto ' + teto + ').' : '.') : '') +
       ' O pace da atividade inteira (' + clock(m.pace) + '/km) mistura tiros e recuperação e não se compara às corridas contínuas.';
     var dest = ts.map(function (x, i) { return 'Tiro ' + (i + 1) + ': ' + clock(x.pace) + '/km · ' + x.m + ' m' + (x.fcmax ? ' · FC máx ' + x.fcmax : ''); });
     var sug;
@@ -3604,7 +3604,7 @@ window.MOVES = (function () {
     var m = anaMet(id); if (!m) return;
     var sd = Store.get('strava', id);
     if (sd && ehCorrida(sd.tipo)) {
-      m.tiros = sd.tiros || null;
+      m.tiros = tirosLimpos(sd.tiros, sd.data);
       if (!sd.tirosLido && !tirosTent[id]) { tirosTent[id] = 1; carregaDet(id); }
     }
     var ant = anaAnteriores(m, 6), r = anaLocal(m, ant), velho = Store.get('analises', id);
@@ -7048,6 +7048,26 @@ window.MOVES = (function () {
     var m = String(t || '').match(/(\d+):(\d{2})(?:\s*[-–a]\s*(\d+):(\d{2}))?/); if (!m) return null;
     var a = +m[1] * 60 + +m[2], b = m[3] ? +m[3] * 60 + +m[4] : a; return [Math.min(a, b), Math.max(a, b)];
   }
+  // Tiros detectados, limpos: tira o começo do aquecimento ou um trecho lento que entrou como tiro
+  // e, se o plano do dia diz quantos tiros eram, fica com essa quantidade (os mais parecidos entre si).
+  function tirosLimpos(tb, data) {
+    if (!tb || !Array.isArray(tb.tiros) || tb.tiros.length < 3) return tb || null;
+    var med = function (a) { var o = a.slice().sort(function (x, y) { return x - y; }); return o[Math.floor(o.length / 2)]; };
+    var ts = tb.tiros.map(function (x, i) { return Object.assign({ _i: i }, x); });
+    var pm = med(ts.map(function (x) { return x.pace || 9999; })), mm = med(ts.map(function (x) { return x.m || 0; }));
+    var bons = ts.filter(function (x) { return x.pace && x.pace <= pm * 1.1 && x.m >= mm * 0.5; });
+    if (bons.length >= 3) ts = bons;
+    var sx = data && trSessaoDe(data), txt = sx ? (sx.titulo || '') + ' ' + (sx.descricao || '') : '';
+    var mq = txt.match(/(\d+)\s*(?:x|×|tiros?|repeti|vezes)/i), n = mq ? Number(mq[1]) : 0;
+    if (n >= 3 && ts.length > n) {
+      var fora = ts.slice().sort(function (a, b) { return Math.abs(b.pace - pm) - Math.abs(a.pace - pm) || a.m - b.m; }).slice(0, ts.length - n).map(function (x) { return x._i; });
+      ts = ts.filter(function (x) { return fora.indexOf(x._i) < 0; });
+    }
+    if (ts.length === tb.tiros.length) return tb;
+    var rec = [];
+    for (var i = 1; i < ts.length; i++) rec.push(ts[i].ini - (ts[i - 1].ini + ts[i - 1].seg));
+    return { tiros: ts.map(function (x) { var o = Object.assign({}, x); delete o._i; return o; }), rec: rec, descartados: tb.tiros.length - ts.length };
+  }
   function trSessaoDe(d) {
     var p = trPlano(), x = null; if (!p || !p.semanas) return null;
     p.semanas.forEach(function (w) { (w.sessoes || []).forEach(function (s) { if (s.data === d) x = s; }); }); return x;
@@ -7055,7 +7075,7 @@ window.MOVES = (function () {
   function trRetornoDe(r) {
     var s = trSessaoDe(r.data), it = [], nivel = 'bom';
     if (!s) return { nivel: 'ok', titulo: 'Corrida fora do plano', itens: ['Não havia sessão planejada para ' + dsem(r.data) + '. Tudo bem, só não some intensidade extra na semana.'] };
-    var f = trPaceFaixa(s.pace), sd = Store.get('strava', r.id), tb = sd && sd.tiros && sd.tiros.tiros;
+    var f = trPaceFaixa(s.pace), sd = Store.get('strava', r.id), tl = sd && tirosLimpos(sd.tiros, r.data), tb = tl && tl.tiros;
     if (tb && tb.length >= 3) {
       // Intervalado: compara o ritmo dos tiros, não a média com as recuperações.
       var med = Math.round(tb.reduce(function (a, x) { return a + x.pace; }, 0) / tb.length), fm = Math.max.apply(null, tb.map(function (x) { return x.fcmax || 0; }));
