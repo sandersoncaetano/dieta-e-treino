@@ -3517,8 +3517,9 @@ window.MOVES = (function () {
   }
   function pctTxt(p) { return fmtN(Math.abs(p) * 100, 0) + '%'; }
   // Corrida com tiros: analisa os tiros, não a média da atividade inteira.
+  function tirosPlano(s) { var mq = s && ((s.titulo || '') + ' ' + (s.descricao || '')).match(/(\d+)\s*(?:x|×|tiros?)/i); return mq ? Number(mq[1]) : 0; }
   function anaTiros(m) {
-    var ts = m.tiros.tiros, n = ts.length, s = trSessaoDe(m.data), faixa = s ? trPaceFaixa(s.pace) : null, teto = s && s.fc_max;
+    var ts = m.tiros.tiros, n = ts.length, s = trSessaoDe(m.data), faixa = s ? trPaceFaixa(s.pace) : null, teto = s && s.fc_max, nP = tirosPlano(s);
     var p1 = ts[0].pace, pn = ts[n - 1].pace, med = Math.round(ts.reduce(function (a, x) { return a + x.pace; }, 0) / n);
     var queda = p1 ? (pn - p1) / p1 : 0, fcm = Math.max.apply(null, ts.map(function (x) { return x.fcmax || 0; }));
     var rec = m.tiros.rec || [], recM = rec.length ? Math.round(rec.reduce(function (a, x) { return a + x; }, 0) / rec.length) : null;
@@ -3529,6 +3530,7 @@ window.MOVES = (function () {
     else ve = 'estavel';
     var titulo = ve === 'atencao' ? (acimaFc ? 'Tiros acima da FC combinada' : 'Tiros perderam ritmo no fim') : ve === 'evolucao' ? 'Tiros no ritmo do plano' : 'Intervalado de ' + n + ' tiros';
     var dg = n + ' tiros de cerca de ' + mm + ' m: o 1º a ' + clock(p1) + '/km e o último a ' + clock(pn) + '/km (média de ' + clock(med) + '/km' + (faixa ? '; plano ' + s.pace : '') + ').' +
+      (nP && nP !== n ? ' O plano pedia ' + nP + ' tiros; você fez ' + n + '.' : '') +
       (recM ? ' Recuperação média de ' + clock(recM) + '.' : '') + (m.tiros.descartados ? ' ' + (m.tiros.descartados === 1 ? 'Um trecho mais lento (início do aquecimento) foi descartado' : m.tiros.descartados + ' trechos mais lentos foram descartados') + ' da contagem.' : '') + (fcm ? ' FC máxima nos tiros: ' + fcm + ' bpm' + (teto ? ' (teto ' + teto + ').' : '.') : '') +
       ' O pace da atividade inteira (' + clock(m.pace) + '/km) mistura tiros e recuperação e não se compara às corridas contínuas.';
     var dest = ts.map(function (x, i) { return 'Tiro ' + (i + 1) + ': ' + clock(x.pace) + '/km · ' + x.m + ' m' + (x.fcmax ? ' · FC máx ' + x.fcmax : ''); });
@@ -3536,6 +3538,7 @@ window.MOVES = (function () {
     if (faixa && p1 < faixa[0] - 10) sug = 'O 1º tiro saiu a ' + clock(p1) + '/km, mais rápido que o plano (' + s.pace + '). Segure o começo: tiros parelhos rendem mais que um 1º tiro forte.';
     else if (acimaFc) sug = 'Quando a FC passar de ' + teto + ' bpm, encerre o tiro ou estique a recuperação.';
     else if (queda > .12) sug = 'Os últimos tiros caíram ' + pctTxt(queda) + ': comece um pouco mais devagar ou faça 1 tiro a menos.';
+    else if (nP && n > nP) sug = 'Bom controle, e com ' + (n - nP) + (n - nP === 1 ? ' tiro' : ' tiros') + ' a mais que o plano. Sem sinal de queda, tudo bem; no próximo, siga a quantidade do plano para não somar carga antes da hora.';
     else sug = 'Bom controle. Mantenha o mesmo ritmo e recuperação no próximo intervalado.';
     return { veredito: ve, titulo: titulo, diagnostico: dg, destaques: dest, sugestao: sug };
   }
@@ -7049,7 +7052,7 @@ window.MOVES = (function () {
     var a = +m[1] * 60 + +m[2], b = m[3] ? +m[3] * 60 + +m[4] : a; return [Math.min(a, b), Math.max(a, b)];
   }
   // Tiros detectados, limpos: tira o começo do aquecimento ou um trecho lento que entrou como tiro
-  // e, se o plano do dia diz quantos tiros eram, fica com essa quantidade (os mais parecidos entre si).
+  // (quantos tiros ele fez é o que vale, mesmo que passe do plano).
   function tirosLimpos(tb, data) {
     if (!tb || !Array.isArray(tb.tiros) || tb.tiros.length < 3) return tb || null;
     var med = function (a) { var o = a.slice().sort(function (x, y) { return x - y; }); return o[Math.floor(o.length / 2)]; };
@@ -7057,12 +7060,6 @@ window.MOVES = (function () {
     var pm = med(ts.map(function (x) { return x.pace || 9999; })), mm = med(ts.map(function (x) { return x.m || 0; }));
     var bons = ts.filter(function (x) { return x.pace && x.pace <= pm * 1.1 && x.m >= mm * 0.5; });
     if (bons.length >= 3) ts = bons;
-    var sx = data && trSessaoDe(data), txt = sx ? (sx.titulo || '') + ' ' + (sx.descricao || '') : '';
-    var mq = txt.match(/(\d+)\s*(?:x|×|tiros?|repeti|vezes)/i), n = mq ? Number(mq[1]) : 0;
-    if (n >= 3 && ts.length > n) {
-      var fora = ts.slice().sort(function (a, b) { return Math.abs(b.pace - pm) - Math.abs(a.pace - pm) || a.m - b.m; }).slice(0, ts.length - n).map(function (x) { return x._i; });
-      ts = ts.filter(function (x) { return fora.indexOf(x._i) < 0; });
-    }
     if (ts.length === tb.tiros.length) return tb;
     var rec = [];
     for (var i = 1; i < ts.length; i++) rec.push(ts[i].ini - (ts[i - 1].ini + ts[i - 1].seg));
