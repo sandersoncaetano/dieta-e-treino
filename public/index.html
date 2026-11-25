@@ -5262,12 +5262,14 @@ window.MOVES = (function () {
       if (igual) { copiaValores(doc, igual.v); Store.set('refeicoes', id, doc); renderFood(); return; }
     }
     // Relato simples (sem correções nem receita): calcula no app o que já é conhecido e pede à IA só o resto.
-    var cal = doc.relato && !doc.receita && !(doc.ajustes || []).length ? aliCalcula(doc.relato) : null;
+    var cal = doc.relato && !(doc.ajustes || []).length ? aliCalcula(doc.relato) : null;
     if (cal && !cal.trechos.length) cal = null;
+    if (cal && doc.receita && (forca || cal.faltam.length || doc.foto)) cal = null;
     var exclui = {}; (doc.ia_trechos || []).forEach(function (n) { exclui[n] = 1; });
     if (cal) cal.trechos.forEach(function (t, i) { if (exclui[t.nome] && cal.itens[i]) { cal.itens[i] = null; cal.faltam.push(i); } });
     if (cal && !forca && !cal.faltam.length && !(doc.foto && cal.temPad)) {
       doc._id = id;
+      if (doc.receita) { var rq = doc.receita; cal.itens = [{ nome: 'Receita: ' + rq.nome, quantidade: rq.quantidade, kcal: rq.kcal, proteina_g: rq.proteina_g, gordura_g: rq.gordura_g, carbo_g: rq.carbo_g }].concat(cal.itens); }
       mealAplica(doc, cal.itens, 'Calculado pelo app com alimentos que você já registrou' + (doc.foto ? '; a foto não foi analisada (toque em Recalcular para usar a IA).' : '.'));
       delete doc._id; doc.origem = 'local';
       Store.set('refeicoes', id, doc); usoLocal('refeicao'); renderFood(); return;
@@ -5338,6 +5340,8 @@ window.MOVES = (function () {
       }
       var av = r.avaliacao || {};
       cur.avaliacao = av.texto ? { nivel: ['bom', 'ok', 'atencao'].indexOf(av.nivel) > -1 ? av.nivel : 'ok', texto: String(av.texto) } : null;
+      // Com receita, a IA só viu o restante e costuma avaliar só ele: a avaliação sai da refeição inteira, no app.
+      if (cur.receita) cur.avaliacao = mealAval(cur, id, { kcal: cur.kcal, p: cur.proteina_g, g: cur.gordura_g }, cur.itens);
       cur.observacao = String(r.observacao || '');
       cur.origem = 'estimativa';
       Store.set('refeicoes', id, cur);
