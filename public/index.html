@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#1a5fd0">
+<meta name="theme-color" content="#0e1116">
 <script>
 /* Tema escolhido (claro, escuro ou automático pelo aparelho), aplicado antes de desenhar a página. */
 (function () {
@@ -11,7 +11,7 @@
     var r = document.documentElement;
     if (t === 'claro') r.setAttribute('data-theme', 'light'); else if (t === 'escuro') r.setAttribute('data-theme', 'dark'); else r.removeAttribute('data-theme');
     var esc = t === 'escuro' || (t !== 'claro' && window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches);
-    var m = document.querySelector('meta[name="theme-color"]'); if (m) m.setAttribute('content', esc ? '#0f1726' : '#1a5fd0');
+    var m = document.querySelector('meta[name="theme-color"]'); if (m) m.setAttribute('content', esc ? '#0e1116' : '#f5f6f8');
   }
   var t = 'auto'; try { t = localStorage.getItem('dt-tema') || 'auto'; } catch (e) {}
   aplica(t);
@@ -29,35 +29,38 @@
 <script src="/plataforma.js"></script>
 <title>Dieta e Treino</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&display=swap" media="print" onload="this.media='all'">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" media="print" onload="this.media='all'">
 <style>
 /* Layout: uma coluna para seguir no chão, com o celular ao lado. Cada exercício é uma faixa de tatame com a figura em movimento. */
 :root {
-  --bg: #ffffff; --surface: #f5f8fd; --mat: #e4ecf8; --line: #c6d4e8;
-  --fg: #142338; --muted: #4f5f78;
+  --bg: #f5f6f8; --surface: #ffffff; --mat: #eceff3; --line: #dde2e8;
+  --fg: #12161c; --muted: #566070;
   --fig: #1d3f72; --far: #8ba3c6; --hi: #e2570f; --hi-far: #f19a6c;
-  --accent: #1a5fd0; --on-accent: #ffffff;
+  --accent: #0e7c4d; --on-accent: #ffffff;
+  --blue: #2f6fd6; --amber: #a86a12; --ring-k: #0e7c4d; --ring-k0: #d6ece1; --ring-p: #2f6fd6; --ring-p0: #dbe6f7;
   --stop: #b3261e; --stop-bg: #f9e3e0;
-  --display: "Bricolage Grotesque", "Trebuchet MS", system-ui, sans-serif;
-  --body: "Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
+  --display: "Inter", system-ui, sans-serif;
+  --body: "Inter", "Segoe UI", system-ui, sans-serif;
   color-scheme: light;
 }
 /* Tema escuro: escolhido no menu Conta, ou automático quando o aparelho está no escuro */
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --bg: #0f1726; --surface: #16213a; --mat: #1f2d48; --line: #2e4062;
-  --fg: #e8eef9; --muted: #a6b5cd;
+  --bg: #0e1116; --surface: #171b22; --mat: #1f2530; --line: #262c36;
+  --fg: #edeff3; --muted: #9aa3b2;
   --fig: #a9c6f5; --far: #6684b3; --hi: #ff7d3f; --hi-far: #b85a2c;
-  --accent: #5c9bff; --on-accent: #0b1424;
+  --accent: #3ddc97; --on-accent: #0b2418;
+  --blue: #6ca8ff; --amber: #f2b84b; --ring-k: #3ddc97; --ring-k0: #24412f; --ring-p: #6ca8ff; --ring-p0: #1f3350;
   --stop: #ff6b5f; --stop-bg: #3b1f22;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
-    --bg: #0f1726; --surface: #16213a; --mat: #1f2d48; --line: #2e4062;
-    --fg: #e8eef9; --muted: #a6b5cd;
+    --bg: #0e1116; --surface: #171b22; --mat: #1f2530; --line: #262c36;
+    --fg: #edeff3; --muted: #9aa3b2;
     --fig: #a9c6f5; --far: #6684b3; --hi: #ff7d3f; --hi-far: #b85a2c;
-    --accent: #5c9bff; --on-accent: #0b1424;
+    --accent: #3ddc97; --on-accent: #0b2418;
+    --blue: #6ca8ff; --amber: #f2b84b; --ring-k: #3ddc97; --ring-k0: #24412f; --ring-p: #6ca8ff; --ring-p0: #1f3350;
     --stop: #ff6b5f; --stop-bg: #3b1f22;
   }
 }
@@ -615,6 +618,84 @@ footer { padding-block: 0 44px; color: var(--muted); font-size: .95rem; }
 footer .col { display: grid; gap: 10px; }
 .urgent { background: var(--stop-bg); color: var(--fg); border-radius: 10px; padding: 14px 16px; font-size: 1rem; }
 .urgent b { color: var(--stop); }
+
+/* ===== Visual A · Anéis: cartões macios, Inter, navegação embaixo ===== */
+body { font-size: 16px; -webkit-font-smoothing: antialiased; }
+h1 { font-size: clamp(1.6rem, 7vw, 2.1rem); letter-spacing: -.025em; }
+h2 { font-size: 1.25rem; letter-spacing: -.015em; }
+h3 { font-size: 1.1rem; letter-spacing: -.01em; }
+.meal h3, .lift h3 { font-size: 1.05rem; }
+main { padding-bottom: calc(110px + env(safe-area-inset-bottom, 0px)); }
+.nav { position: fixed; top: auto; bottom: 0; left: 0; right: 0; z-index: 40; border: 0; border-top: 1px solid var(--line); background: color-mix(in srgb, var(--bg) 92%, transparent); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+.nav button { height: 60px; border-bottom: 0; color: var(--muted); font-weight: 600; }
+.nav svg { width: 24px; height: 24px; stroke-width: 2; }
+.nav span { font-size: .72rem; }
+.nav button[aria-current="page"] { color: var(--accent); font-weight: 700; }
+.lift, .meal, .tr-sem, .pl-card, .rec-compras, .rec-vers, .gym-pend { border-radius: 20px; }
+.lift, .meal { padding: 16px; }
+.pl-card, .tr-sem, .rec-vers, .rec-compras { border: 0; background: var(--surface); }
+.verdict, .fech-gasto, .mini-stats div, .tr-kpis div, .rec-pick, .rec-porc, .seg, .food-pre { border-radius: 14px; }
+.notice { border-radius: 14px; }
+input, textarea, select { border-width: 1.5px; border-radius: 12px; background: var(--surface); }
+input, textarea { padding: 10px 12px; }
+.go { height: 56px; border-radius: 28px; font: 700 1.1rem var(--body); letter-spacing: -.005em; }
+.go.run { font-size: 1.8rem; }
+.howbtn { border-radius: 22px; border-width: 1.5px; height: 42px; padding: 0 16px; font-weight: 600; }
+.letter { border-radius: 14px; border-width: 1.5px; font: 800 1.2rem var(--body); }
+.rec-top, .conta-menu summary { border-radius: 14px; border-width: 1.5px; }
+.conta-menu .conta-pop { border-radius: 16px; border-width: 1px; }
+.st-bar { border-radius: 16px; }
+.st-bar button { border-radius: 22px; }
+.tr-prox { border-width: 1.5px; border-radius: 20px; }
+.tr-head { border-radius: 20px; }
+.track { height: 8px; border-radius: 4px; background: var(--mat); }
+.track i { border-radius: 4px; }
+.rest { bottom: calc(61px + env(safe-area-inset-bottom, 0px)); padding-block: 10px; border-radius: 20px 20px 0 0; }
+/* Resumo do dia: anéis + mini cartões */
+.resumo-aneis { display: flex; align-items: center; gap: 18px; }
+.aneis { flex: none; width: 124px; height: 124px; }
+.aneis svg { display: block; width: 100%; height: 100%; }
+.aneis circle { transition: stroke-dasharray .5s ease; }
+.ra-txt { display: grid; gap: 10px; min-width: 0; }
+.ra-num { display: grid; }
+.ra-num b { font-size: 2.2rem; font-weight: 800; letter-spacing: -.035em; line-height: 1; font-variant-numeric: tabular-nums; }
+.ra-num span { font-size: .85rem; color: var(--muted); }
+.ra-leg { display: grid; gap: 4px; font-size: .85rem; }
+.ra-leg span { display: flex; align-items: center; gap: 7px; }
+.ra-leg i { flex: none; width: 9px; height: 9px; border-radius: 50%; }
+.ra-k { background: var(--ring-k); } .ra-p { background: var(--ring-p); }
+.mini-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.mini-card { display: grid; gap: 5px; align-content: start; text-align: left; min-width: 0; padding: 12px; border-radius: 16px; border: 0; background: var(--mat); color: var(--fg); font: inherit; }
+.mc-nome { font-size: .78rem; color: var(--muted); font-weight: 600; }
+.mc-val { font-size: 1.2rem; font-weight: 800; letter-spacing: -.02em; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.mc-val small { font-size: .7rem; color: var(--muted); font-weight: 600; letter-spacing: 0; }
+#ev-btn { max-width: none; text-align: left; color: var(--accent); text-decoration: none; font-weight: 600; }
+.ev-box { margin: 0; }
+.mc-st { font-size: .7rem; color: var(--muted); line-height: 1.25; }
+.mini-card .track { position: relative; height: 6px; background: color-mix(in srgb, var(--fg) 10%, transparent); overflow: visible; }
+.mini-card .track i { background: var(--amber); height: 6px; }
+.mini-card.ok .track i { background: var(--accent); }
+.mini-card.acima .track i, .mini-card .track i.over { background: var(--stop); }
+.mini-card .agua-i { background: var(--blue) !important; }
+.mini-card .gauge-min { top: -2px; bottom: -2px; }
+@media (max-width: 370px) { .mini-3 { gap: 6px; } .mini-card { padding: 10px 9px; } .mc-val { font-size: 1.05rem; } .resumo-aneis { gap: 12px; } .aneis { width: 104px; height: 104px; } }
+/* Cartão da refeição: ícone, tipo e hora, total à direita */
+.meal-head { display: flex; align-items: center; gap: 12px; }
+.mh-ic { flex: none; width: 44px; height: 44px; border-radius: 14px; display: grid; place-items: center; }
+.mh-ic svg { width: 22px; height: 22px; }
+.mh-cafe { background: color-mix(in srgb, var(--amber) 16%, transparent); color: var(--amber); }
+.mh-almoco, .mh-outro { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); }
+.mh-lanche, .mh-sobremesa { background: color-mix(in srgb, var(--hi) 16%, transparent); color: var(--hi); }
+.mh-jantar { background: color-mix(in srgb, var(--blue) 18%, transparent); color: var(--blue); }
+.mh-nome { flex: 1; min-width: 0; display: grid; }
+.mh-nome h3 { font-size: 1.05rem; }
+.mh-nome span { font-size: .8rem; color: var(--muted); }
+.mh-tot { display: grid; justify-items: end; text-align: right; }
+.mh-tot b { font-size: 1.05rem; font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.mh-tot span { font-size: .8rem; color: var(--muted); white-space: nowrap; }
+.panel, .finish { border-radius: 24px; padding: 18px; }
+.agua .agua-topo b, .agua > .agua-barra { display: none; }
+.toast { bottom: calc(84px + env(safe-area-inset-bottom, 0px)); border-radius: 22px; }
 </style>
 </head>
 <body>
@@ -5478,11 +5559,25 @@ window.MOVES = (function () {
       h('p', { class: 'tip', text: 'Se você mudar o texto ou a foto, o cálculo e a avaliação são refeitos. Trocar só o tipo mantém os valores.' }),
       save, emsg, cancel);
   }
+  var MEAL_IC = (function () {
+    var w = function (d) { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + d + '</svg>'; };
+    return {
+      cafe: w('<path d="M17 8h1a4 4 0 010 8h-1"/><path d="M3 8h14v9a4 4 0 01-4 4H7a4 4 0 01-4-4z"/><path d="M6 2v3M10 2v3M14 2v3"/>'),
+      almoco: w('<path d="M7 3v8a2 2 0 002 2v8M4 3v6a3 3 0 003 3M10 3v6M17 3c-2 2-3 5-3 8h3v10"/>'),
+      lanche: w('<path d="M12 7c3-3 7-1 7 4 0 5-4 10-7 10S5 16 5 11c0-5 4-7 7-4z"/><path d="M12 7c0-2 1-4 3-4"/>'),
+      sobremesa: w('<path d="M7 11a5 5 0 0110 0"/><path d="M5 11h14l-2 9H7z"/>'),
+      jantar: w('<path d="M20 14.5A8 8 0 019.5 4 7 7 0 1020 14.5z"/>'),
+      outro: w('<circle cx="12" cy="12" r="8"/><path d="M12 8v8M8 12h8"/>')
+    };
+  })();
   function mealCard(id, m) {
     if (foodEdit && foodEdit.id === id) return mealEdit(id, m);
-    var total = h('strong', { text: m.kcal === null || m.kcal === undefined ? (foodBusy[id] ? 'Calculando...' : 'Sem cálculo') : nInt(m.kcal) + ' kcal · ' + nInt(m.proteina_g) + ' g de proteína' });
+    var semK = m.kcal === null || m.kcal === undefined;
+    var total = h('div', { class: 'mh-tot' }, h('b', { text: semK ? (foodBusy[id] ? 'Calculando...' : 'Sem cálculo') : nInt(m.kcal) + ' kcal' }), semK ? null : h('span', { text: nInt(m.proteina_g) + ' g prot.' }));
+    var hr = m.criado ? new Date(m.criado) : null, hrs = hr && !isNaN(hr) ? String(hr.getHours()).padStart(2, '0') + ':' + String(hr.getMinutes()).padStart(2, '0') : '';
+    var ic = h('span', { class: 'mh-ic mh-' + (m.tipo || 'outro'), 'aria-hidden': 'true' }); ic.innerHTML = MEAL_IC[m.tipo] || MEAL_IC.outro;
     var card = h('article', { class: 'meal' },
-      h('div', { class: 'lift-head' }, h('h3', { text: tipoNome(m.tipo) }), total),
+      h('div', { class: 'meal-head' }, ic, h('div', { class: 'mh-nome' }, h('h3', { text: tipoNome(m.tipo) }), hrs ? h('span', { text: hrs }) : null), total),
       m.foto ? h('img', { src: m.foto, alt: 'Foto: ' + tipoNome(m.tipo) }) : null,
       m.relato ? h('p', { text: m.relato }) : null);
     if (m.itens && m.itens.length) {
@@ -6149,24 +6244,40 @@ window.MOVES = (function () {
       return h('div', { class: 'track' }, i);
     }
     var left = meta - k, pm = protMeta(foodDate);
-    box.appendChild(h('div', { class: 'gauge' },
-      h('div', { class: 'gauge-top' }, h('strong', { text: nInt(k) + ' de ' + nInt(meta) + ' kcal' }), h('span', { text: left >= 0 ? 'Faltam ' + nInt(left) : nInt(-left) + ' acima' })),
-      bar(k / meta * 100, left < 0)));
-    box.appendChild(h('div', { class: 'gauge' },
-      h('div', { class: 'gauge-top' }, h('strong', { text: nInt(p) + ' g de proteína' }), h('span', { text: p >= pm.min ? 'Meta atingida' : 'Faltam ' + nInt(pm.min - p) + ' a ' + nInt(pm.max - p) + ' g' })),
-      bar(p / pm.min * 100, false)));
+    // Anéis: calorias (fora) e proteína (dentro).
+    var C1 = 2 * Math.PI * 56, C2 = 2 * Math.PI * 40, fk = Math.min(1, k / meta), fp = Math.min(1, p / pm.min);
+    var an = h('div', { class: 'aneis', role: 'img', 'aria-label': nInt(k) + ' de ' + nInt(meta) + ' kcal e ' + nInt(p) + ' de ' + pm.min + ' g de proteína' });
+    an.innerHTML = '<svg viewBox="0 0 128 128" aria-hidden="true">' +
+      '<circle cx="64" cy="64" r="56" fill="none" stroke="var(--ring-k0)" stroke-width="12"/>' +
+      '<circle cx="64" cy="64" r="56" fill="none" stroke="' + (left < 0 ? 'var(--stop)' : 'var(--ring-k)') + '" stroke-width="12" stroke-linecap="round" stroke-dasharray="' + (C1 * fk).toFixed(1) + ' ' + C1.toFixed(1) + '" transform="rotate(-90 64 64)"/>' +
+      '<circle cx="64" cy="64" r="40" fill="none" stroke="var(--ring-p0)" stroke-width="12"/>' +
+      '<circle cx="64" cy="64" r="40" fill="none" stroke="var(--ring-p)" stroke-width="12" stroke-linecap="round" stroke-dasharray="' + (C2 * fp).toFixed(1) + ' ' + C2.toFixed(1) + '" transform="rotate(-90 64 64)"/></svg>';
+    box.appendChild(h('div', { class: 'resumo-aneis' }, an,
+      h('div', { class: 'ra-txt' },
+        h('div', { class: 'ra-num' }, h('b', { text: nInt(Math.abs(left)) }), h('span', { text: left >= 0 ? 'kcal restantes de ' + nInt(meta) : 'kcal acima da meta de ' + nInt(meta) })),
+        h('div', { class: 'ra-leg' },
+          h('span', {}, h('i', { class: 'ra-k' }), document.createTextNode(nInt(k) + ' kcal comidas')),
+          h('span', {}, h('i', { class: 'ra-p' }), document.createTextNode(nInt(p) + ' g de proteína · ' + (p >= pm.min ? 'meta atingida' : 'meta ' + pm.min)))))));
     // Gordura e carboidrato: faixa mínima e máxima; a barra mostra onde está dentro do máximo.
     var mm = macroMeta(foodDate), md = macrosDia(foodDate), hj = foodDate === today;
     function faixa(nome, v, f) {
       var txt = v > f.max ? nInt(v - f.max) + ' g acima do máximo' : v >= f.min ? 'Dentro da faixa' : hj ? 'Faltam ' + nInt(f.min - v) + ' g para o mínimo' : 'Abaixo do mínimo';
       var i = h('i', { class: v > f.max ? 'over' : '' }); i.style.width = Math.min(100, v / f.max * 100) + '%';
       var mk = h('b', { class: 'gauge-min', 'aria-hidden': 'true' }); mk.style.left = (f.min / f.max * 100) + '%';
-      return h('div', { class: 'gauge gauge-mini' },
-        h('div', { class: 'gauge-top' }, h('strong', { text: nInt(v) + ' g de ' + nome }), h('span', { text: txt })),
+      return h('div', { class: 'mini-card' + (v > f.max ? ' acima' : v >= f.min ? ' ok' : '') },
+        h('span', { class: 'mc-nome', text: nome }),
+        h('b', { class: 'mc-val' }, document.createTextNode(nInt(v)), h('small', { text: ' / ' + f.min + '–' + f.max + ' g' })),
         h('div', { class: 'track' }, i, mk),
-        h('small', { class: 'gauge-faixa', text: 'Faixa: ' + f.min + ' a ' + f.max + ' g' }));
+        h('span', { class: 'mc-st', text: txt }));
     }
-    box.appendChild(h('div', { class: 'gauge-2' }, faixa('gordura', md.g, mm.gord), faixa('carboidrato', md.c, mm.carbo)));
+    var aT = aguaTotal(foodDate), aM = aguaMeta(foodDate), ai = h('i', { class: 'agua-i' }); ai.style.width = Math.min(100, aT / aM * 100) + '%';
+    var agC = h('button', { type: 'button', class: 'mini-card mc-agua', 'aria-label': 'Água: ' + fmtN(aT / 1000, 1) + ' de ' + fmtN(aM / 1000, 1) + ' litros. Ir para o registro de água' },
+      h('span', { class: 'mc-nome', text: 'Água' }),
+      h('b', { class: 'mc-val' }, document.createTextNode(fmtN(aT / 1000, 1)), h('small', { text: ' / ' + fmtN(aM / 1000, 1) + ' L' })),
+      h('div', { class: 'track' }, ai),
+      h('span', { class: 'mc-st', text: aT >= aM ? 'Meta atingida' : 'Faltam ' + fmtN((aM - aT) / 1000, 1) + ' L' }));
+    agC.addEventListener('click', function () { var b = $('agua-box'); if (b) b.scrollIntoView({ behavior: 'smooth', block: 'center' }); });
+    box.appendChild(h('div', { class: 'mini-3' }, faixa('Gordura', md.g, mm.gord), faixa('Carboidrato', md.c, mm.carbo), agC));
     var mon = new Date(today + 'T12:00:00'); mon.setDate(mon.getDate() - ((mon.getDay() + 6) % 7));
     var from = Store.day(mon), wk = 0, days = {};
     sorted('refeicoes').forEach(function (r) { if (r.v.data >= from) { wk += r.v.kcal || 0; days[r.v.data] = 1; } });
@@ -6191,6 +6302,7 @@ window.MOVES = (function () {
   function aguaAdd(d, rec, ml) {
     var a = aguaDia(d); a = { data: d, registros: a.registros.concat([{ t: new Date().toISOString(), ml: ml, rec: rec }]) };
     Store.set('agua', d, a);
+    if (d === foodDate) try { renderFoodSummary(); } catch (e) {}
   }
   function renderAgua() {
     var box = $('agua-box'); if (!box) return;
