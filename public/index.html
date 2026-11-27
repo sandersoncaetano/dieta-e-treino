@@ -695,13 +695,34 @@ input, textarea { padding: 10px 12px; }
 .mh-tot span { font-size: .8rem; color: var(--muted); white-space: nowrap; }
 .panel, .finish { border-radius: 24px; padding: 18px; }
 .agua .agua-topo b, .agua > .agua-barra { display: none; }
+/* Visual A · demais telas: controles preenchidos, sem bordas duras */
+.intro { padding-block: 16px 6px; }
+.intro .col { gap: 8px; }
+#hoje { order: -1; font-size: .85rem; font-weight: 600; color: var(--muted); }
+.titlebar h1 { font-size: 1.75rem; }
+.letter, .stepper button, .pip, .freq, .dur, .rest-step button, .wk-nav, .cal-head button, .g-exp, .g-per button, .rec-fav, .pl-chip, .rec-top, .conta-menu summary { border: 0; background: var(--mat); color: var(--fg); }
+.letter, .stepper button, .pip, .rest-step button, .wk-nav, .cal-head button, .g-exp, .rec-fav { border-radius: 14px; }
+.freq, .dur, .g-per button, .pl-chip { border-radius: 999px; }
+.g-exp { color: var(--accent); }
+.letter[aria-pressed="true"], .g-per button[aria-pressed="true"], .pip[aria-pressed="true"], .dur[aria-pressed="true"], .pl-chip[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); }
+.wk-day { border: 0; background: var(--mat); border-radius: 14px; }
+.wk-day.sel { color: var(--on-accent); }
+.cal-day { border-radius: 12px; border-width: 1.5px; }
+.cal-day.none { border-color: transparent; background: color-mix(in srgb, var(--mat) 55%, transparent); }
+.cal-day.sel { border-color: var(--accent); }
+.d-item, .food-pre { border-color: transparent; background: var(--mat); border-radius: 16px; }
+.now { outline-width: 2px; outline-offset: 2px; border-radius: 20px; }
+.lift.now, .ex.now { background: color-mix(in srgb, var(--accent) 10%, var(--surface)); }
+.seg { background: var(--mat); padding: 4px; border-radius: 16px; }
+.seg button { border-radius: 12px; }
+.howto summary, details > summary { cursor: pointer; }
 .toast { bottom: calc(84px + env(safe-area-inset-bottom, 0px)); border-radius: 22px; }
 </style>
 </head>
 <body>
 
 <header class="intro gut"><div class="col">
-  <div class="titlebar"><h1>Dieta e Treino</h1>
+  <div class="titlebar"><h1 id="v-titulo">Treino</h1>
   <button type="button" class="rec-top" id="t-receitas" aria-label="Minhas receitas"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3.5h11.5a2 2 0 0 1 2 2V20.5H7a2 2 0 0 1-2-2z"/><path d="M5 18.5a2 2 0 0 1 2-2h11.5"/><path d="M9.5 7v4.5M11.5 7v4.5M9.5 9.5h2M14.5 7c-1 .6-1.2 2-1.2 3h1.2v1.5"/></svg><span>Receitas</span></button></div>
   <p id="hoje"></p>
 </div></header>
@@ -7477,6 +7498,9 @@ window.MOVES = (function () {
       var b = $('t-' + t); if (b) b.setAttribute('aria-current', (t === 'treino' ? noTreino : t === v) ? 'page' : 'false');
     });
     $('treino-seg-box').hidden = !noTreino;
+    var TIT = { refeicoes: 'Refeições', peso: 'Medidas', historico: 'Histórico', desempenho: 'Evolução', receitas: 'Receitas' };
+    $('v-titulo').textContent = noTreino ? 'Treino' : TIT[v] || 'Dieta e Treino';
+    document.title = $('v-titulo').textContent + ' · Dieta e Treino';
     // Alerta de sinais de urgência da lombar: só na tela do pilates.
     var rod = document.querySelector('body > footer'); if (rod) rod.hidden = v !== 'lombar';
     TREINO.forEach(function (t) { $('ts-' + t).setAttribute('aria-selected', String(t === v)); });
