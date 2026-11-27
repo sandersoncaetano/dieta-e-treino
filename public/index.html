@@ -731,6 +731,8 @@ input, textarea { padding: 10px 12px; }
 .stop, .urgent, .pending { background: var(--stop-bg); border-radius: 16px; }
 .verdict { border-radius: 16px; padding: 12px 14px; }
 .verdict .link { max-width: none; text-align: left; justify-self: start; color: var(--accent); text-decoration: none; font-weight: 600; }
+.meal-obs { color: var(--muted); font-size: .9rem; font-style: italic; }
+#fe-obs { width: 100%; margin-top: 8px; }
 .toast { bottom: calc(84px + env(safe-area-inset-bottom, 0px)); border-radius: 22px; }
 </style>
 </head>
@@ -827,6 +829,7 @@ input, textarea { padding: 10px 12px; }
       <div id="food-tipo"></div>
       <div id="food-freq" hidden></div>
       <div class="field"><label for="food-relato">O que você comeu</label><textarea id="food-relato" rows="3" placeholder="Ex.: 85 g de arroz, 78 g de feijão e 95 g de lombo"></textarea></div>
+      <div class="field field-obs"><label for="food-obs">Observação <span class="tip">(opcional)</span></label><input id="food-obs" maxlength="160" placeholder="Ex.: não comi a gordura, sem balança, peso do prato 450 g"></div>
       <div id="food-sug" class="freq-list sug" hidden></div>
       <div id="food-pre" class="food-pre" aria-live="polite" hidden></div>
       <p class="tip">Para ditar, toque no campo e use o microfone do teclado.</p>
@@ -5023,7 +5026,7 @@ window.MOVES = (function () {
       'Em texto, escreva até duas frases curtas em português: diga qual alimento mais pesou ou mais ajudou, com o motivo (gordura, calorias, pouca proteína, boa proteína) e, se couber, uma troca concreta. ' +
       'Seja específico e honesto: não elogie sem motivo, não exagere e não use tom de culpa. ' +
       contextoLivre(doc, id) +
-      'Refeição: ' + tipoNome(doc.tipo) + '. Relato: ' + (doc.relato || '(sem relato, use a foto)') + ajustesTexto(doc) +
+      'Refeição: ' + tipoNome(doc.tipo) + '. Relato: ' + (doc.relato || '(sem relato, use a foto)') + (mealObs(doc).length ? '. Observações do usuário (não são alimentos; ajuste o cálculo por elas): ' + mealObs(doc).join('; ') : '') + ajustesTexto(doc) +
       (doc.receita ? ' Atenção: a receita "' + doc.receita.nome + '" (' + doc.receita.quantidade + ', ' + doc.receita.kcal + ' kcal e ' + doc.receita.proteina_g + ' g de proteína) já foi calculada e será somada depois. Não a inclua nos itens nem nos totais; calcule só o restante. Na avaliacao, considere a refeição inteira, somando a receita.' : '');
   }
   function ajustesTexto(doc) {
@@ -5107,6 +5110,8 @@ window.MOVES = (function () {
   var ALI_ESTIMA = /balanca|vide (a )?foto|ver (a )?foto|pela foto|a olho|estim(e|ar|ado)/;
   function aliNota(x) { return ALI_NOTA.test(aliNorm(x).replace(/^[^a-z]+/, '').trim()); }
   function aliNotas(relato) { return String(relato || '').replace(/\r/g, '').split(/\n|;|(?<!\d)[.,]|[.,](?!\d)/).map(function (x) { return x.trim(); }).filter(function (x) { return x && aliNota(x); }); }
+  // Observações da refeição: o campo próprio mais as notas que vierem no relato.
+  function mealObs(doc) { return [doc && doc.obs].concat(aliNotas(doc && doc.relato)).filter(Boolean); }
   function aliEstima(relato) { return ALI_ESTIMA.test(aliNorm(relato)); }
   function aliTrechos(relato) {
     var partes = String(relato || '').replace(/\r/g, '').replace(/\(([^)]*)\)/g, function (m, x) { return '(' + x.replace(/(?<!\d)[.,]|[.,](?!\d)|[;+]/g, ' ') + ')'; }).split(/\n|;|\+|(?<!\d)[.,]|[.,](?!\d)/);
@@ -5240,7 +5245,7 @@ window.MOVES = (function () {
     var n = 0;
     sorted('refeicoes').forEach(function (r) {
       var m = r.v;
-      if (!m.relato || (m.ajustes || []).length || m.receita || m.origem === 'receita' || m.origem === 'local' || !Array.isArray(m.itens)) return;
+      if (!m.relato || m.obs || (m.ajustes || []).length || m.receita || m.origem === 'receita' || m.origem === 'local' || !Array.isArray(m.itens)) return;
       var its = m.itens.filter(function (x) { return !/^Receita:/.test(x.nome || ''); }), ts = aliTrechos(m.relato).map(aliLe);
       if (its.length !== ts.length) return;
       ts.forEach(function (t, i) {
@@ -5283,7 +5288,7 @@ window.MOVES = (function () {
     return 'Você é um nutricionista estimando uma refeição de um adulto brasileiro. ' +
       'Use as quantidades informadas e valores típicos da tabela TACO; quando faltar quantidade, estime pela foto ou por uma porção comum. ' +
       'Bebidas: use o valor da marca quando houver; cerveja pilsen comum (Heineken, Brahma, Skol, Amstel) tem cerca de 42 kcal, 3,2 g de carboidrato e 0,4 g de proteína por 100 ml (lata 350 ml = 150 kcal; latão 473 ml = 200 kcal); vinho cerca de 85 kcal por 100 ml; destilado cerca de 230 kcal por 100 ml. ' +
-      (aliNotas(doc.relato).length ? 'Observações do usuário: ' + aliNotas(doc.relato).join('; ') + '. ' : '') +
+      (mealObs(doc).length ? 'Observações do usuário (não são alimentos; ajuste o cálculo por elas): ' + mealObs(doc).join('; ') + '. ' : '') +
       'Referências deste usuário: whey Black Skull 100% HD, 1 scoop de 35 g = 129 kcal e 21 g de proteína. ' +
       'Trechos do relato (' + tipoNome(doc.tipo) + '):\n' + lista + '\n' +
       'Calcule SÓ os trechos sem valor. Para cada um, devolva um item com o número do trecho, um nome curto e claro do alimento, a quantidade, os gramas considerados e os valores totais desse trecho. ' +
@@ -5389,12 +5394,13 @@ window.MOVES = (function () {
       doc.relato = fonte.map(function (r) { return r.v.relato; }).filter(Boolean).join('. ') + (idem.resto ? '. ' + idem.resto : '');
       Store.set('refeicoes', id, doc);
     }
-    if (!forca && doc.relato && !doc.foto && !doc.receita && !(doc.ajustes || []).length) {
+    if (!forca && doc.relato && !doc.obs && !doc.foto && !doc.receita && !(doc.ajustes || []).length) {
       var igual = mealIgual(doc.relato, id);
       if (igual) { copiaValores(doc, igual.v); Store.set('refeicoes', id, doc); renderFood(); return; }
     }
     // Relato simples (sem correções nem receita): calcula no app o que já é conhecido e pede à IA só o resto.
-    var cal = doc.relato && !(doc.ajustes || []).length ? aliCalcula(doc.relato) : null;
+    // Com observação ("não comi a gordura"), a IA ajusta os valores: o cálculo local ignoraria isso.
+    var cal = doc.relato && !doc.obs && !(doc.ajustes || []).length ? aliCalcula(doc.relato) : null;
     if (cal && !cal.trechos.length) cal = null;
     if (cal && doc.receita && (forca || cal.faltam.length || doc.foto)) cal = null;
     var exclui = {}; (doc.ia_trechos || []).forEach(function (n) { exclui[n] = 1; });
@@ -5430,7 +5436,7 @@ window.MOVES = (function () {
           var xs = porT[i + 1] || [];
           xs.forEach(function (x) { itens.push({ nome: String(x.nome || t.txt), quantidade: String(x.quantidade || aliQtd(t)), kcal: Number(x.kcal) || 0, proteina_g: Number(x.proteina_g) || 0, gordura_g: Number(x.gordura_g) || 0, carbo_g: Number(x.carbo_g) || 0 }); });
           // Aprende quando o trecho virou um item só.
-          if (xs.length === 1) aliAprende(t, { kcal: Number(xs[0].kcal), p: Number(xs[0].proteina_g) || 0, g: Number(xs[0].gordura_g) || 0, c: xs[0].carbo_g != null ? Number(xs[0].carbo_g) : null, gramas: Number(xs[0].gramas) || null }, String(xs[0].nome || ''), 'ia', !!forca || !!exclui[t.nome]);
+          if (xs.length === 1 && !doc.obs) aliAprende(t, { kcal: Number(xs[0].kcal), p: Number(xs[0].proteina_g) || 0, g: Number(xs[0].gordura_g) || 0, c: xs[0].carbo_g != null ? Number(xs[0].carbo_g) : null, gramas: Number(xs[0].gramas) || null }, String(xs[0].nome || ''), 'ia', !!forca || !!exclui[t.nome]);
         });
         (porT[0] || []).forEach(function (x) { itens.push({ nome: String(x.nome || 'Item da foto'), quantidade: String(x.quantidade || ''), kcal: Number(x.kcal) || 0, proteina_g: Number(x.proteina_g) || 0, gordura_g: Number(x.gordura_g) || 0, carbo_g: Number(x.carbo_g) || 0 }); });
         if (!itens.length || cal.faltam.some(function (i) { return !(porT[i + 1] || []).length; })) throw new Error('itens');
@@ -5537,14 +5543,17 @@ window.MOVES = (function () {
     var ta = h('textarea', { id: 'fe-relato', rows: '4' });
     ta.value = e.relato;
     ta.addEventListener('input', function () { e.relato = ta.value; });
+    var ob = h('input', { id: 'fe-obs', maxlength: '160', placeholder: 'Observação (opcional)', 'aria-label': 'Observação' });
+    ob.value = e.obs || '';
+    ob.addEventListener('input', function () { e.obs = ob.value; });
     var save = h('button', { type: 'button', class: 'go', id: 'fe-save', text: 'Salvar' });
     save.addEventListener('click', function () {
       var c = Store.get('refeicoes', id); if (!c) return;
-      var relato = e.relato.trim(), changed = relato !== (c.relato || '');
+      var relato = e.relato.trim(), obs = (e.obs || '').trim(), changed = relato !== (c.relato || '') || obs !== (c.obs || '');
       if (!e.tipo) { emsg.textContent = 'Escolha a refeição.'; return; }
       if (e.lendo) { emsg.textContent = 'Aguarde a foto terminar de carregar.'; return; }
       if (!relato && !c.foto && !e.jpg) { emsg.textContent = 'Escreva o que comeu ou adicione uma foto.'; return; }
-      c.tipo = e.tipo; c.relato = relato;
+      c.tipo = e.tipo; c.relato = relato; if (obs) c.obs = obs; else delete c.obs;
       if (!e.jpg) {
         Store.set('refeicoes', id, c);
         foodEdit = null;
@@ -5603,7 +5612,7 @@ window.MOVES = (function () {
         if (!v) { $('fe-t-' + e.tipo).setAttribute('aria-pressed', 'true'); return; }
         e.tipo = v; emsg.textContent = '';
       }),
-      h('div', { class: 'field' }, h('label', { for: 'fe-relato', text: 'O que você comeu' }), ta),
+      h('div', { class: 'field' }, h('label', { for: 'fe-relato', text: 'O que você comeu' }), ta, ob),
       h('p', { class: 'tip', text: 'Para ditar, toque no campo e use o microfone do teclado.' }),
       h('div', { class: 'photo-row' }, h('div', { class: 'pick-wrap' }, h('button', { type: 'button', class: 'howbtn', tabindex: '-1', text: m.foto ? 'Trocar foto' : 'Adicionar foto' }), fi), fn),
       fp,
@@ -5630,7 +5639,7 @@ window.MOVES = (function () {
     var card = h('article', { class: 'meal' },
       h('div', { class: 'meal-head' }, ic, h('div', { class: 'mh-nome' }, h('h3', { text: tipoNome(m.tipo) }), hrs ? h('span', { text: hrs }) : null), total),
       m.foto ? h('img', { src: m.foto, alt: 'Foto: ' + tipoNome(m.tipo) }) : null,
-      m.relato ? h('p', { text: m.relato }) : null);
+      m.relato ? h('p', { text: m.relato }) : null, m.obs ? h('p', { class: 'meal-obs', text: 'Obs.: ' + m.obs }) : null);
     if (m.itens && m.itens.length) {
       var ul = h('ul', { class: 'itens' });
       m.itens.forEach(function (i) {
@@ -5671,7 +5680,7 @@ window.MOVES = (function () {
       renderFood();
     });
     var edt = h('button', { type: 'button', class: 'howbtn', id: 'fedit-' + id, text: 'Editar' });
-    edt.addEventListener('click', function () { foodEdit = { id: id, tipo: m.tipo, relato: m.relato || '' }; renderFood(); });
+    edt.addEventListener('click', function () { foodEdit = { id: id, tipo: m.tipo, relato: m.relato || '', obs: m.obs || '' }; renderFood(); });
     if (m.ajustes && m.ajustes.length) {
       var ula = h('ul', { class: 'itens' });
       m.ajustes.forEach(function (a) { ula.appendChild(h('li', { text: a.texto + (a.foto ? ' (com foto das sobras)' : '') })); });
@@ -7126,9 +7135,9 @@ window.MOVES = (function () {
 
     $('food-form').addEventListener('submit', function (e) {
       e.preventDefault();
-      var relato = $('food-relato').value.trim(), msg = $('food-msg'), f = foodFile;
+      var relato = $('food-relato').value.trim(), obs = $('food-obs').value.trim(), msg = $('food-msg'), f = foodFile;
       // Sem quantidade em algum alimento: avisa antes de calcular (com foto, a IA pode estimar pela imagem).
-      if (relato && !f && !foodLendo && !semQtdOk && !foodRec.id && !aliEstima(relato) && !mealIdem(relato)) {
+      if (relato && !f && !foodLendo && !semQtdOk && !foodRec.id && !aliEstima(relato + ' ' + obs) && !mealIdem(relato)) {
         var falta = semQtd(aliCalcula(relato));
         if (falta.length) {
           msg.textContent = '';
@@ -7152,6 +7161,7 @@ window.MOVES = (function () {
       var id = foodDate + '_' + Date.now();
       var doc = { data: foodDate, tipo: foodTipo, relato: relato, kcal: null, proteina_g: null, itens: [], criado: new Date().toISOString() };
       if (rec) doc.receita = rec;
+      if (obs) doc.obs = obs;
       var exNomes = Object.keys(preExclui); if (exNomes.length && relato) doc.ia_trechos = exNomes;
       var btn = $('food-save'); btn.disabled = true; msg.textContent = 'Salvando...';
       var ready = f ? storePhoto(f).then(function (ph) {
@@ -7164,7 +7174,7 @@ window.MOVES = (function () {
         if (!relato && !doc.foto && !rec) { msg.textContent = 'Não consegui usar a foto (' + photoInfo(f) + '), e nada foi salvo. Escreva o que comeu.'; return; }
         Store.set('refeicoes', id, doc);
         foodRec = { id: '', qtd: 1, un: 'porcao' }; renderRecPick();
-        $('food-relato').value = ''; file.value = ''; foodFile = null; name.textContent = '';
+        $('food-relato').value = ''; $('food-obs').value = ''; file.value = ''; foodFile = null; name.textContent = '';
         preExclui = {}; semQtdOk = false; renderPre();
         foodErro = ''; prev.hidden = true;
         tipoChips();
