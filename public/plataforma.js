@@ -62,7 +62,7 @@
         '<button type="button" id="pl-entrar" style="font:inherit;font-weight:700;padding:12px;border-radius:10px;border:0;background:var(--accent,#1a5fd0);color:#fff">Entrar com senha</button>' +
         '<button type="submit" style="font:inherit;font-weight:700;padding:12px;border-radius:10px;border:2px solid var(--accent,#1a5fd0);background:transparent;color:inherit">Receber link de acesso por e-mail</button>' +
         '<p id="pl-msg" aria-live="polite" style="margin:0"></p>' +
-        '<p style="margin:4px 0 0;text-align:center">Ainda não tem acesso? <button type="button" id="pl-pedir" style="font:inherit;font-weight:700;border:0;background:none;color:var(--accent,#1a5fd0);padding:6px;cursor:pointer">Pedir acesso</button></p></form>';
+        '<p style="margin:4px 0 0;font-size:.9rem;color:var(--muted,#555)">O acesso é só por convite. Se alguém te indicou o app, peça o link de convite.</p></form>';
       document.body.appendChild(box);
       var form = box.querySelector('form'), msg = box.querySelector('#pl-msg');
       form.addEventListener('submit', function (ev) {
@@ -81,7 +81,8 @@
           if (r.error) msg.textContent = 'Não consegui entrar: ' + (r.error.message === 'Invalid login credentials' ? 'e-mail ou senha incorretos.' : r.error.message);
         });
       });
-      box.querySelector('#pl-pedir').addEventListener('click', function () { telaPedido(box); });
+      var cv = new URLSearchParams(location.search).get('convite');
+      if (cv) telaConvite(sb, box, cv.toLowerCase());
       sb.auth.onAuthStateChange(function (_ev, s) { if (s) { box.remove(); resolve(s); } });
     });
   }
@@ -89,38 +90,47 @@
   /* Pedido de acesso: a conta nasce "pendente" e só entra depois da aprovação */
   var EST_IN = 'font:inherit;padding:12px;border-radius:10px;border:2px solid var(--line,#c6d4e8);background:var(--surface,#fff);color:inherit';
   var EST_BT = 'font:inherit;font-weight:700;padding:12px;border-radius:10px;border:0;background:var(--accent,#1a5fd0);color:var(--on-accent,#fff)';
-  function telaPedido(box) {
+  function telaConvite(sb, box, codigo) {
     var f = box.querySelector('form');
-    f.innerHTML = '<h1 style="margin:0;font-size:1.5rem">Pedir acesso</h1>' +
-      '<p style="margin:0">Crie seu acesso. Você entra assim que o pedido for aprovado.</p>' +
-      '<label for="pa-nome">Seu nome</label><input id="pa-nome" required autocomplete="name" style="' + EST_IN + '">' +
-      '<label for="pa-email">Seu e-mail</label><input id="pa-email" type="email" required autocomplete="email" style="' + EST_IN + '">' +
-      '<label for="pa-senha">Crie uma senha (mínimo 8 caracteres)</label><input id="pa-senha" type="password" required minlength="8" autocomplete="new-password" style="' + EST_IN + '">' +
-      '<label for="pa-senha2">Repita a senha</label><input id="pa-senha2" type="password" required minlength="8" autocomplete="new-password" style="' + EST_IN + '">' +
-      '<label for="pa-ind">Quem indicou (opcional)</label><input id="pa-ind" autocomplete="off" style="' + EST_IN + '">' +
-      '<button type="submit" style="' + EST_BT + '">Enviar pedido</button>' +
-      '<button type="button" id="pa-volta" style="font:inherit;font-weight:700;border:0;background:none;color:var(--accent,#1a5fd0);padding:8px">Voltar para entrar</button>' +
-      '<p id="pa-msg" aria-live="polite" style="margin:0"></p>';
-    var nf = f.cloneNode(true); f.parentNode.replaceChild(nf, f); f = nf;
-    var msg = f.querySelector('#pa-msg');
-    function volta() { location.reload(); }
-    f.querySelector('#pa-volta').addEventListener('click', volta);
-    f.addEventListener('submit', function (ev) {
-      ev.preventDefault();
-      var v = function (id) { return f.querySelector('#' + id).value.trim(); };
-      if (f.querySelector('#pa-senha').value !== f.querySelector('#pa-senha2').value) { msg.textContent = 'As senhas não são iguais.'; return; }
-      msg.textContent = 'Enviando...';
-      fetch('/api/acesso', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao: 'pedir', nome: v('pa-nome'), email: v('pa-email').toLowerCase(), senha: f.querySelector('#pa-senha').value, indicado: v('pa-ind') }) })
-        .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
-        .then(function (x) {
-          if (!x.ok) { msg.textContent = x.j.erro || 'Não consegui enviar o pedido.'; return; }
-          var st = x.j.status;
-          f.innerHTML = '<h1 style="margin:0;font-size:1.5rem">' + (x.j.ja ? 'Pedido já existe' : 'Pedido enviado') + '</h1>' +
-            '<p style="margin:0">' + (st === 'aprovado' ? 'Este e-mail já tem acesso. Entre com e-mail e senha.' : st === 'pendente' ? 'Assim que for aprovado, entre com o e-mail e a senha que você criou.' : 'Este e-mail não está liberado. Fale com quem te indicou o app.') + '</p>' +
-            '<button type="button" id="pa-ok" style="' + EST_BT + '">Voltar para entrar</button>';
-          f.querySelector('#pa-ok').addEventListener('click', volta);
+    var nf = f.cloneNode(false); f.parentNode.replaceChild(nf, f); f = nf;
+    f.innerHTML = '<h1 style="margin:0;font-size:1.5rem">Convite</h1><p id="pa-msg" aria-live="polite" style="margin:0">Conferindo o convite...</p>';
+    function semConvite() { history.replaceState(null, '', location.pathname + location.hash); }
+    function erro(t) {
+      f.innerHTML = '<h1 style="margin:0;font-size:1.5rem">Convite</h1><p style="margin:0">' + t + '</p><button type="button" id="pa-volta" style="' + EST_BT + '">Ir para entrar</button>';
+      f.querySelector('#pa-volta').addEventListener('click', function () { semConvite(); location.reload(); });
+    }
+    function post(corpo) {
+      return fetch('/api/acesso', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corpo) })
+        .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); });
+    }
+    post({ acao: 'convite', codigo: codigo }).then(function (x) {
+      if (!x.ok) { erro(x.j.erro || 'Convite inválido.'); return; }
+      f.innerHTML = '<h1 style="margin:0;font-size:1.5rem">Você foi convidado</h1>' +
+        '<p style="margin:0">Crie seu acesso ao Dieta e Treino. Depois você entra sempre com este e-mail e esta senha.</p>' +
+        '<label for="pa-nome">Seu nome</label><input id="pa-nome" required autocomplete="name" style="' + EST_IN + '">' +
+        '<label for="pa-email">Seu e-mail</label><input id="pa-email" type="email" required autocomplete="email" style="' + EST_IN + '">' +
+        '<label for="pa-senha">Crie uma senha (mínimo 8 caracteres)</label><input id="pa-senha" type="password" required minlength="8" autocomplete="new-password" style="' + EST_IN + '">' +
+        '<label for="pa-senha2">Repita a senha</label><input id="pa-senha2" type="password" required minlength="8" autocomplete="new-password" style="' + EST_IN + '">' +
+        '<button type="submit" style="' + EST_BT + '">Criar meu acesso</button>' +
+        '<p id="pa-msg" aria-live="polite" style="margin:0"></p>';
+      f.querySelector('#pa-nome').value = x.j.nome || '';
+      if (x.j.email) { var em = f.querySelector('#pa-email'); em.value = x.j.email; em.readOnly = true; }
+      var msg = f.querySelector('#pa-msg');
+      f.addEventListener('submit', function (ev) {
+        ev.preventDefault();
+        var email = f.querySelector('#pa-email').value.trim().toLowerCase(), senha = f.querySelector('#pa-senha').value;
+        if (senha !== f.querySelector('#pa-senha2').value) { msg.textContent = 'As senhas não são iguais.'; return; }
+        msg.textContent = 'Criando...';
+        post({ acao: 'aceitar', codigo: codigo, nome: f.querySelector('#pa-nome').value.trim(), email: email, senha: senha }).then(function (y) {
+          if (!y.ok) { msg.textContent = y.j.erro || 'Não consegui criar o acesso.'; return; }
+          msg.textContent = 'Pronto! Entrando...';
+          semConvite();
+          sb.auth.signInWithPassword({ email: email, password: senha }).then(function (r) {
+            if (r.error) msg.textContent = 'Conta criada. Entre com seu e-mail e senha.';
+          });
         }, function () { msg.textContent = 'Sem conexão. Tente de novo.'; });
-    });
+      });
+    }, function () { erro('Sem conexão. Abra o link de novo.'); });
   }
 
   /* Depois do login: só segue com o perfil aprovado */
@@ -164,7 +174,17 @@
     function carrega() {
       api('/api/acesso', { acao: 'lista' }).then(function (j) {
         var ps = j.perfis || [], pend = ps.filter(function (p) { return p.status === 'pendente'; }).length;
-        c.innerHTML = '<p style="margin:0 0 4px;color:var(--muted,#555)">' + (pend ? pend + (pend === 1 ? ' pedido aguardando' : ' pedidos aguardando') + ' aprovação.' : 'Nenhum pedido aguardando.') + ' Você vê só nome, e-mail e status; os dados de cada pessoa ficam só com ela.</p>' +
+        var cs = j.convites || [];
+        c.innerHTML = '<form id="cv-form" style="background:var(--surface,#f5f5f5);border-radius:16px;padding:12px 14px;display:grid;gap:8px">' +
+          '<strong>Convidar pessoa</strong>' +
+          '<label for="cv-nome" style="font-size:.9rem">Nome</label><input id="cv-nome" style="' + EST_IN + '">' +
+          '<label for="cv-email" style="font-size:.9rem">E-mail (opcional: se preencher, só esse e-mail usa o convite)</label><input id="cv-email" type="email" style="' + EST_IN + '">' +
+          '<button type="submit" style="' + EST_BT + '">Gerar link de convite</button><div id="cv-out"></div></form>' +
+          (cs.length ? '<div style="display:grid;gap:6px"><strong>Convites em aberto</strong>' + cs.map(function (v) {
+            return '<div style="display:flex;justify-content:space-between;gap:8px;align-items:center;background:var(--surface,#f5f5f5);border-radius:14px;padding:8px 12px"><span style="overflow-wrap:anywhere">' + esc(v.nome || v.email || 'Sem nome') + '<br><span style="font-size:.8rem;color:var(--muted,#555)">vence em ' + new Date(v.expira).toLocaleDateString('pt-BR') + '</span></span>' +
+              '<span style="display:flex;gap:6px"><button type="button" data-link="' + esc(v.codigo) + '" style="font:inherit;font-weight:700;min-height:36px;padding:0 12px;border-radius:18px;border:0;background:var(--mat,#eee);color:inherit">Link</button><button type="button" data-cancela="' + esc(v.codigo) + '" style="font:inherit;font-weight:600;min-height:36px;padding:0 10px;border-radius:18px;border:0;background:transparent;color:var(--muted,#555)">Cancelar</button></span></div>';
+          }).join('') + '</div>' : '') +
+          '<p style="margin:0 0 4px;color:var(--muted,#555)">' + (pend ? pend + (pend === 1 ? ' pedido aguardando' : ' pedidos aguardando') + ' aprovação. ' : '') + 'Você vê só nome, e-mail e status; os dados de cada pessoa ficam só com ela.</p>' +
           ps.map(function (p) {
             var bts = p.admin ? '<span style="font-size:.85rem;color:var(--muted,#555)">Administrador</span>' : (ACOES[p.status] || []).map(function (a) {
               return '<button type="button" data-id="' + esc(p.user_id) + '" data-st="' + a[0] + '" style="font:inherit;font-weight:700;min-height:40px;padding:0 14px;border-radius:20px;border:0;' + (a[0] === 'aprovado' ? 'background:var(--accent,#1a5fd0);color:var(--on-accent,#fff)' : 'background:var(--mat,#eee);color:inherit') + '">' + a[1] + '</button>';
@@ -174,6 +194,27 @@
               '<span style="font-size:.85rem;color:var(--muted,#555);overflow-wrap:anywhere">' + esc(p.email) + (p.indicado_por ? ' · indicado por ' + esc(p.indicado_por) : '') + ' · pediu em ' + new Date(p.criado).toLocaleDateString('pt-BR') + '</span>' +
               '<div style="display:flex;gap:8px;flex-wrap:wrap">' + bts + '</div></div>';
           }).join('');
+        function mostraLink(codigo, onde) {
+          var url = location.origin + '/?convite=' + codigo, txt = 'Te convidei para o Dieta e Treino. Abra este link e crie seu acesso: ' + url;
+          onde.innerHTML = '<p style="margin:6px 0;overflow-wrap:anywhere;font-size:.9rem"><code style="user-select:all">' + esc(url) + '</code></p>';
+          var row = document.createElement('div'); row.setAttribute('style', 'display:flex;gap:8px;flex-wrap:wrap');
+          var BT = 'font:inherit;font-weight:700;min-height:40px;padding:0 14px;border-radius:20px;border:0;';
+          if (navigator.share) { var sh = document.createElement('button'); sh.type = 'button'; sh.textContent = 'Compartilhar'; sh.setAttribute('style', BT + 'background:var(--accent,#1a5fd0);color:var(--on-accent,#fff)'); sh.addEventListener('click', function () { navigator.share({ title: 'Dieta e Treino', text: txt }).catch(function () {}); }); row.appendChild(sh); }
+          var wa = document.createElement('a'); wa.href = 'https://wa.me/?text=' + encodeURIComponent(txt); wa.target = '_blank'; wa.rel = 'noopener'; wa.textContent = 'WhatsApp'; wa.setAttribute('style', BT + 'display:inline-grid;place-items:center;text-decoration:none;background:var(--mat,#eee);color:inherit'); row.appendChild(wa);
+          var cp = document.createElement('button'); cp.type = 'button'; cp.textContent = 'Copiar'; cp.setAttribute('style', BT + 'background:var(--mat,#eee);color:inherit');
+          cp.addEventListener('click', function () { (navigator.clipboard ? navigator.clipboard.writeText(txt) : Promise.reject()).then(function () { cp.textContent = 'Copiado'; }, function () { cp.textContent = 'Selecione e copie'; }); });
+          row.appendChild(cp); onde.appendChild(row);
+          var nota = document.createElement('p'); nota.textContent = 'O link vale por 14 dias e serve para uma conta só.'; nota.setAttribute('style', 'margin:6px 0 0;font-size:.85rem;color:var(--muted,#555)'); onde.appendChild(nota);
+        }
+        c.querySelector('#cv-form').addEventListener('submit', function (ev) {
+          ev.preventDefault();
+          var out = c.querySelector('#cv-out'); out.textContent = 'Gerando...';
+          api('/api/acesso', { acao: 'convidar', nome: c.querySelector('#cv-nome').value.trim(), email: c.querySelector('#cv-email').value.trim() }).then(function (k) {
+            mostraLink(k.codigo, out);
+          }, function (e) { out.textContent = e.message; });
+        });
+        c.querySelectorAll('[data-link]').forEach(function (b) { b.addEventListener('click', function () { var d = document.createElement('div'); b.closest('div').after(d); mostraLink(b.getAttribute('data-link'), d); b.disabled = true; }); });
+        c.querySelectorAll('[data-cancela]').forEach(function (b) { b.addEventListener('click', function () { if (!confirm('Cancelar este convite? O link deixa de funcionar.')) return; api('/api/acesso', { acao: 'cancelar', codigo: b.getAttribute('data-cancela') }).then(carrega); }); });
         c.querySelectorAll('[data-st]').forEach(function (b) {
           b.addEventListener('click', function () {
             b.disabled = true;

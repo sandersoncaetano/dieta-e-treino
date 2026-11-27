@@ -1,5 +1,8 @@
 // Pedido de acesso e aprovação de pessoas.
-//  POST {acao:'pedir', nome, email, senha, indicado}  (sem login) → cria a conta como "pendente" e avisa o administrador
+//  POST {acao:'convite', codigo}                       (sem login) → confere o convite
+//  POST {acao:'aceitar', codigo, nome, email, senha}    (sem login) → cria a conta já aprovada e avisa o administrador
+//  POST {acao:'convidar', nome?, email?}                (administrador) → cria um convite (vale 14 dias)
+//  POST {acao:'cancelar', codigo}                       (administrador) → cancela um convite
 //  POST {acao:'lista'}                                 (administrador) → perfis
 //  POST {acao:'status', user_id, status}               (administrador) → aprova, recusa, bloqueia ou reativa
 //  POST {acao:'senha', user_id}                         (administrador) → gera uma senha provisória e devolve para você repassar
@@ -38,22 +41,40 @@ export default rota(async (req, res) => {
   if (req.method !== 'POST') return responde(res, 405, { erro: 'Use POST' });
   const b = await corpo(req);
 
-  if (b.acao === 'pedir') {
+  // Convite: só entra quem recebeu um link seu. A conta nasce aprovada.
+  async function conviteValido(codigo) {
+    const c = /^[a-z0-9]{6,16}$/.test(codigo) ? await banco('convites?select=*&codigo=eq.' + enc(codigo)) : null;
+    const v = c && c[0];
+    if (!v || v.cancelado) return { erro: 'Convite inválido. Peça um novo link a quem te convidou.' };
+    if (v.usado_por) return { erro: 'Este convite já foi usado. Se a conta é sua, entre com e-mail e senha.' };
+    if (new Date(v.expira) < new Date()) return { erro: 'Este convite venceu. Peça um novo link a quem te convidou.' };
+    return { v };
+  }
+
+  if (b.acao === 'convite') {
+    const r = await conviteValido(String(b.codigo || ''));
+    if (r.erro) return responde(res, 400, { erro: r.erro });
+    return responde(res, 200, { ok: true, nome: r.v.nome || '', email: r.v.email || '' });
+  }
+
+  if (b.acao === 'aceitar') {
+    const r = await conviteValido(String(b.codigo || ''));
+    if (r.erro) return responde(res, 400, { erro: r.erro });
     const email = String(b.email || '').trim().toLowerCase();
     const nome = String(b.nome || '').trim().slice(0, 80);
     const senha = String(b.senha || '');
-    const indicado = String(b.indicado || '').trim().slice(0, 80) || null;
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return responde(res, 400, { erro: 'E-mail inválido.' });
+    if (r.v.email && r.v.email !== email) return responde(res, 400, { erro: 'Este convite é para outro e-mail.' });
     if (nome.length < 2) return responde(res, 400, { erro: 'Informe seu nome.' });
     if (senha.length < 8) return responde(res, 400, { erro: 'A senha precisa ter pelo menos 8 caracteres.' });
     const ja = await banco('perfis?select=status&email=eq.' + enc(email));
-    if (ja && ja[0]) return responde(res, 200, { ok: true, status: ja[0].status, ja: true });
-    const pend = await banco('perfis?select=user_id&status=eq.pendente');
-    if (pend && pend.length >= 30) return responde(res, 429, { erro: 'Muitos pedidos aguardando aprovação. Tente de novo mais tarde.' });
+    if (ja && ja[0]) return responde(res, 400, { erro: 'Já existe uma conta com este e-mail. Entre com e-mail e senha.' });
     const u = await authAdmin('users', { method: 'POST', body: JSON.stringify({ email, password: senha, email_confirm: true, user_metadata: { nome } }) });
-    await banco('perfis', { method: 'POST', body: JSON.stringify({ user_id: u.id, email, nome, indicado_por: indicado, status: 'pendente' }), headers: { Prefer: 'return=minimal' } });
-    await avisaAdmins('Novo pedido de acesso', nome + ' (' + email + ')' + (indicado ? ', indicado por ' + indicado : '')).catch(() => {});
-    return responde(res, 200, { ok: true, status: 'pendente' });
+    const quem = r.v.criado_por ? await banco('perfis?select=nome&user_id=eq.' + r.v.criado_por) : null;
+    await banco('perfis', { method: 'POST', body: JSON.stringify({ user_id: u.id, email, nome, indicado_por: (quem && quem[0] && quem[0].nome) || null, status: 'aprovado', aprovado_em: new Date().toISOString() }), headers: { Prefer: 'return=minimal' } });
+    await banco('convites?codigo=eq.' + enc(r.v.codigo), { method: 'PATCH', body: JSON.stringify({ usado_por: u.id, usado_em: new Date().toISOString() }), headers: { Prefer: 'return=minimal' } });
+    await avisaAdmins('Convite aceito', nome + ' (' + email + ') criou a conta.').catch(() => {});
+    return responde(res, 200, { ok: true });
   }
 
   const u = await usuario(req);
@@ -61,7 +82,22 @@ export default rota(async (req, res) => {
 
   if (b.acao === 'lista') {
     const ps = await banco('perfis?select=user_id,email,nome,status,admin,indicado_por,criado,aprovado_em&order=criado.desc');
-    return responde(res, 200, { perfis: ps || [] });
+    const cs = await banco('convites?select=codigo,nome,email,criado,expira&usado_por=is.null&cancelado=eq.false&expira=gt.' + enc(new Date().toISOString()) + '&order=criado.desc');
+    return responde(res, 200, { perfis: ps || [], convites: cs || [] });
+  }
+
+  if (b.acao === 'convidar') {
+    const nome = String(b.nome || '').trim().slice(0, 80) || null;
+    const email = String(b.email || '').trim().toLowerCase() || null;
+    if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return responde(res, 400, { erro: 'E-mail inválido.' });
+    const ABC = 'abcdefghjkmnpqrstuvwxyz23456789', codigo = Array.from(crypto.randomBytes(10), (x) => ABC[x % ABC.length]).join('');
+    await banco('convites', { method: 'POST', body: JSON.stringify({ codigo, nome, email, criado_por: u.id }), headers: { Prefer: 'return=minimal' } });
+    return responde(res, 200, { ok: true, codigo });
+  }
+
+  if (b.acao === 'cancelar') {
+    await banco('convites?codigo=eq.' + enc(String(b.codigo || '')), { method: 'PATCH', body: JSON.stringify({ cancelado: true }), headers: { Prefer: 'return=minimal' } });
+    return responde(res, 200, { ok: true });
   }
 
   if (b.acao === 'status') {
