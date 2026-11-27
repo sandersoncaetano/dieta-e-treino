@@ -30,8 +30,13 @@ export async function usuario(req) {
   });
   if (!r.ok) throw Object.assign(new Error('Login expirado'), { status: 401, code: 'sem_login' });
   const u = await r.json();
-  const permitidos = env('EMAILS_PERMITIDOS').split(',').map((s) => s.trim().toLowerCase());
-  if (!permitidos.includes(String(u.email || '').toLowerCase())) throw Object.assign(new Error('Usuário não autorizado'), { status: 403, code: 'nao_autorizado' });
+  // Acesso: perfil aprovado na tabela perfis; a lista EMAILS_PERMITIDOS continua valendo como reserva.
+  let perfil = null;
+  try { const p = await banco('perfis?select=status,admin&user_id=eq.' + u.id); perfil = p && p[0]; } catch (e) { perfil = null; }
+  const permitidos = (process.env.EMAILS_PERMITIDOS || '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
+  const naLista = permitidos.includes(String(u.email || '').toLowerCase());
+  if (!(perfil && perfil.status === 'aprovado') && !naLista) throw Object.assign(new Error('Usuário não autorizado'), { status: 403, code: 'nao_autorizado' });
+  u.admin = !!(perfil && perfil.admin && perfil.status === 'aprovado');
   return u;
 }
 

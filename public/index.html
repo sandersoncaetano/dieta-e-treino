@@ -989,7 +989,7 @@ input, textarea { padding: 10px 12px; }
 
 <script>
 var Store = (function () {
-  var COLLS = ['treinos', 'cardio', 'lombar', 'cargas', 'imagens', 'refeicoes', 'descansos', 'dias', 'peso', 'strava', 'receitas', 'analises', 'medidas', 'composicao', 'saude_dia', 'semanas', 'fechamentos', 'treinador', 'alimentos', 'agua', 'eventos'];
+  var COLLS = ['treinos', 'cardio', 'lombar', 'cargas', 'imagens', 'refeicoes', 'descansos', 'dias', 'peso', 'strava', 'receitas', 'analises', 'medidas', 'composicao', 'saude_dia', 'semanas', 'fechamentos', 'treinador', 'alimentos', 'agua', 'eventos', 'perfil'];
   var KEY = 'caderno-treino';
   var cache = {}; COLLS.forEach(function (c) { cache[c] = {}; });
   var subs = [], db = null, mode = 'loading';
@@ -1818,6 +1818,7 @@ window.MOVES = (function () {
   ];
   var DIA = ['Domingo: descanso', 'Segunda: corrida leve e treino A', 'Terça: treino B e pilates', 'Quarta: treino C',
     'Quinta: treino D e pilates', 'Sexta: corrida leve e treino E', 'Sábado: bike, se for pedalar'];
+  var TREINOS0 = JSON.parse(JSON.stringify(TREINOS));
   var LOMBAR = [['melhor', 'Melhor'], ['igual', 'Igual'], ['pior', 'Pior']];
   var TIPOS = [['corrida', 'Corrida'], ['bike', 'Bike'], ['caminhada', 'Caminhada']];
 
@@ -2840,6 +2841,33 @@ window.MOVES = (function () {
   /* Histórico */
   /* Balanço semanal: estimativa conservadora, calibrada pelo peso real */
   var BAL = { nasc: '1980-01-31', altura: 178, atividade: 1.25, fator: .7, kcalKg: 7700, pesoBase: 104.8 };
+  /* Perfil da pessoa (coleção "perfil", doc "config"). Sem doc, valem estes padrões (os do Sanderson). */
+  var PERFIL0 = {
+    nome: 'Sanderson', sexo: 'm', nasc: '1980-01-31', altura: 178, atividade: 1.25, pesoBase: 104.8, pesoMeta: 95,
+    kcal: { util: 2000, fds: 2800 }, prot: { min: 160, max: 180 },
+    modalidades: ['academia', 'pilates', 'cardio'], cidade: 'Itaúna-MG',
+    contexto_treino: 'Faz musculação (treinos A a E), pilates em casa e corrida leve. Tem histórico de dor lombar (faz pilates duas vezes por semana).',
+    contexto_corrida: 'Homem adulto emagrecendo (cerca de 10 kg de gordura a perder), voltou a correr em 03/11/2026 depois de um tempo parado. Tem histórico de dor lombar (faz pilates duas vezes por semana). Faz musculação cerca de 5 vezes por semana no fim da tarde e pedala aos sábados. Corre de manhã nos dias úteis, cerca de 30 minutos, antes do trabalho em casa.'
+  };
+  var PERFIL = JSON.parse(JSON.stringify(PERFIL0));
+  function aplicaPerfil() {
+    var c = Store.get('perfil', 'config') || {};
+    PERFIL = Object.assign(JSON.parse(JSON.stringify(PERFIL0)), c);
+    PERFIL.kcal = Object.assign({}, PERFIL0.kcal, c.kcal || {});
+    PERFIL.prot = Object.assign({}, PERFIL0.prot, c.prot || {});
+    BAL.nasc = PERFIL.nasc; BAL.altura = PERFIL.altura; BAL.atividade = PERFIL.atividade; BAL.pesoBase = PERFIL.pesoBase;
+    PESO_META = PERFIL.pesoMeta;
+    // Ficha da academia do perfil (mesmo formato de TREINOS); sem ela, a ficha embutida.
+    var fa = Store.get('perfil', 'ficha_academia'), src = fa && fa.treinos && Object.keys(fa.treinos).length ? fa.treinos : TREINOS0;
+    var nova = JSON.stringify(src);
+    if (nova !== fichaAplicada) {
+      fichaAplicada = nova;
+      Object.keys(TREINOS).forEach(function (k) { delete TREINOS[k]; });
+      Object.assign(TREINOS, JSON.parse(nova));
+    }
+  }
+  var fichaAplicada = null;
+  function pessoaTxt() { return PERFIL.sexo === 'f' ? 'uma mulher' : 'um homem'; }
   function ddmm(d) { return d.slice(8, 10) + '/' + d.slice(5, 7); }
   function sinal(v, f) { return (v > 0 ? '+' : v < 0 ? '−' : '') + f(Math.abs(v)); }
   function kg2(v) { return v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
@@ -2849,8 +2877,8 @@ window.MOVES = (function () {
     return k ? Store.get('peso', k).kg : BAL.pesoBase;
   }
   function tmbFormula(d) {
-    var a = parseInt(d.slice(0, 4), 10) - 1980 - (d.slice(5) < BAL.nasc.slice(5) ? 1 : 0);
-    return 10 * pesoAte(d) + 6.25 * BAL.altura - 5 * a + 5;
+    var a = parseInt(d.slice(0, 4), 10) - parseInt(BAL.nasc.slice(0, 4), 10) - (d.slice(5) < BAL.nasc.slice(5) ? 1 : 0);
+    return 10 * pesoAte(d) + 6.25 * BAL.altura - 5 * a + (PERFIL.sexo === 'f' ? -161 : 5);
   }
   // Pesagem da balança (Health Connect) mais recente até o dia, de no máximo 60 dias antes.
   function compAte(d, campo) {
@@ -2880,7 +2908,7 @@ window.MOVES = (function () {
      (faixa usada para quem treina em déficit). Sem balança, 160 a 180 g. */
   function protMeta(d) {
     var c = compAte(d || Store.day(), 'massa_magra_kg');
-    if (!c) return { min: 160, max: 180, mm: null };
+    if (!c) return { min: PERFIL.prot.min, max: PERFIL.prot.max, mm: null };
     return { min: Math.round(c.massa_magra_kg * 2.3 / 5) * 5, max: Math.round(c.massa_magra_kg * 2.6 / 5) * 5, mm: c.massa_magra_kg };
   }
   // Metas de gordura e carboidrato (g), a partir da meta de calorias e da proteína do dia.
@@ -3674,8 +3702,8 @@ window.MOVES = (function () {
   }
   function anaPrompt(m, ant) {
     var ta = m.treinoAnt ? { data: m.treinoAnt.key.slice(0, 10), volume_kg: m.treinoAnt.vol, series: m.treinoAnt.series, exercicios: m.treinoAnt.ex.map(function (e) { return e.nome + ' ' + e.rtxt + ' reps com ' + e.kg + ' kg'; }) } : null;
-    return 'Você é um treinador que acompanha um homem de cerca de 105 kg em processo de emagrecimento (meta 95 kg), com cuidado com a lombar. ' +
-      'Ele voltou a correr com liberação médica para corrida leve: esforço 4 a 5 e frequência cardíaca até cerca de 150 bpm. Faz musculação (treinos A a E), pilates em casa e corrida leve. ' +
+    return 'Você é um treinador que acompanha ' + pessoaTxt() + ' de cerca de ' + nInt(pesoAte(Store.day())) + ' kg em processo de emagrecimento (meta ' + PESO_META + ' kg), com cuidado com a lombar. ' +
+      'Ele voltou a correr com liberação médica para corrida leve: esforço 4 a 5 e frequência cardíaca até cerca de 150 bpm. ' + PERFIL.contexto_treino + ' ' +
       'Analise a atividade atual comparando com as anteriores do mesmo tipo e diga se houve evolução, estabilidade ou queda de desempenho. ' +
       'Regras: diferenças pequenas (até cerca de 3%) são estabilidade; uma sessão isolada não define tendência, então seja cauteloso com poucos dados; ' +
       'considere calor e umidade, cansaço por outra atividade no mesmo dia ou no dia anterior, e que calorias do relógio são estimativas. ' +
@@ -4251,8 +4279,8 @@ window.MOVES = (function () {
   }
   function fechPrompt(r) {
     var L = fechLocal(r);
-    return 'Feche a semana de ' + br(r.seg) + ' a ' + br(r.dom) + ' de um homem que quer emagrecer preservando músculo (metas: 2.000 kcal nos dias úteis, 2.800 no fim de semana, ' + protTxt(r.dom) + ' g de proteína por dia). ' +
-      'Números já calculados pelo app: ' + L.pontos.join(' ') + ' Comeu ' + nInt(r.comeu) + ' de 15.600 kcal. Avaliação do app: ' + L.nivel + '. ' +
+    return 'Feche a semana de ' + br(r.seg) + ' a ' + br(r.dom) + ' de ' + pessoaTxt() + ' que quer emagrecer preservando músculo (metas: ' + nInt(PERFIL.kcal.util) + ' kcal nos dias úteis, ' + nInt(PERFIL.kcal.fds) + ' no fim de semana, ' + protTxt(r.dom) + ' g de proteína por dia). ' +
+      'Números já calculados pelo app: ' + L.pontos.join(' ') + ' Comeu ' + nInt(r.comeu) + ' de ' + nInt(PERFIL.kcal.util * 5 + PERFIL.kcal.fds * 2) + ' kcal. Avaliação do app: ' + L.nivel + '. ' +
       'Escreva só: um resumo de até 2 frases curtas que interprete esses números (sem repeti-los todos) e uma ação principal para a próxima semana. ' +
       'Trate exceções sociais do fim de semana, de feriados e de eventos como normais se a semana segue no caminho; não sugira jejum, compensação nem cortes radicais; se faltam registros, diga isso. ' +
       'Responda com JSON: {"resumo":"texto","ajuste":"texto"}';
@@ -4971,7 +4999,7 @@ window.MOVES = (function () {
   var FOOD_TIPOS = [['cafe', 'Café'], ['almoco', 'Almoço'], ['lanche', 'Lanche'], ['sobremesa', 'Sobremesa'], ['jantar', 'Jantar'], ['outro', 'Outro']];
   var foodDate = today, foodTipo = null, foodFile = null;
   var foodBusy = {}, foodBlobs = {}, foodMsg = {};
-  function metaDia(d) { var w = weekday(d); return w === 0 || w === 6 ? 2800 : 2000; }
+  function metaDia(d) { var w = weekday(d); return w === 0 || w === 6 ? PERFIL.kcal.fds : PERFIL.kcal.util; }
   /* Feriados nacionais e eventos do dia: mudam a leitura (exceção prevista), não as calorias contadas. */
   var FER_FIXOS = { '01-01': 'Confraternização Universal', '04-21': 'Tiradentes', '05-01': 'Dia do Trabalho', '09-07': 'Independência', '10-12': 'Nossa Senhora Aparecida', '11-02': 'Finados', '11-15': 'Proclamação da República', '11-20': 'Consciência Negra', '12-25': 'Natal' };
   function pascoa(y) {
@@ -5994,7 +6022,7 @@ window.MOVES = (function () {
   }
   function semPrompt(dPes) {
     var L = semLocal(dPes);
-    return 'Analise a semana de um homem de ' + BAL.altura + ' cm que quer emagrecer preservando músculo (meta ' + PESO_META + ' kg). ' +
+    return 'Analise a semana de ' + pessoaTxt() + ' de ' + BAL.altura + ' cm que quer emagrecer preservando músculo (meta ' + PESO_META + ' kg). ' +
       'Números já calculados pelo app para a pesagem de ' + br(dPes) + ': ' + L.pontos.join(' ') + (L.tmsg ? ' Leitura do app: ' + L.tmsg : '') + ' ' +
       'Bioimpedância oscila até 1 kg com água; julgue pela tendência. ' +
       'Escreva só: um resumo de até 2 frases curtas que interprete esses números e uma ação principal para a próxima semana. Não invente dados, não sugira jejum nem cortes radicais; se faltam registros, diga isso. ' +
@@ -7275,7 +7303,7 @@ window.MOVES = (function () {
       'Meta: prova "' + m.nome + '" de ' + m.km + ' km em ' + m.prova + ' (' + dsem(m.prova) + '), terminando com pace médio de ' + trPaceTxt(m.pace) + ' (' + clock(m.pace * m.km) + ' no total).',
       'Disponibilidade por dia da semana (respeite à risca): ' + [1, 2, 3, 4, 5, 6, 0].map(function (d) { return TR_DIA_NOME[d] + ': ' + ({ livre: 'pode correr, você decide o tipo de treino', leve: 'só corrida leve', leve_opc: 'treino OPCIONAL e bem leve, curto, sem suar muito (marque opcional=true)', forte: 'dia preferido para o treino mais forte da semana, dentro do que o médico liberou', nao: 'não corre' })[m.dias[d]]; }).join('; ') + '. Faça de 3 a 5 corridas por semana, contando a opcional.' + (m.nota_dias ? ' Observação dele: ' + m.nota_dias : ''),
       (m.perna !== '' && m.perna != null ? 'Treino de PERNA na academia: ' + TR_DIA_NOME[m.perna] + ' no fim da tarde (pesado para as pernas). Leve isso em conta: no dia seguinte de manhã as pernas estarão cansadas; se esse for o dia do treino forte, ajuste o tipo e a intensidade e explique a escolha, ou sugira trocar.' : '') ,
-      'Perfil: homem adulto emagrecendo (cerca de 10 kg de gordura a perder), voltou a correr em 03/11/2026 depois de um tempo parado. Tem histórico de dor lombar (faz pilates duas vezes por semana). Faz musculação cerca de 5 vezes por semana no fim da tarde e pedala aos sábados. Corre de manhã nos dias úteis, cerca de 30 minutos, antes do trabalho em casa.',
+      'Perfil: ' + PERFIL.contexto_corrida,
       m.liberado
         ? 'O médico liberou treinos intensos (intervalados e ritmo de prova).'
         : 'IMPORTANTE: o médico liberou apenas corridas leves (esforço moderado, cerca de até 150 bpm). Até ele liberar mais, NÃO prescreva intervalados nem tiros acima disso; use corridas leves, progressão de volume, educativos e acelerações curtas e controladas (strides de 15 a 20 s) só se fizer sentido. Diga com clareza, em "alertas", que bater ' + trPaceTxt(m.pace) + ' na prova provavelmente exige esforço acima do liberado e que ele deve confirmar com o médico.',
@@ -7669,6 +7697,7 @@ window.MOVES = (function () {
   var firstData = true, lastImgs = '', retomou = false;
   var stravaAuto = false;
   Store.watch(function () {
+    aplicaPerfil();
     aliSemente(); medBadge();
     if (!stravaAuto && Object.keys(Store.all('strava')).length) { stravaAuto = true; syncStrava(true); }
     if (firstData && !$('gym').contains(document.activeElement)) { firstData = false; pickDefault(); }
