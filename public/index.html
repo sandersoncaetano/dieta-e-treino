@@ -292,16 +292,16 @@ input[type="date"] { height: 46px; }
 .gym-pend-it button { flex: none; }
 .agua h2 { margin: 0; font-size: 1.1rem; }
 .agua-topo { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
-.agua-topo b { font-size: 1.3rem; color: #3aa0ff; white-space: nowrap; }
+.agua-topo b { font-size: 1.3rem; color: var(--blue); white-space: nowrap; }
 .agua-barra { height: 12px; border-radius: 999px; background: var(--mat); overflow: hidden; margin: 8px 0; }
-.agua-barra span { display: block; height: 100%; background: linear-gradient(90deg, #3aa0ff, #64c8ff); border-radius: 999px; }
+.agua-barra span { display: block; height: 100%; background: linear-gradient(90deg, var(--blue), var(--blue)); border-radius: 999px; }
 .agua-rec { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 8px 0; }
-.agua-rec button { min-height: 58px; border-radius: 14px; border: 1px solid color-mix(in srgb, #3aa0ff 40%, var(--line)); background: color-mix(in srgb, #3aa0ff 10%, var(--surface)); color: inherit; font: inherit; cursor: pointer; display: grid; gap: 1px; padding: 6px; text-align: center; }
+.agua-rec button { min-height: 58px; border-radius: 14px; border: 1px solid color-mix(in srgb, var(--blue) 40%, var(--line)); background: color-mix(in srgb, var(--blue) 10%, var(--surface)); color: inherit; font: inherit; cursor: pointer; display: grid; gap: 1px; padding: 6px; text-align: center; }
 .agua-rec button b { font-size: .95rem; }
 .agua-rec button span { font-size: .8rem; color: var(--muted); }
 .agua { padding-top: 10px; padding-bottom: 10px; }
 .agua-chips { display: flex; gap: 6px; overflow-x: auto; padding: 2px 0 4px; margin-top: 2px; }
-.agua-chips button { flex: none; min-height: 44px; border-radius: 12px; border: 1px solid color-mix(in srgb, #3aa0ff 40%, var(--line)); background: color-mix(in srgb, #3aa0ff 10%, var(--surface)); color: inherit; font: inherit; cursor: pointer; display: grid; gap: 0; padding: 4px 10px; text-align: center; line-height: 1.15; }
+.agua-chips button { flex: none; min-height: 44px; border-radius: 12px; border: 1px solid color-mix(in srgb, var(--blue) 40%, var(--line)); background: color-mix(in srgb, var(--blue) 10%, var(--surface)); color: inherit; font: inherit; cursor: pointer; display: grid; gap: 0; padding: 4px 10px; text-align: center; line-height: 1.15; }
 .agua-chips button b { font-size: .85rem; }
 .agua-chips button span { font-size: .72rem; color: var(--muted); }
 .agua-chips .agua-mais { display: block; background: none; font-size: .85rem; color: var(--muted); }
@@ -392,7 +392,7 @@ button.pl-chip { color: var(--accent); font-weight: 700; }
 .stats.d-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 12px; margin-top: 10px; }
 .stats.d-stats .stat b { font-size: 1.45rem; white-space: nowrap; }
 .d-pr { font-weight: 700; margin-top: 10px; }
-.corpo-wrap { display: grid; justify-items: center; margin: 4px 0 8px; background: #101b2e; border-radius: 16px; padding: 14px 8px 6px; }
+.corpo-wrap { display: grid; justify-items: center; margin: 4px 0 8px; background: #12161d; border-radius: 16px; padding: 14px 8px 6px; }
 svg.corpo { width: 100%; max-width: 420px; height: auto; }
 svg.corpo text { font-size: 9px; font-weight: 700; }
 svg.corpo .musc { cursor: pointer; transition: fill .15s; -webkit-tap-highlight-color: transparent; }
@@ -3255,7 +3255,7 @@ window.MOVES = (function () {
     var max = Math.max(t.k, t.gasto, t.meta);
     box.appendChild(h('div', { class: 'cmp' },
       barra('Consumido', t.k, max, 'var(--accent)', nInt(t.k) + ' kcal'),
-      barra('Gasto est.', t.gasto, max, 'var(--far)', nInt(t.gasto) + ' kcal'),
+      barra('Gasto est.', t.gasto, max, 'var(--blue)', nInt(t.gasto) + ' kcal'),
       barra('Meta', t.meta, max, 'var(--line)', nInt(t.meta) + ' kcal')));
     if (t.n) {
       var sal = Math.round(t.saldo);
@@ -3823,7 +3823,8 @@ window.MOVES = (function () {
     });
     return chartP;
   }
-  function cor(n) { return getComputedStyle(document.documentElement).getPropertyValue('--' + n).trim() || '#1a5fd0'; }
+  // Gráficos: a série secundária ('far') usa o azul do tema novo; a figura dos exercícios continua com --far.
+  function cor(n) { var m = { far: 'blue' }[n] || n; return getComputedStyle(document.documentElement).getPropertyValue('--' + m).trim() || '#3ddc97'; }
   function alfa(hex, a) { var x = hex.replace('#', ''); if (x.length !== 6) return hex; return 'rgba(' + parseInt(x.slice(0, 2), 16) + ',' + parseInt(x.slice(2, 4), 16) + ',' + parseInt(x.slice(4, 6), 16) + ',' + a + ')'; }
   function diaNum(d) { return Math.floor(new Date(d + 'T12:00:00').getTime() / 864e5); }
   function numDia(n) { return Store.day(new Date(n * 864e5 + 432e5)); }
@@ -3837,7 +3838,7 @@ window.MOVES = (function () {
     var opt = c.options || {};
     var xDias = c.xDias;
     var escalas = opt.scales || {};
-    var base = { grid: { color: alfa(lin.length === 7 ? lin : '#c6d4e8', 0.55), drawTicks: false }, border: { display: false }, ticks: { color: mut, padding: 6, font: { size: grande ? 13 : 11, weight: '600' } } };
+    var base = { grid: { color: alfa(lin.length === 7 ? lin : '#dde2e8', 0.7), drawTicks: false }, border: { display: false }, ticks: { color: mut, padding: 6, font: { size: grande ? 13 : 11, weight: '600' } } };
     var sc = {};
     var xs = Object.assign({}, base, { grid: { display: false } }, escalas.x || {});
     if (xDias) {
@@ -3860,8 +3861,8 @@ window.MOVES = (function () {
           legend: { display: nds > 1, position: 'bottom', labels: { usePointStyle: true, pointStyle: 'circle', boxWidth: 8, boxHeight: 8, padding: 14, color: fg, font: { size: grande ? 14 : 12, weight: '600' }, filter: function (it, d) { return !d.datasets[it.datasetIndex].semLegenda; } } },
           tooltip: {
             // Fundo escuro com texto claro nos dois temas (no escuro, a cor do texto do app é clara).
-            backgroundColor: alfa(escuro() ? '#22324f' : (fg.length === 7 ? fg : '#142338'), 0.96), borderColor: escuro() ? alfa('#8fb3ff', 0.35) : 'transparent', borderWidth: escuro() ? 1 : 0,
-            titleColor: '#fff', bodyColor: '#fff', footerColor: '#dbe6f7', padding: 10, cornerRadius: 10, boxPadding: 4, usePointStyle: true,
+            backgroundColor: alfa(escuro() ? '#262c36' : (fg.length === 7 ? fg : '#12161c'), 0.96), borderColor: escuro() ? alfa('#3ddc97', 0.3) : 'transparent', borderWidth: escuro() ? 1 : 0,
+            titleColor: '#fff', bodyColor: '#fff', footerColor: '#c9d1dc', padding: 10, cornerRadius: 12, boxPadding: 4, usePointStyle: true,
             titleFont: { size: 13, weight: '700' }, bodyFont: { size: 13 },
             filter: function (it) { return it.raw !== null && it.raw !== undefined && !(it.dataset.semDica); },
             callbacks: Object.assign({ title: function (its) { if (!its.length) return ''; var x = its[0].parsed.x; return xDias ? dsem(numDia(x)) + ', ' + br(numDia(x)) : its[0].label; } }, c.dicas || {})
@@ -4487,7 +4488,7 @@ window.MOVES = (function () {
   // Faixa semanal de referência por grupo (séries): grupos grandes 10 a 20, pequenos a partir de 6.
   var MUSC_ALVO = { peito: 10, dorsais: 10, ombros: 10, biceps: 8, triceps: 8, quadriceps: 10, posteriores: 10, gluteos: 10, panturrilhas: 6, trapezio: 6, abdomen: 6, obliquos: 4, lombar: 4, adutores: 4, antebraco: 4 };
   function faixaDe(g, v) { var a = MUSC_ALVO[g] || 10; return v <= 0 ? 0 : v < a * 0.4 ? 1 : v < a ? 2 : 3; }
-  var CORPO_COR = { fundo: '#101b2e', pele: '#1c2a43', borda: '#3a5279', base: '#2a3c5c', texto: '#9fb3d1', sel: '#ffffff' };
+  var CORPO_COR = { fundo: '#12161d', pele: '#1f2530', borda: '#3a4351', base: '#2a313d', texto: '#9aa3b2', sel: '#ffffff' };
   function corpoSVG(dados, alvo) {
     var semanal = function (g) { return dados.m[g] / dados.semanas; };
     var C = CORPO_COR;
@@ -4597,7 +4598,7 @@ window.MOVES = (function () {
     if (!tot) { box.appendChild(h('p', { class: 'g-vazio', text: 'Sem séries de musculação ou pilates registradas no app nesse período.' })); return; }
     dd.faixa = true;
     box.appendChild(mapaInterativo(dd, 'séries por semana'));
-    box.appendChild(legenda([['Na faixa recomendada', '#ff7a2f'], ['Abaixo', 'rgba(255,122,47,.6)'], ['Pouco', 'rgba(255,122,47,.3)'], ['Nenhuma', '#2a3c5c']]));
+    box.appendChild(legenda([['Na faixa recomendada', '#ff7a2f'], ['Abaixo', 'rgba(255,122,47,.6)'], ['Pouco', 'rgba(255,122,47,.3)'], ['Nenhuma', '#2a313d']]));
     var porSem = function (g) { return dd.m[g] / dd.semanas; };
     // Ranking e equilíbrio
     var ord = Object.keys(MUSC).sort(function (a, b) { return porSem(b) - porSem(a); });
