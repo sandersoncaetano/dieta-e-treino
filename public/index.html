@@ -22,9 +22,9 @@
   if (window.matchMedia) try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function () { aplica(window.dtTema.atual()); window.dispatchEvent(new Event('dt-tema')); }); } catch (e) {}
 })();
 </script>
-<link rel="manifest" href="/manifest.webmanifest">
-<link rel="icon" href="/icons/icon-192.png">
-<link rel="apple-touch-icon" href="/icons/icon-192.png">
+<link rel="manifest" href="/manifest.webmanifest?v=2">
+<link rel="icon" href="/icons/app-192.png">
+<link rel="apple-touch-icon" href="/icons/app-180.png">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="/plataforma.js"></script>
 <title>Dieta e Treino</title>
@@ -348,7 +348,7 @@ input[type="date"] { height: 46px; }
 .tr-acoes { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .seg-ana { grid-template-columns: repeat(4, minmax(0, 1fr)); margin: 0 0 12px; }
 .seg-ana button { font-size: .88rem; padding-left: 4px; padding-right: 4px; }
-.seg-treino { margin: 12px 0 0; grid-template-columns: repeat(4, 1fr); }
+.seg-treino { margin: 12px 0 0; grid-template-columns: repeat(3, 1fr); }
 .pl-tit { font-size: 1.05rem; margin: 18px 0 8px; }
 .pl-card { border: 1px solid var(--line); border-radius: 14px; padding: 12px; margin: 0 0 10px; background: var(--card, transparent); scroll-margin-top: 80px; }
 .pl-card.pisca { outline: 2px solid var(--accent); }
@@ -716,6 +716,9 @@ input, textarea { padding: 10px 12px; }
 .seg { background: var(--mat); padding: 4px; border-radius: 16px; }
 .seg button { border-radius: 12px; }
 .howto summary, details > summary { cursor: pointer; }
+.seg button:has(.tab-ic) { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; min-height: 56px; padding: 6px 4px; line-height: 1.1; }
+.tab-ic { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+.seg-ana button span { font-size: .8rem; }
 .toast { bottom: calc(84px + env(safe-area-inset-bottom, 0px)); border-radius: 22px; }
 </style>
 </head>
@@ -736,7 +739,7 @@ input, textarea { padding: 10px 12px; }
 </div></nav>
 
 <div class="gut" id="treino-seg-box" hidden><div class="col"><div class="seg seg-treino" role="tablist" aria-label="Tipo de treino">
-  <button type="button" role="tab" id="ts-academia">Academia</button><button type="button" role="tab" id="ts-cardio">Cardio</button><button type="button" role="tab" id="ts-lombar">Pilates</button><button type="button" role="tab" id="ts-planos">Planos</button>
+  <button type="button" role="tab" id="ts-academia"><svg class="tab-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 7v10M18 7v10M3 10v4M21 10v4M6 12h12"/></svg><span>Academia</span></button><button type="button" role="tab" id="ts-cardio"><svg class="tab-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h4l2.5-6 4.5 12 2.5-6H21"/></svg><span>Cardio</span></button><button type="button" role="tab" id="ts-lombar"><svg class="tab-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="2"/><path d="M12 7.5v5.5M5 11.5c3 1.2 11 1.2 14 0M6.5 20c2.5-3.5 8.5-3.5 11 0"/></svg><span>Pilates</span></button><button type="button" role="tab" id="ts-planos" hidden>Planos</button>
 </div></div></div>
 <div class="week gut" id="week"><div class="col" id="week-box"></div></div>
 
@@ -885,9 +888,9 @@ input, textarea { padding: 10px 12px; }
   </section>
   <section class="view" id="v-historico" hidden>
     <div class="seg" role="tablist" aria-label="Seções do histórico">
-      <button type="button" role="tab" id="hs-registro" data-sec="registro">Registro</button>
-      <button type="button" role="tab" id="hs-graficos" data-sec="graficos">Gráficos</button>
-      <button type="button" role="tab" id="hs-analises" data-sec="analises">Análises</button>
+      <button type="button" role="tab" id="hs-registro" data-sec="registro"><svg class="tab-ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="3"/><path d="M8 3v4M16 3v4M4 10h16"/></svg><span>Registro</span></button>
+      <button type="button" role="tab" id="hs-graficos" data-sec="graficos"><svg class="tab-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20V11M12 20V5M19 20v-6"/></svg><span>Gráficos</span></button>
+      <button type="button" role="tab" id="hs-analises" data-sec="analises"><svg class="tab-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5"/></svg><span>Análises</span></button>
     </div>
     <div id="h-sec-registro" role="tabpanel" aria-labelledby="hs-registro">
       <section class="panel" id="h-cal"></section>
@@ -918,10 +921,10 @@ input, textarea { padding: 10px 12px; }
     </div>
     <div id="h-sec-analises" role="tabpanel" aria-labelledby="hs-analises" hidden>
       <div class="seg seg-ana" role="tablist" aria-label="Tipos de análise">
-        <button type="button" role="tab" id="as-ativ">Atividades</button>
-        <button type="button" role="tab" id="as-pesagem">Pesagem</button>
-        <button type="button" role="tab" id="as-corpo">Corpo</button>
-        <button type="button" role="tab" id="as-semana">Semana</button>
+        <button type="button" role="tab" id="as-ativ"><svg class="tab-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M13 3L5 13h6l-1 8 8-10h-6z"/></svg><span>Atividades</span></button>
+        <button type="button" role="tab" id="as-pesagem"><svg class="tab-ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="4"/><path d="M9 12a3 3 0 016 0M12 12l1.5-2"/></svg><span>Pesagem</span></button>
+        <button type="button" role="tab" id="as-corpo"><svg class="tab-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="2"/><path d="M12 8v7M8 11h8M10 21l2-6 2 6"/></svg><span>Corpo</span></button>
+        <button type="button" role="tab" id="as-semana"><svg class="tab-ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="3"/><path d="M4 10h16M8 14h8"/></svg><span>Semana</span></button>
       </div>
       <div id="a-sec-semana" role="tabpanel" aria-labelledby="as-semana" hidden><section class="panel" id="a-fech"></section></div>
       <div id="a-sec-pesagem" role="tabpanel" aria-labelledby="as-pesagem" hidden><section class="panel" id="a-semana"></section></div>
@@ -7515,7 +7518,7 @@ window.MOVES = (function () {
   ['refeicoes', 'peso', 'historico', 'desempenho', 'receitas'].forEach(function (n) { $('t-' + n).addEventListener('click', function () { vai(n); }); });
   $('t-treino').addEventListener('click', function () {
     var u = 'academia'; try { u = localStorage.getItem('dt-treino-ultimo') || 'academia'; } catch (e) {}
-    vai(['academia', 'cardio', 'lombar', 'planos'].indexOf(u) >= 0 ? u : 'academia');
+    vai(['academia', 'cardio', 'lombar'].indexOf(u) >= 0 ? u : 'academia');
   });
   ['academia', 'cardio', 'lombar', 'planos'].forEach(function (n) { $('ts-' + n).addEventListener('click', function () { location.hash = n; show(); }); });
   window.addEventListener('hashchange', show);

@@ -1,7 +1,7 @@
 // Service worker: guarda a página e os arquivos estáticos para abrir rápido e com sinal fraco.
 // Dados e IA sempre vão para a rede.
-const CACHE = 'dieta-treino-v2';
-const BASE = ['/', '/index.html', '/plataforma.js', '/manifest.webmanifest', '/icons/icon-192.png', '/icons/icon-512.png'];
+const CACHE = 'dieta-treino-v3';
+const BASE = ['/', '/index.html', '/plataforma.js', '/manifest.webmanifest', '/icons/app-192.png', '/icons/app-512.png'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(BASE)).then(() => self.skipWaiting()));
@@ -37,8 +37,8 @@ self.addEventListener('push', (e) => {
       renotify: true,
       requireInteraction: false,
       vibrate: [900, 150, 900, 150, 900],
-      icon: '/icons/icon-192.png',
-      badge: '/icons/icon-192.png',
+      icon: '/icons/app-192.png',
+      badge: '/icons/app-192.png',
       timestamp: Date.now()
     });
   }));
