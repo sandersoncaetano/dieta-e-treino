@@ -6,7 +6,7 @@ export default rota(async (req, res) => {
   if (req.headers['x-cron-secret'] !== env('CRON_SECRET')) return responde(res, 403, { erro: 'segredo' });
   const { ids = [] } = await corpo(req);
   if (!ids.length) return responde(res, 200, { enviados: 0 });
-  webpush.setVapidDetails('mailto:' + env('EMAILS_PERMITIDOS').split(',')[0].trim(), env('VAPID_PUBLIC'), env('VAPID_PRIVATE'));
+  webpush.setVapidDetails('mailto:' + ((process.env.EMAILS_PERMITIDOS || '').split(',')[0].trim() || process.env.VAPID_EMAIL || 'contato@dieta-e-treino.app'), env('VAPID_PUBLIC'), env('VAPID_PRIVATE'));
   const alertas = await banco('alertas?select=id,user_id,titulo,corpo,dispara_em&id=in.(' + ids.join(',') + ')');
   let enviados = 0;
   for (const a of alertas) {

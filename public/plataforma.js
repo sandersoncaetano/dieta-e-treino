@@ -24,8 +24,7 @@
   function sessao() {
     if (!sessaoP) sessaoP = cliente().then(function (sb) {
       return sb.auth.getSession().then(function (r) {
-        if (r.data && r.data.session) return r.data.session;
-        return telaLogin(sb);
+        return (r.data && r.data.session ? Promise.resolve(r.data.session) : telaLogin(sb)).then(function (s) { return confereAcesso(sb, s); });
       });
     });
     return sessaoP;
@@ -62,7 +61,8 @@
         '<input id="pl-senha" type="password" autocomplete="current-password" style="font:inherit;padding:12px;border-radius:10px;border:2px solid var(--line,#c6d4e8)">' +
         '<button type="button" id="pl-entrar" style="font:inherit;font-weight:700;padding:12px;border-radius:10px;border:0;background:var(--accent,#1a5fd0);color:#fff">Entrar com senha</button>' +
         '<button type="submit" style="font:inherit;font-weight:700;padding:12px;border-radius:10px;border:2px solid var(--accent,#1a5fd0);background:transparent;color:inherit">Receber link de acesso por e-mail</button>' +
-        '<p id="pl-msg" aria-live="polite" style="margin:0"></p></form>';
+        '<p id="pl-msg" aria-live="polite" style="margin:0"></p>' +
+        '<p style="margin:4px 0 0;text-align:center">Ainda não tem acesso? <button type="button" id="pl-pedir" style="font:inherit;font-weight:700;border:0;background:none;color:var(--accent,#1a5fd0);padding:6px;cursor:pointer">Pedir acesso</button></p></form>';
       document.body.appendChild(box);
       var form = box.querySelector('form'), msg = box.querySelector('#pl-msg');
       form.addEventListener('submit', function (ev) {
@@ -81,8 +81,108 @@
           if (r.error) msg.textContent = 'Não consegui entrar: ' + (r.error.message === 'Invalid login credentials' ? 'e-mail ou senha incorretos.' : r.error.message);
         });
       });
+      box.querySelector('#pl-pedir').addEventListener('click', function () { telaPedido(box); });
       sb.auth.onAuthStateChange(function (_ev, s) { if (s) { box.remove(); resolve(s); } });
     });
+  }
+
+  /* Pedido de acesso: a conta nasce "pendente" e só entra depois da aprovação */
+  var EST_IN = 'font:inherit;padding:12px;border-radius:10px;border:2px solid var(--line,#c6d4e8);background:var(--surface,#fff);color:inherit';
+  var EST_BT = 'font:inherit;font-weight:700;padding:12px;border-radius:10px;border:0;background:var(--accent,#1a5fd0);color:var(--on-accent,#fff)';
+  function telaPedido(box) {
+    var f = box.querySelector('form');
+    f.innerHTML = '<h1 style="margin:0;font-size:1.5rem">Pedir acesso</h1>' +
+      '<p style="margin:0">Crie seu acesso. Você entra assim que o pedido for aprovado.</p>' +
+      '<label for="pa-nome">Seu nome</label><input id="pa-nome" required autocomplete="name" style="' + EST_IN + '">' +
+      '<label for="pa-email">Seu e-mail</label><input id="pa-email" type="email" required autocomplete="email" style="' + EST_IN + '">' +
+      '<label for="pa-senha">Crie uma senha (mínimo 8 caracteres)</label><input id="pa-senha" type="password" required minlength="8" autocomplete="new-password" style="' + EST_IN + '">' +
+      '<label for="pa-senha2">Repita a senha</label><input id="pa-senha2" type="password" required minlength="8" autocomplete="new-password" style="' + EST_IN + '">' +
+      '<label for="pa-ind">Quem indicou (opcional)</label><input id="pa-ind" autocomplete="off" style="' + EST_IN + '">' +
+      '<button type="submit" style="' + EST_BT + '">Enviar pedido</button>' +
+      '<button type="button" id="pa-volta" style="font:inherit;font-weight:700;border:0;background:none;color:var(--accent,#1a5fd0);padding:8px">Voltar para entrar</button>' +
+      '<p id="pa-msg" aria-live="polite" style="margin:0"></p>';
+    var nf = f.cloneNode(true); f.parentNode.replaceChild(nf, f); f = nf;
+    var msg = f.querySelector('#pa-msg');
+    function volta() { location.reload(); }
+    f.querySelector('#pa-volta').addEventListener('click', volta);
+    f.addEventListener('submit', function (ev) {
+      ev.preventDefault();
+      var v = function (id) { return f.querySelector('#' + id).value.trim(); };
+      if (f.querySelector('#pa-senha').value !== f.querySelector('#pa-senha2').value) { msg.textContent = 'As senhas não são iguais.'; return; }
+      msg.textContent = 'Enviando...';
+      fetch('/api/acesso', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao: 'pedir', nome: v('pa-nome'), email: v('pa-email').toLowerCase(), senha: f.querySelector('#pa-senha').value, indicado: v('pa-ind') }) })
+        .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+        .then(function (x) {
+          if (!x.ok) { msg.textContent = x.j.erro || 'Não consegui enviar o pedido.'; return; }
+          var st = x.j.status;
+          f.innerHTML = '<h1 style="margin:0;font-size:1.5rem">' + (x.j.ja ? 'Pedido já existe' : 'Pedido enviado') + '</h1>' +
+            '<p style="margin:0">' + (st === 'aprovado' ? 'Este e-mail já tem acesso. Entre com e-mail e senha.' : st === 'pendente' ? 'Assim que for aprovado, entre com o e-mail e a senha que você criou.' : 'Este e-mail não está liberado. Fale com quem te indicou o app.') + '</p>' +
+            '<button type="button" id="pa-ok" style="' + EST_BT + '">Voltar para entrar</button>';
+          f.querySelector('#pa-ok').addEventListener('click', volta);
+        }, function () { msg.textContent = 'Sem conexão. Tente de novo.'; });
+    });
+  }
+
+  /* Depois do login: só segue com o perfil aprovado */
+  function confereAcesso(sb, s) {
+    return sb.from('perfis').select('status,admin,nome').eq('user_id', s.user.id).maybeSingle().then(function (r) {
+      var p = r.data;
+      if (p && p.status === 'aprovado') { window.PERFIL_ACESSO = p; return s; }
+      return new Promise(function () {
+        var box = document.createElement('div');
+        box.setAttribute('style', 'position:fixed;inset:0;z-index:9999;display:grid;place-items:center;background:var(--bg,#fff);color:var(--fg,#142338);padding:16px;font-family:inherit');
+        var st = p ? p.status : 'pendente';
+        box.innerHTML = '<div style="max-width:360px;width:100%;display:grid;gap:12px;background:var(--surface,#fff);padding:20px;border-radius:16px">' +
+          '<h1 style="margin:0;font-size:1.5rem">' + (st === 'pendente' ? 'Aguardando aprovação' : 'Acesso não liberado') + '</h1>' +
+          '<p style="margin:0">' + (st === 'pendente' ? 'Seu pedido foi recebido. Assim que for aprovado, o app abre normalmente.' : st === 'bloqueado' ? 'Seu acesso está suspenso. Fale com quem te indicou o app.' : 'Seu pedido não foi aprovado. Fale com quem te indicou o app.') + '</p>' +
+          (st === 'pendente' ? '<button type="button" id="pg-de-novo" style="' + EST_BT + '">Verificar de novo</button>' : '') +
+          '<button type="button" id="pg-sair" style="font:inherit;font-weight:700;border:0;background:none;color:var(--accent,#1a5fd0);padding:8px">Sair</button></div>';
+        document.body.appendChild(box);
+        var dn = box.querySelector('#pg-de-novo'); if (dn) dn.addEventListener('click', function () { location.reload(); });
+        box.querySelector('#pg-sair').addEventListener('click', function () { sb.auth.signOut().then(function () { location.reload(); }); });
+      });
+    });
+  }
+
+  /* Pessoas (só administrador): aprovar, recusar, bloquear, reativar */
+  function painelPessoas() {
+    var velho = document.getElementById('pl-pes-box'); if (velho) velho.remove();
+    var box = document.createElement('div');
+    box.id = 'pl-pes-box'; box.setAttribute('role', 'dialog'); box.setAttribute('aria-label', 'Pessoas');
+    box.setAttribute('style', 'position:fixed;inset:0;z-index:9500;background:rgba(0,0,0,.45);display:grid;place-items:center;padding:16px');
+    box.innerHTML = '<div style="background:var(--bg,#fff);color:var(--fg,#142338);max-width:480px;width:100%;box-sizing:border-box;max-height:90vh;overflow:auto;border-radius:20px;padding:18px;display:grid;gap:12px">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;gap:12px"><h2 style="margin:0;font-size:1.4rem">Pessoas</h2><button type="button" id="pl-pes-x" aria-label="Fechar" style="font:inherit;font-weight:700;border:0;background:var(--mat,#eee);color:inherit;border-radius:20px;width:40px;height:40px">✕</button></div>' +
+      '<div id="pl-pes-c">Carregando...</div></div>';
+    document.body.appendChild(box);
+    function fecha() { box.remove(); }
+    box.addEventListener('click', function (e) { if (e.target === box) fecha(); });
+    box.querySelector('#pl-pes-x').addEventListener('click', fecha);
+    var c = box.querySelector('#pl-pes-c');
+    var NOME = { pendente: 'Aguardando', aprovado: 'Aprovado', recusado: 'Recusado', bloqueado: 'Bloqueado' };
+    var ACOES = { pendente: [['aprovado', 'Aprovar'], ['recusado', 'Recusar']], aprovado: [['bloqueado', 'Bloquear']], recusado: [['aprovado', 'Aprovar']], bloqueado: [['aprovado', 'Reativar']] };
+    function esc(t) { return String(t == null ? '' : t).replace(/[&<>"]/g, function (m) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[m]; }); }
+    function carrega() {
+      api('/api/acesso', { acao: 'lista' }).then(function (j) {
+        var ps = j.perfis || [], pend = ps.filter(function (p) { return p.status === 'pendente'; }).length;
+        c.innerHTML = '<p style="margin:0 0 4px;color:var(--muted,#555)">' + (pend ? pend + (pend === 1 ? ' pedido aguardando' : ' pedidos aguardando') + ' aprovação.' : 'Nenhum pedido aguardando.') + ' Você vê só nome, e-mail e status; os dados de cada pessoa ficam só com ela.</p>' +
+          ps.map(function (p) {
+            var bts = p.admin ? '<span style="font-size:.85rem;color:var(--muted,#555)">Administrador</span>' : (ACOES[p.status] || []).map(function (a) {
+              return '<button type="button" data-id="' + esc(p.user_id) + '" data-st="' + a[0] + '" style="font:inherit;font-weight:700;min-height:40px;padding:0 14px;border-radius:20px;border:0;' + (a[0] === 'aprovado' ? 'background:var(--accent,#1a5fd0);color:var(--on-accent,#fff)' : 'background:var(--mat,#eee);color:inherit') + '">' + a[1] + '</button>';
+            }).join('');
+            return '<div style="background:var(--surface,#f5f5f5);border-radius:16px;padding:12px 14px;display:grid;gap:8px">' +
+              '<div style="display:flex;justify-content:space-between;gap:8px;align-items:baseline"><strong>' + esc(p.nome || p.email) + '</strong><span style="font-size:.8rem;font-weight:700;color:' + (p.status === 'pendente' ? 'var(--warn,#a86a12)' : p.status === 'aprovado' ? 'var(--accent,#0e7c4d)' : 'var(--muted,#555)') + '">' + NOME[p.status] + '</span></div>' +
+              '<span style="font-size:.85rem;color:var(--muted,#555);overflow-wrap:anywhere">' + esc(p.email) + (p.indicado_por ? ' · indicado por ' + esc(p.indicado_por) : '') + ' · pediu em ' + new Date(p.criado).toLocaleDateString('pt-BR') + '</span>' +
+              '<div style="display:flex;gap:8px;flex-wrap:wrap">' + bts + '</div></div>';
+          }).join('');
+        c.querySelectorAll('[data-st]').forEach(function (b) {
+          b.addEventListener('click', function () {
+            b.disabled = true;
+            api('/api/acesso', { acao: 'status', user_id: b.getAttribute('data-id'), status: b.getAttribute('data-st') }).then(carrega, function (e) { b.disabled = false; alert(e.message); });
+          });
+        });
+      }, function (e) { c.textContent = 'Não consegui carregar: ' + e.message; });
+    }
+    carrega();
   }
 
   /* db: mesma interface que o app usava (collection().doc().set/delete e onSnapshot) */
@@ -211,7 +311,7 @@
     var d = document.createElement('details');
     d.className = 'conta-menu';
     d.innerHTML = '<summary aria-label="Conta"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg><span>Conta</span></summary>' +
-      '<div class="conta-pop"><button type="button" id="pl-uso">Uso da IA</button><button type="button" id="pl-con">Conectar ou reconectar Strava</button><button type="button" id="pl-hc">Health Connect (balança e relógio)</button><div class="pl-tema" role="group" aria-label="Tema"><span>Tema</span><button type="button" data-tema="auto">Automático</button><button type="button" data-tema="claro">Claro</button><button type="button" data-tema="escuro">Escuro</button></div><button type="button" id="pl-sair">Sair</button></div>';
+      '<div class="conta-pop"><button type="button" id="pl-uso">Uso da IA</button><button type="button" id="pl-con">Conectar ou reconectar Strava</button><button type="button" id="pl-hc">Health Connect (balança e relógio)</button><div class="pl-tema" role="group" aria-label="Tema"><span>Tema</span><button type="button" data-tema="auto">Automático</button><button type="button" data-tema="claro">Claro</button><button type="button" data-tema="escuro">Escuro</button></div><button type="button" id="pl-pessoas" hidden>Pessoas</button><button type="button" id="pl-sair">Sair</button></div>';
     var rec = document.getElementById('t-receitas');
     if (rec && rec.parentNode) {
       var col = document.createElement('div');
@@ -229,6 +329,8 @@
     function marcaTema() { var t = window.dtTema ? window.dtTema.atual() : 'auto'; d.querySelectorAll('[data-tema]').forEach(function (b) { b.setAttribute('aria-pressed', String(b.getAttribute('data-tema') === t)); }); }
     d.querySelectorAll('[data-tema]').forEach(function (b) { b.addEventListener('click', function () { if (window.dtTema) window.dtTema.muda(b.getAttribute('data-tema')); marcaTema(); }); });
     marcaTema();
+    var bp = d.querySelector('#pl-pessoas');
+    if (window.PERFIL_ACESSO && window.PERFIL_ACESSO.admin) { bp.hidden = false; bp.addEventListener('click', function () { d.open = false; painelPessoas(); }); }
     d.querySelector('#pl-sair').addEventListener('click', function () { sb.auth.signOut().then(function () { location.reload(); }); });
   }
 
