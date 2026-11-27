@@ -3514,7 +3514,7 @@ window.MOVES = (function () {
     });
   }
   /* Análise das atividades */
-  var ANA_V = 1, anaBusy = {}, anaMsg = {}, anaFila = false;
+  var ANA_V = 2, anaBusy = {}, anaMsg = {}, anaFila = false;
   var ANA_NOMES = { WeightTraining: 'Musculação', Pilates: 'Pilates', Yoga: 'Ioga', Workout: 'Treino', HighIntensityIntervalTraining: 'HIIT' };
   function anaGrupo(a) { return STRAVA_CARDIO[a.tipo] || a.tipo || 'outro'; }
   function anaGrupoNome(g) { var t = TIPOS.filter(function (x) { return x[0] === g; })[0]; return t ? t[1] : CARDIO_NOMES[g] || ANA_NOMES[g] || g; }
@@ -3673,7 +3673,9 @@ window.MOVES = (function () {
     else if (m.treino) { v = m.treino.vol; base = m.treinoAnt ? m.treinoAnt.vol : null; }
     else { v = m.min; base = media(ant, 'min'); }
     if (v != null && base) p = (v - base) / Math.abs(base);
-    if (corr && m.acima150 && !lib) { ve = 'atencao'; motivo = 'fc'; }
+    var ses = corr && m.km ? trSessaoDe(m.data) : null, intensa = ses && TR_INTENSO[ses.tipo];
+    var rt = ses && trPlano() ? trRetornoDe({ id: m.id, data: m.data, pace: m.pace, km: m.km, fc: m.fc }) : null;
+    if (corr && m.acima150 && !lib && !intensa) { ve = 'atencao'; motivo = 'fc'; }
     else if (m.treino && m.treino.planejadas && m.treino.series < m.treino.planejadas) { ve = 'atencao'; motivo = 'series'; }
     else if (mesmoDia >= 2) { ve = 'atencao'; motivo = 'carga'; }
     else if (m.treino ? !m.treinoAnt : n < 2) ve = 'inicio';
@@ -3688,8 +3690,9 @@ window.MOVES = (function () {
       dg.push('Você fez ' + fmtN(m.km, 2) + ' km a ' + clock(m.pace) + '/km' + (m.fc ? ', com FC média de ' + Math.round(m.fc) + ' bpm' : '') + '.');
       if (m.efic && base && n >= 2) dg.push('Isso dá ' + fmtN(m.efic, 2) + ' metros por batimento, ' + (Math.abs(p) < .03 ? 'praticamente igual à' : pctTxt(p) + (p > 0 ? ' acima da' : ' abaixo da')) + ' média das ' + n + ' anteriores.');
       else if (n < 2) dg.push('Ainda há poucas atividades do mesmo tipo para comparar.');
-      if (corr && m.acima150) dg.push(m.acima150 + (m.acima150 === 1 ? ' km ficou' : ' km ficaram') + ' acima de 150 bpm' + (lib ? '.' : ', acima do combinado para corrida leve.'));
-      else if (m.deriva >= 12) dg.push('A FC subiu ' + m.deriva + ' bpm do primeiro ao último km.');
+      if (rt) dg.unshift('No plano (' + (ses.titulo || ses.tipo) + '): ' + rt.itens[0]);
+      if (corr && m.acima150 && !intensa) dg.push(m.acima150 + (m.acima150 === 1 ? ' km ficou' : ' km ficaram') + ' acima de 150 bpm' + (lib ? '.' : ', acima do combinado para corrida leve.'));
+      else if (m.deriva >= 12 && !(ses && /aquec/i.test(ses.descricao || ''))) dg.push('A FC subiu ' + m.deriva + ' bpm do primeiro ao último km.');
     } else if (m.treino) {
       dg.push('Treino ' + L + ' com ' + m.treino.series + ' séries' + (m.treino.planejadas ? ' de ' + m.treino.planejadas + ' planejadas' : '') + ' e ' + nInt(m.treino.vol) + ' kg de volume.');
       if (m.treinoAnt && p !== null) dg.push(Math.abs(p) < .03 ? 'Volume praticamente igual ao último treino ' + L + '.' : 'O volume ficou ' + pctTxt(p) + (p > 0 ? ' acima' : ' abaixo') + ' do último treino ' + L + '.');
@@ -3706,7 +3709,9 @@ window.MOVES = (function () {
     var dest = anaInd(m, ant).filter(function (o) { return o.dir; }).slice(0, 3).map(function (o) { return o.rot + ': ' + o.txt + (o.base ? ' (' + o.base + ')' : ''); });
     var sug;
     if (m.km && corr) {
-      sug = m.acima150 && !lib ? 'Segure o ritmo nos primeiros km para a FC não passar de 150 bpm.'
+      sug = rt && rt.bloco && rt.nivel !== 'bom' ? (rt.bloco.pace < trPaceFaixa(ses.pace)[0] ? 'No próximo treino de ritmo, segure em ' + ses.pace + '/km: correr mais rápido que o plano soma cansaço sem ganho extra.' : 'No próximo treino de ritmo, mire em ' + ses.pace + '/km no bloco principal.')
+        : rt && rt.nivel === 'bom' && intensa ? 'Treino feito como o plano pedia. Mantenha o descanso antes do próximo treino forte.'
+        : m.acima150 && !lib && !intensa ? 'Segure o ritmo nos primeiros km para a FC não passar de 150 bpm.'
         : m.deriva >= 12 ? 'Comece mais devagar e beba água antes: a FC subiu bastante no fim.'
         : ve === 'queda' ? 'Faça a próxima bem leve e durma bem; uma corrida mais pesada isolada é normal.'
         : ve === 'evolucao' ? 'Mantenha o ritmo confortável: a eficiência está subindo.'
@@ -3723,7 +3728,8 @@ window.MOVES = (function () {
       sug = m.rotina && !m.rotina.concluida ? 'Tente completar a rotina inteira na próxima.' : 'Mantenha a regularidade.';
     }
     if (motivo === 'carga') sug = 'Muitas atividades em pouco tempo: faça a próxima mais leve ou descanse.';
-    return { veredito: ve, titulo: T[ve] || VERED[ve][0], diagnostico: dg.slice(0, 3).join(' '), destaques: dest, sugestao: sug };
+    if (rt && rt.itens.length > 1) dest = rt.itens.slice(1, 3).concat(dest).slice(0, 4);
+    return { veredito: ve, titulo: rt ? (rt.nivel === 'bom' ? 'Como o plano pedia' : rt.nivel === 'atencao' ? 'Acima do combinado no plano' : 'Fora do ritmo do plano') + ' · ' + (T[ve] || VERED[ve][0]).toLowerCase() : T[ve] || VERED[ve][0], diagnostico: dg.slice(0, rt ? 4 : 3).join(' '), destaques: dest, sugestao: sug };
   }
   function analisaLocal(id) {
     var m = anaMet(id); if (!m) return;
@@ -7270,6 +7276,25 @@ window.MOVES = (function () {
     var p = trPlano(), x = null; if (!p || !p.semanas) return null;
     p.semanas.forEach(function (w) { (w.sessoes || []).forEach(function (s) { if (s.data === d) x = s; }); }); return x;
   }
+  // Bloco principal de um treino contínuo de ritmo ("Aquecer 8 min. 2 km em 6:45-6:55. Desaquecer"):
+  // a janela mais rápida de N km seguidos, pulando o 1º km quando o plano pede aquecimento.
+  function trBloco(s, pkm, fckm) {
+    if (!s || !TR_INTENSO[s.tipo] || s.tipo === 'intervalado' || !pkm || pkm.length < 2) return null;
+    var d = s.descricao || '', mq = d.match(/(\d+(?:[.,]\d+)?)\s*km\s*(?:em|a|no|de|firme)/i), n = mq ? Math.round(parseFloat(mq[1].replace(',', '.'))) : 0;
+    var i0 = /aquec/i.test(d) ? 1 : 0;
+    if (!(n >= 1) || i0 + n > pkm.length) return null;
+    var best = null;
+    for (var i = i0; i + n <= pkm.length; i++) {
+      var w = pkm.slice(i, i + n); if (w.some(function (x) { return !(x > 0); })) continue;
+      var pc = Math.round(w.reduce(function (a, x) { return a + x; }, 0) / n);
+      if (!best || pc < best.pace) best = { ini: i, n: n, pace: pc };
+    }
+    if (!best) return null;
+    var fw = (fckm || []).slice(best.ini, best.ini + n).filter(Boolean);
+    best.fcMin = fw.length ? Math.min.apply(null, fw) : null; best.fcMax = fw.length ? Math.max.apply(null, fw) : null;
+    best.aq = i0 && pkm[0] ? pkm[0] : null;
+    return best;
+  }
   function trRetornoDe(r) {
     var s = trSessaoDe(r.data), it = [], nivel = 'bom';
     if (!s) return { nivel: 'ok', titulo: 'Corrida fora do plano', itens: ['Não havia sessão planejada para ' + dsem(r.data) + '. Tudo bem, só não some intensidade extra na semana.'] };
@@ -7281,6 +7306,17 @@ window.MOVES = (function () {
       if (f && (med < f[0] - 10 || med > f[1] + 10)) nivel = 'ok';
       if (s.fc_max && fm) { if (fm > s.fc_max + 3) { it.push('FC chegou a ' + fm + ' bpm nos tiros, acima do teto de ' + s.fc_max + '.'); nivel = 'atencao'; } else it.push('FC máxima de ' + fm + ' bpm nos tiros, dentro do teto de ' + s.fc_max + '.'); }
       return { nivel: nivel, titulo: (s.titulo || s.tipo) + ': ' + ({ bom: 'como planejado', ok: 'com desvios', atencao: 'acima do combinado' })[nivel], itens: it };
+    }
+    var bl = trBloco(s, sd && sd.pkm, sd && sd.fckm);
+    if (bl && f) {
+      var faixa = 'km ' + (bl.ini + 1) + (bl.n > 1 ? '–' + (bl.ini + bl.n) : '');
+      if (bl.pace < f[0] - 8) { it.push('Bloco principal (' + faixa + '): ' + clock(bl.pace) + '/km, mais rápido que o planejado (' + s.pace + '). O objetivo era controle, não velocidade.'); nivel = 'ok'; }
+      else if (bl.pace > f[1] + 8) { it.push('Bloco principal (' + faixa + '): ' + clock(bl.pace) + '/km, mais lento que o planejado (' + s.pace + ').'); nivel = 'ok'; }
+      else it.push('Bloco principal (' + faixa + '): ' + clock(bl.pace) + '/km, dentro do planejado (' + s.pace + ').');
+      if (bl.aq) it.push('Aquecimento no 1º km a ' + clock(bl.aq) + '/km.');
+      if (s.fc_max && bl.fcMax) { if (bl.fcMax > s.fc_max) { it.push('FC no bloco chegou a ' + bl.fcMax + ' bpm, acima do teto de ' + s.fc_max + '.'); nivel = 'atencao'; } else it.push('FC no bloco entre ' + bl.fcMin + ' e ' + bl.fcMax + ' bpm, dentro do teto de ' + s.fc_max + '.'); }
+      if (s.km) { var dkb = (r.km - s.km) / s.km; it.push(Math.abs(dkb) <= .1 ? 'Distância total: ' + fmtN(r.km, 2) + ' km.' : fmtN(r.km, 2) + ' km no total, ' + (dkb > 0 ? 'mais' : 'menos') + ' que os ' + fmtN(s.km, 1) + ' km planejados.'); }
+      return { nivel: nivel, titulo: (s.titulo || s.tipo) + ': ' + ({ bom: 'como planejado', ok: 'com desvios', atencao: 'acima do combinado' })[nivel], itens: it, bloco: bl, sessao: s };
     }
     if (TR_INTENSO[s.tipo] && sd && !sd.tirosLido) return { nivel: 'ok', titulo: (s.titulo || s.tipo) + ': lendo os tiros...', itens: ['Buscando os detalhes no Strava para separar tiros e recuperação.'] };
     if (f) {
@@ -7341,7 +7377,7 @@ window.MOVES = (function () {
     function kpi(v, t) { k.appendChild(h('div', {}, h('b', { text: v }), h('span', { text: t }))); }
     kpi(paceAtual ? clock(paceAtual) : '—', 'pace médio nas últimas ' + (rec.length || 3) + ' corridas');
     kpi(paceAtual ? (paceAtual > m.pace ? '−' + (paceAtual - m.pace) + ' s' : '✓') : '—', paceAtual && paceAtual > m.pace ? 'a tirar por km até a meta' : 'já no pace da meta');
-    kpi(p && p.estimativa_seg ? clock(p.estimativa_seg) : '—', 'estimativa da IA para os ' + m.km + ' km hoje');
+    kpi(p && p.estimativa_seg ? clock(p.estimativa_seg) : '—', 'estimativa da IA para os ' + m.km + ' km' + (p && p.criado ? ' (' + ddmm(Store.day(new Date(p.criado))) + ')' : ''));
     box.appendChild(k);
     if (!m.liberado) box.appendChild(h('p', { class: 'tip', text: 'O plano está só com corridas leves, como o médico liberou. Quando ele liberar treinos mais fortes, marque em "Editar meta" e atualize o plano.' }));
 
@@ -7365,6 +7401,8 @@ window.MOVES = (function () {
     // Análise
     if (p && p.analise) {
       var NV = { bom: 'No caminho certo', ok: 'Dá para chegar com ajustes', atencao: 'Atenção' };
+      var crd = Store.day(new Date(p.criado)), novas = trCorridas().filter(function (x) { return x.data > crd; }).length;
+      box.appendChild(h('p', { class: 'tip tr-leit', text: 'Leitura da IA de ' + br(crd) + ', feita ao montar o plano' + (novas ? '. Depois dela vieram ' + novas + (novas === 1 ? ' corrida' : ' corridas') + ', avaliadas acima. Ela é refeita quando a semana fecha ou em Refazer plano.' : '.') }));
       var v = h('div', { class: 'verdict ' + p.nivel }, h('b', { text: (NV[p.nivel] || NV.ok) + (p.chance ? ' · chance ' + ({ alta: 'alta', media: 'média', baixa: 'baixa' }[p.chance] || p.chance) : '') }), h('p', { text: p.analise }));
       if (p.resumo) v.appendChild(h('p', { text: p.resumo }));
       if (p.alertas && p.alertas.length) { var ul = h('ul'); p.alertas.forEach(function (x) { ul.appendChild(h('li', { text: x })); }); v.appendChild(ul); }
