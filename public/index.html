@@ -5109,7 +5109,7 @@ window.MOVES = (function () {
   function aliNotas(relato) { return String(relato || '').replace(/\r/g, '').split(/\n|;|(?<!\d)[.,]|[.,](?!\d)/).map(function (x) { return x.trim(); }).filter(function (x) { return x && aliNota(x); }); }
   function aliEstima(relato) { return ALI_ESTIMA.test(aliNorm(relato)); }
   function aliTrechos(relato) {
-    var partes = String(relato || '').replace(/\r/g, '').split(/\n|;|\+|(?<!\d)[.,]|[.,](?!\d)/);
+    var partes = String(relato || '').replace(/\r/g, '').replace(/\(([^)]*)\)/g, function (m, x) { return '(' + x.replace(/(?<!\d)[.,]|[.,](?!\d)|[;+]/g, ' ') + ')'; }).split(/\n|;|\+|(?<!\d)[.,]|[.,](?!\d)/);
     var out = [];
     partes.forEach(function (p) {
       p = p.trim(); if (!p || aliNota(p)) return;
@@ -5210,10 +5210,16 @@ window.MOVES = (function () {
     return k === 'troca' ? Object.assign({}, novo, { k: 1 }) : o;
   }
   // Aprende um trecho com os valores calculados (pela IA ou do histórico). troca=true substitui o que havia.
+  // Nome de alimento sem vírgula (a vírgula separa itens no relato e na receita); decimais como "4,6 g" ficam.
+  function aliNomeLimpo(n) {
+    return String(n || '').replace(/\(([^)]*)\)/g, function (m, x) { return '(' + x.replace(/(?<!\d)\s*,\s*|\s*,\s*(?!\d)/g, ' · ') + ')'; })
+      .replace(/(?<!\d)\s*,\s*|\s*,\s*(?!\d)/g, ' ').replace(/\s{2,}/g, ' ').trim();
+  }
   function aliAprende(t, v, nome, fonte, troca) {
     if (!t || t.amb || !t.nome || v.kcal == null || isNaN(v.kcal)) return;
     var key = aliKey(t.nome), a = Object.assign({ alias: t.nome, nome: nome || t.nome }, Store.get('alimentos', key) || {});
     if (nome) a.nome = nome;
+    a.nome = aliNomeLimpo(a.nome);
     var c = v.c != null ? v.c : Math.max(0, (v.kcal - 4 * (v.p || 0) - 9 * (v.g || 0)) / 4);
     var tot = { kcal: v.kcal, p: v.p || 0, g: v.g || 0, c: c };
     var md = troca ? 'troca' : null;
@@ -6891,7 +6897,7 @@ window.MOVES = (function () {
   function refeicaoParaReceita(id) {
     var m = Store.get('refeicoes', id); if (!m) return;
     var rid = 'r' + Date.now();
-    var doc = { nome: '', ingredientes: m.relato || (m.itens || []).map(function (x) { return x.quantidade + ' de ' + x.nome; }).join(', '), porcoes: 1, tags: [], criado: new Date().toISOString() };
+    var doc = { nome: '', ingredientes: m.relato || (m.itens || []).map(function (x) { return x.quantidade + ' de ' + aliNomeLimpo(x.nome); }).join('\n'), porcoes: 1, tags: [], criado: new Date().toISOString() };
     if (typeof m.kcal === 'number' && Array.isArray(m.itens) && m.itens.length) {
       doc.total = { kcal: m.kcal, proteina_g: m.proteina_g || 0, gordura_g: m.gordura_g || 0, carbo_g: m.carbo_g || 0 };
       doc.itens = m.itens.map(function (x) { return { nome: x.nome, quantidade: x.quantidade, kcal: x.kcal, proteina_g: x.proteina_g, gordura_g: x.gordura_g }; });
