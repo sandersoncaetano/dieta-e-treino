@@ -2,6 +2,8 @@
 //  POST {acao:'pedir', nome, email, senha, indicado}  (sem login) → cria a conta como "pendente" e avisa o administrador
 //  POST {acao:'lista'}                                 (administrador) → perfis
 //  POST {acao:'status', user_id, status}               (administrador) → aprova, recusa, bloqueia ou reativa
+//  POST {acao:'senha', user_id}                         (administrador) → gera uma senha provisória e devolve para você repassar
+import crypto from 'node:crypto';
 import webpush from 'web-push';
 import { env, responde, corpo, usuario, banco, rota } from './_lib.js';
 
@@ -69,6 +71,16 @@ export default rota(async (req, res) => {
     const patch = { status: st, ...(st === 'aprovado' ? { aprovado_em: new Date().toISOString() } : {}) };
     const r = await banco('perfis?user_id=eq.' + enc(id), { method: 'PATCH', body: JSON.stringify(patch) });
     return responde(res, 200, { ok: true, perfil: r && r[0] });
+  }
+
+  if (b.acao === 'senha') {
+    const id = String(b.user_id || '');
+    if (!id || id === u.id) return responde(res, 400, { erro: 'Escolha outra pessoa.' });
+    // Sem letras e números que se confundem (0/O, 1/l), para ditar ou mandar por mensagem.
+    const ABC = 'abcdefghjkmnpqrstuvwxyz23456789', bytes = crypto.randomBytes(10);
+    const senha = Array.from(bytes, (x) => ABC[x % ABC.length]).join('');
+    await authAdmin('users/' + enc(id), { method: 'PUT', body: JSON.stringify({ password: senha }) });
+    return responde(res, 200, { ok: true, senha });
   }
 
   responde(res, 400, { erro: 'Ação desconhecida.' });

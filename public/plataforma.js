@@ -168,7 +168,7 @@
           ps.map(function (p) {
             var bts = p.admin ? '<span style="font-size:.85rem;color:var(--muted,#555)">Administrador</span>' : (ACOES[p.status] || []).map(function (a) {
               return '<button type="button" data-id="' + esc(p.user_id) + '" data-st="' + a[0] + '" style="font:inherit;font-weight:700;min-height:40px;padding:0 14px;border-radius:20px;border:0;' + (a[0] === 'aprovado' ? 'background:var(--accent,#1a5fd0);color:var(--on-accent,#fff)' : 'background:var(--mat,#eee);color:inherit') + '">' + a[1] + '</button>';
-            }).join('');
+            }).join('') + (p.admin ? '' : '<button type="button" data-senha="' + esc(p.user_id) + '" data-nome="' + esc(p.nome || p.email) + '" style="font:inherit;font-weight:600;min-height:40px;padding:0 14px;border-radius:20px;border:0;background:transparent;color:var(--accent,#1a5fd0)">Senha provisória</button>');
             return '<div style="background:var(--surface,#f5f5f5);border-radius:16px;padding:12px 14px;display:grid;gap:8px">' +
               '<div style="display:flex;justify-content:space-between;gap:8px;align-items:baseline"><strong>' + esc(p.nome || p.email) + '</strong><span style="font-size:.8rem;font-weight:700;color:' + (p.status === 'pendente' ? 'var(--warn,#a86a12)' : p.status === 'aprovado' ? 'var(--accent,#0e7c4d)' : 'var(--muted,#555)') + '">' + NOME[p.status] + '</span></div>' +
               '<span style="font-size:.85rem;color:var(--muted,#555);overflow-wrap:anywhere">' + esc(p.email) + (p.indicado_por ? ' · indicado por ' + esc(p.indicado_por) : '') + ' · pediu em ' + new Date(p.criado).toLocaleDateString('pt-BR') + '</span>' +
@@ -180,9 +180,57 @@
             api('/api/acesso', { acao: 'status', user_id: b.getAttribute('data-id'), status: b.getAttribute('data-st') }).then(carrega, function (e) { b.disabled = false; alert(e.message); });
           });
         });
+        c.querySelectorAll('[data-senha]').forEach(function (b) {
+          b.addEventListener('click', function () {
+            if (!confirm('Criar uma senha provisória para ' + b.getAttribute('data-nome') + '? A senha atual dela deixa de funcionar.')) return;
+            b.disabled = true;
+            api('/api/acesso', { acao: 'senha', user_id: b.getAttribute('data-senha') }).then(function (j) {
+              var cx = b.parentNode, p = document.createElement('p');
+              p.setAttribute('style', 'margin:0;width:100%;display:flex;gap:8px;align-items:center;flex-wrap:wrap');
+              p.innerHTML = 'Senha provisória: <code style="font-size:1.1rem;font-weight:700;user-select:all;background:var(--mat,#eee);padding:4px 8px;border-radius:8px">' + esc(j.senha) + '</code>';
+              var cp = document.createElement('button'); cp.type = 'button'; cp.textContent = 'Copiar';
+              cp.setAttribute('style', 'font:inherit;font-weight:700;min-height:36px;padding:0 12px;border-radius:18px;border:0;background:var(--mat,#eee);color:inherit');
+              cp.addEventListener('click', function () { (navigator.clipboard ? navigator.clipboard.writeText(j.senha) : Promise.reject()).then(function () { cp.textContent = 'Copiado'; }, function () { cp.textContent = 'Selecione e copie'; }); });
+              p.appendChild(cp);
+              var dica = document.createElement('span'); dica.textContent = 'Mande para a pessoa e peça para trocar em Conta → Trocar senha.'; dica.setAttribute('style', 'font-size:.85rem;color:var(--muted,#555)');
+              p.appendChild(dica);
+              cx.parentNode.appendChild(p); b.remove();
+            }, function (e) { b.disabled = false; alert(e.message); });
+          });
+        });
       }, function (e) { c.textContent = 'Não consegui carregar: ' + e.message; });
     }
     carrega();
+  }
+
+  /* Trocar a própria senha */
+  function painelSenha(sb) {
+    var velho = document.getElementById('pl-senha-box'); if (velho) velho.remove();
+    var box = document.createElement('div');
+    box.id = 'pl-senha-box'; box.setAttribute('role', 'dialog'); box.setAttribute('aria-label', 'Trocar senha');
+    box.setAttribute('style', 'position:fixed;inset:0;z-index:9500;background:rgba(0,0,0,.45);display:grid;place-items:center;padding:16px');
+    box.innerHTML = '<form style="background:var(--bg,#fff);color:var(--fg,#142338);max-width:380px;width:100%;box-sizing:border-box;border-radius:20px;padding:18px;display:grid;gap:10px">' +
+      '<h2 style="margin:0;font-size:1.4rem">Trocar senha</h2>' +
+      '<label for="ts-1">Nova senha (mínimo 8 caracteres)</label><input id="ts-1" type="password" required minlength="8" autocomplete="new-password" style="' + EST_IN + '">' +
+      '<label for="ts-2">Repita a nova senha</label><input id="ts-2" type="password" required minlength="8" autocomplete="new-password" style="' + EST_IN + '">' +
+      '<button type="submit" style="' + EST_BT + '">Salvar senha</button>' +
+      '<button type="button" id="ts-x" style="font:inherit;font-weight:700;border:0;background:none;color:var(--accent,#1a5fd0);padding:8px">Cancelar</button>' +
+      '<p id="ts-msg" aria-live="polite" style="margin:0"></p></form>';
+    document.body.appendChild(box);
+    var f = box.querySelector('form'), msg = box.querySelector('#ts-msg');
+    function fecha() { box.remove(); }
+    box.addEventListener('click', function (e) { if (e.target === box) fecha(); });
+    box.querySelector('#ts-x').addEventListener('click', fecha);
+    f.addEventListener('submit', function (ev) {
+      ev.preventDefault();
+      var a = box.querySelector('#ts-1').value, b2 = box.querySelector('#ts-2').value;
+      if (a !== b2) { msg.textContent = 'As senhas não são iguais.'; return; }
+      msg.textContent = 'Salvando...';
+      sb.auth.updateUser({ password: a }).then(function (r) {
+        if (r.error) { msg.textContent = 'Não consegui trocar: ' + r.error.message; return; }
+        msg.textContent = 'Senha trocada.'; setTimeout(fecha, 1200);
+      });
+    });
   }
 
   /* db: mesma interface que o app usava (collection().doc().set/delete e onSnapshot) */
@@ -311,7 +359,7 @@
     var d = document.createElement('details');
     d.className = 'conta-menu';
     d.innerHTML = '<summary aria-label="Conta"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg><span>Conta</span></summary>' +
-      '<div class="conta-pop"><button type="button" id="pl-uso">Uso da IA</button><button type="button" id="pl-con">Conectar ou reconectar Strava</button><button type="button" id="pl-hc">Health Connect (balança e relógio)</button><div class="pl-tema" role="group" aria-label="Tema"><span>Tema</span><button type="button" data-tema="auto">Automático</button><button type="button" data-tema="claro">Claro</button><button type="button" data-tema="escuro">Escuro</button></div><button type="button" id="pl-pessoas" hidden>Pessoas</button><button type="button" id="pl-sair">Sair</button></div>';
+      '<div class="conta-pop"><button type="button" id="pl-uso">Uso da IA</button><button type="button" id="pl-con">Conectar ou reconectar Strava</button><button type="button" id="pl-hc">Health Connect (balança e relógio)</button><div class="pl-tema" role="group" aria-label="Tema"><span>Tema</span><button type="button" data-tema="auto">Automático</button><button type="button" data-tema="claro">Claro</button><button type="button" data-tema="escuro">Escuro</button></div><button type="button" id="pl-senha">Trocar senha</button><button type="button" id="pl-pessoas" hidden>Pessoas</button><button type="button" id="pl-sair">Sair</button></div>';
     var rec = document.getElementById('t-receitas');
     if (rec && rec.parentNode) {
       var col = document.createElement('div');
@@ -329,6 +377,7 @@
     function marcaTema() { var t = window.dtTema ? window.dtTema.atual() : 'auto'; d.querySelectorAll('[data-tema]').forEach(function (b) { b.setAttribute('aria-pressed', String(b.getAttribute('data-tema') === t)); }); }
     d.querySelectorAll('[data-tema]').forEach(function (b) { b.addEventListener('click', function () { if (window.dtTema) window.dtTema.muda(b.getAttribute('data-tema')); marcaTema(); }); });
     marcaTema();
+    d.querySelector('#pl-senha').addEventListener('click', function () { d.open = false; painelSenha(sb); });
     var bp = d.querySelector('#pl-pessoas');
     if (window.PERFIL_ACESSO && window.PERFIL_ACESSO.admin) { bp.hidden = false; bp.addEventListener('click', function () { d.open = false; painelPessoas(); }); }
     d.querySelector('#pl-sair').addEventListener('click', function () { sb.auth.signOut().then(function () { location.reload(); }); });
