@@ -733,6 +733,8 @@ input, textarea { padding: 10px 12px; }
 .verdict .link { max-width: none; text-align: left; justify-self: start; color: var(--accent); text-decoration: none; font-weight: 600; }
 .meal-obs { color: var(--muted); font-size: .9rem; font-style: italic; }
 #fe-obs { width: 100%; margin-top: 8px; }
+.session-fim { margin: 0; font-weight: 700; color: var(--accent); }
+.session-retoma { justify-self: start; }
 .toast { bottom: calc(84px + env(safe-area-inset-bottom, 0px)); border-radius: 22px; }
 </style>
 </head>
@@ -1928,7 +1930,9 @@ window.MOVES = (function () {
     var time = h('b', { class: 'session-time', id: id + '-time', text: '0:00' });
     var btn = h('button', { type: 'button', class: 'go', id: id + '-btn' });
     var fonte = h('p', { class: 'tip', hidden: '' });
-    var el = h('section', { class: 'session' }, h('div', { class: 'session-row' }, h('span', { text: 'Tempo de treino' }), time), fonte, btn);
+    var fimTxt = h('p', { class: 'session-fim', hidden: '' });
+    var el = h('section', { class: 'session' }, h('div', { class: 'session-row' }, h('span', { text: 'Tempo de treino' }), time), fonte, fimTxt, btn);
+    var RETOMA_MS = 10 * 60 * 1000; // depois de encerrar, dá para retomar por 10 minutos
     function secs(d) {
       if (!d.inicio) return 0;
       return Math.max(0, Math.round(((d.fim ? new Date(d.fim).getTime() : Date.now()) - new Date(d.inicio).getTime()) / 1000));
@@ -1938,6 +1942,14 @@ window.MOVES = (function () {
       time.textContent = hms(secs(d));
       fonte.hidden = d.fonte_tempo !== 'strava';
       fonte.textContent = 'Tempo do relógio, trazido do Strava.';
+      var resta = d.fim ? RETOMA_MS - (Date.now() - new Date(d.fim).getTime()) : 0;
+      if (d.fim) {
+        var hf = new Date(d.fim);
+        fimTxt.hidden = false;
+        fimTxt.textContent = '✓ Treino concluído às ' + String(hf.getHours()).padStart(2, '0') + ':' + String(hf.getMinutes()).padStart(2, '0') + (resta > 0 ? ' · dá para retomar por mais ' + Math.ceil(resta / 60000) + ' min' : '');
+      } else fimTxt.hidden = true;
+      btn.hidden = !!d.fim && resta <= 0;
+      btn.className = d.fim ? 'howbtn session-retoma' : 'go';
       btn.textContent = !d.inicio ? 'Iniciar treino' : d.fim ? 'Retomar treino' : 'Encerrar treino';
     }
     btn.addEventListener('click', function () {
@@ -1945,7 +1957,7 @@ window.MOVES = (function () {
       window.Fig.prep();
       delete d.fonte_tempo;
       if (!d.inicio) { d.inicio = new Date().toISOString(); delete d.fim; window.Fig.hold(); }
-      else if (d.fim) { d.inicio = new Date(Date.now() - secs(d) * 1000).toISOString(); delete d.fim; window.Fig.hold(); }
+      else if (d.fim) { if (Date.now() - new Date(d.fim).getTime() > RETOMA_MS) { run(); return; } d.inicio = new Date(Date.now() - secs(d) * 1000).toISOString(); delete d.fim; window.Fig.hold(); }
       else { d.fim = new Date().toISOString(); d.minutos = Math.max(1, Math.round(secs(d) / 60)); window.Fig.free(); }
       api.set(d); run();
       if (api.after) api.after();
