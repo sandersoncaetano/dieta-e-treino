@@ -143,26 +143,42 @@ async function recebe(uid, p) {
     await grava(uid, 'saude_dia', novos);
   }
   // 4) Atividades do relógio (corrida, caminhada, bike) viram registros de cardio, para quem não usa o Strava.
+  // A mesma atividade costuma chegar de duas fontes (o relógio e o Google Fit): fica a do relógio.
   let ativ = 0;
-  const sessoes = (p.exercise || []).filter((x) => ['corrida', 'caminhada', 'bike'].includes(x.tipo) && x.start_time && Number(x.duration_seconds) >= 300);
+  const prioEx = (o) => /google\.android\.apps\.fitness/i.test(o || '') ? 1 : 2;
+  const minimo = (t) => t === 'caminhada' ? 600 : 300;
+  // Caminhadas que o Google Fit detecta sozinho (ir à cozinha, ao carro) não entram: só as de verdade, com 20 min e 1 km.
+  const valeGoogle = (x) => !(x.tipo === 'caminhada' && prioEx(x.metadata && x.metadata.data_origin) === 1) || (Number(x.duration_seconds) >= 1200 && Number(x.distance_m) >= 1000);
+  const sessoes = (p.exercise || []).filter((x) => ['corrida', 'caminhada', 'bike'].includes(x.tipo) && x.start_time && x.end_time && Number(x.duration_seconds) >= minimo(x.tipo) && valeGoogle(x));
   if (sessoes.length) {
     const st = await banco('strava_tokens?select=user_id&user_id=eq.' + uid);
     if (!(st && st[0])) {
-      const ids = sessoes.map((x) => 'hc_' + String((x.metadata && x.metadata.id) || x.start_time).replace(/[^A-Za-z0-9_-]/g, '').slice(0, 60));
-      const ja = await docs(uid, 'cardio', ids), novos = {};
-      sessoes.forEach((x, i) => {
-        const id = ids[i], velho = ja[id];
-        if (velho && velho.origem !== 'health-connect') return;
+      const dias = [...new Set(sessoes.map((x) => diaLocal(x.start_time)))];
+      const exist = await banco('docs?select=id,data&user_id=eq.' + uid + '&colecao=eq.cardio&id=like.hc_*&data->>data=in.(' + dias.map((d) => '"' + d + '"').join(',') + ')');
+      const lista = (exist || []).map((d) => ({ id: d.id, ini: new Date(d.data.ini_iso || 0).getTime(), fim: new Date(d.data.fim_iso || 0).getTime(), prio: d.data.prio || 1, seg: d.data.segundos || 0, doc: d.data, velho: true }));
+      const sobrepoe = (a, b) => Math.min(a.fim, b.fim) - Math.max(a.ini, b.ini) > 0.5 * Math.min(a.fim - a.ini, b.fim - b.ini);
+      const grava1 = {}, apaga = new Set();
+      for (const x of sessoes) {
+        const c = { id: 'hc_' + String((x.metadata && x.metadata.id) || x.start_time).replace(/[^A-Za-z0-9_-]/g, '').slice(0, 60), ini: new Date(x.start_time).getTime(), fim: new Date(x.end_time).getTime(), prio: prioEx(x.metadata && x.metadata.data_origin), seg: Number(x.duration_seconds), x };
+        const rival = lista.find((o) => o.id !== c.id && !apaga.has(o.id) && sobrepoe(o, c));
+        if (rival) {
+          if (rival.prio > c.prio || (rival.prio === c.prio && rival.seg >= c.seg)) continue;
+          apaga.add(rival.id); delete grava1[rival.id];
+        }
+        const ant = lista.find((o) => o.id === c.id);
+        if (ant && ant.doc && ant.doc.origem !== 'health-connect') continue;
         const kcal = Number(x.kcal_ativa) || Number(x.kcal_total) || null;
-        novos[id] = Object.assign({}, velho || {}, {
-          tipo: x.tipo, data: diaLocal(x.start_time), inicio: horaLocal(x.start_time),
-          distancia_km: x.distance_m ? Math.round(Number(x.distance_m) / 10) / 100 : 0, segundos: Math.round(Number(x.duration_seconds)),
+        grava1[c.id] = Object.assign({}, ant && ant.doc ? ant.doc : {}, {
+          tipo: x.tipo, data: diaLocal(x.start_time), inicio: horaLocal(x.start_time), ini_iso: x.start_time, fim_iso: x.end_time, prio: c.prio,
+          distancia_km: x.distance_m ? Math.round(Number(x.distance_m) / 10) / 100 : 0, segundos: Math.round(c.seg),
           fc_media: x.fc_media ? Math.round(Number(x.fc_media)) : null, fc_max: x.fc_max ? Math.round(Number(x.fc_max)) : null,
-          kcal_relogio: kcal ? Math.round(kcal) : null, nota: String(x.title || '').slice(0, 120) || (velho && velho.nota) || '',
+          kcal_relogio: kcal ? Math.round(kcal) : null, nota: String(x.title || '').slice(0, 120) || (ant && ant.doc && ant.doc.nota) || '',
           origem: 'health-connect', atualizado: new Date().toISOString()
         });
-      });
-      await grava(uid, 'cardio', novos); ativ = Object.keys(novos).length;
+        if (!ant) lista.push(c);
+      }
+      for (const id of apaga) await banco('docs?user_id=eq.' + uid + '&colecao=eq.cardio&id=eq.' + enc(id), { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
+      await grava(uid, 'cardio', grava1); ativ = Object.keys(grava1).length;
     }
   }
   return { registros: linhas.length, composicao: dias.length, dias: diasR.length, atividades: ativ };
