@@ -774,12 +774,16 @@ input, textarea { padding: 10px 12px; }
 .fi-busca { z-index: 9100; } .fi-busca input[type=search] { width: 100%; box-sizing: border-box; min-height: 48px; font: inherit; }
 .fi-res { display: grid; gap: 8px; }
 .fi-item { display: flex; align-items: center; gap: 12px; text-align: left; padding: 8px 10px; border-radius: 14px; border: 0; background: var(--surface); color: var(--fg); font: inherit; min-height: 60px; }
+.fi-item.ja { opacity: .55; } .fi-item.ja small { color: var(--accent); }
+.fi-svg { background: var(--mat); padding: 2px; box-sizing: border-box; } .fi-svg svg { width: 100%; height: 100%; }
+.fi-item .fi-th { width: 56px; height: 56px; }
 .fi-item b { display: block; } .fi-item small { color: var(--muted); }
 .flip { position: relative; background: #fff; border-radius: 10px; overflow: hidden; }
 .flip img { display: block; width: 100%; max-height: min(27vh, 240px); object-fit: contain; }
 .flip img + img { position: absolute; inset: 0; height: 100%; max-height: none; animation: flipx 1.6s steps(1) infinite; }
 @keyframes flipx { 0% { opacity: 0; } 50% { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .flip img + img { animation-duration: 4s; } }
+#fi-rm { justify-self: start; max-width: none; text-align: left; }
 .fi-passos { margin: 0; padding-left: 20px; display: grid; gap: 6px; }
 .toast { bottom: calc(84px + env(safe-area-inset-bottom, 0px)); border-radius: 22px; }
 </style>
@@ -3113,13 +3117,19 @@ window.MOVES = (function () {
   // Exercícios que já têm animação no app (vêm das fichas embutidas).
   function exDoApp() {
     var m = {};
-    [TREINOS0, FICHA_INICIAL].forEach(function (t) { Object.keys(t).forEach(function (k) { t[k].ex.forEach(function (e) { if (window.MOVES[e.id] && !m[e.id]) m[e.id] = { id: e.id, n: e.name, k: normTxt(e.name), app: 1, unit: e.unit, step: e.step }; }); }); });
+    [TREINOS0, FICHA_INICIAL].forEach(function (t) { Object.keys(t).forEach(function (k) { t[k].ex.forEach(function (e) { if (window.MOVES[e.id] && !m[e.id] && !Object.keys(m).some(function (z) { return m[z].k === normTxt(e.name); })) m[e.id] = { id: e.id, n: e.name, k: normTxt(e.name), app: 1, unit: e.unit, step: e.step }; }); }); });
     return Object.keys(m).map(function (k) { return m[k]; });
   }
   function fotosEx(urls, nome) {
     var f = h('div', { class: 'flip', role: 'img', 'aria-label': 'Fotos do movimento: ' + nome });
     urls.slice(0, 2).forEach(function (u) { f.appendChild(h('img', { src: u, alt: '', loading: 'lazy', decoding: 'async' })); });
     return f;
+  }
+  function miniEx(id, img, nome) {
+    if (img && img[0]) return h('img', { class: 'fi-th', src: img[0], alt: '', loading: 'lazy' });
+    var mv = window.MOVES[id], sp = h('span', { class: 'fi-th' });
+    if (mv) { try { mv.name = nome; var f = window.Fig.build(mv, true); f.draw(mv.B); sp.appendChild(f.svg); sp.classList.add('fi-svg'); return sp; } catch (e) {} }
+    sp.textContent = '•'; return sp;
   }
   function repsAlvo(t) { var m = String(t || '').match(/\d+/g); return m ? Number(m[m.length - 1]) : 10; }
   var fichaAberta = false;
@@ -3199,7 +3209,7 @@ window.MOVES = (function () {
       rm.addEventListener('click', function () { if (!rm.dataset.sure) { rm.dataset.sure = '1'; rm.textContent = '?'; rm.setAttribute('aria-label', 'Confirmar remoção'); return; } t.ex.splice(i, 1); mudou = true; desenha(); });
       var nome = h('input', { type: 'text', id: p + 'nome', maxlength: '60', 'aria-label': 'Nome do exercício' }); nome.value = e.name;
       nome.addEventListener('input', function () { e.name = nome.value; mudou = true; });
-      var th = e.img && e.img[0] ? h('img', { class: 'fi-th', src: e.img[0], alt: '', loading: 'lazy' }) : h('span', { class: 'fi-th', text: window.MOVES[e.id] ? '▶' : '•' });
+      var th = miniEx(e.id, e.img, e.name);
       return h('div', { class: 'fi-ex' },
         h('div', { class: 'fi-cab' }, th, nome, up, dn, rm),
         h('div', { class: 'fi-3' }, num(p + 'sets', 'Séries', e.sets, function (v) { e.sets = v; }, { inputmode: 'numeric', step: '1' }),
@@ -3232,10 +3242,12 @@ window.MOVES = (function () {
         function nota(x) { var n = normTxt(x.n); return (x.app ? 0 : 4) + (n.indexOf(k) === 0 ? 0 : n.indexOf(k) > 0 ? 1 : 2); }
         achou.sort(function (a, b) { return nota(a) - nota(b) || a.n.length - b.n.length; });
         achou.slice(0, 40).forEach(function (x) {
-          var b = h('button', { type: 'button', class: 'fi-item' },
-            x.img ? h('img', { class: 'fi-th', src: x.img[0], alt: '', loading: 'lazy' }) : h('span', { class: 'fi-th', text: '▶' }),
-            h('span', {}, h('b', { text: x.n }), h('small', { text: x.app ? 'Com animação do app' : [x.g.join(', '), x.eq].filter(Boolean).join(' · ') })));
-          b.addEventListener('click', function () { poe(x); }); res.appendChild(b);
+          var ja = t.ex.some(function (z) { return z.id === x.id; });
+          var b = h('button', { type: 'button', class: 'fi-item' + (ja ? ' ja' : '') },
+            miniEx(x.id, x.img, x.n),
+            h('span', {}, h('b', { text: x.n }), h('small', { text: ja ? '✓ Já está neste treino' : x.app ? 'Com animação do app' : [x.g.join(', '), x.eq].filter(Boolean).join(' · ') })));
+          if (ja) b.setAttribute('aria-disabled', 'true'); else b.addEventListener('click', function () { poe(x); });
+          res.appendChild(b);
         });
         if (q.value.trim().length >= 3) {
           var nomeP = q.value.trim().slice(0, 60), own = h('button', { type: 'button', class: 'howbtn', id: 'fi-proprio', text: 'Criar exercício próprio: "' + nomeP + '"' });

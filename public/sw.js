@@ -1,6 +1,6 @@
 // Service worker: guarda a página e os arquivos estáticos para abrir rápido e com sinal fraco.
 // Dados e IA sempre vão para a rede.
-const CACHE = 'peleja-v6';
+const CACHE = 'peleja-v7';
 const BASE = ['/', '/index.html', '/plataforma.js', '/manifest.webmanifest', '/icons/app-192.png', '/icons/app-512.png'];
 
 self.addEventListener('install', (e) => {
