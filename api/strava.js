@@ -1,7 +1,7 @@
 // Leitura do Strava pela API oficial, devolvendo o mesmo formato que o app recebia do conector:
 //   list_activities          -> { activities: [{ id, name, sport_type, start_local, summary: {...} }] }
 //   get_activity_performance -> { has_heartrate, average_heartrate, max_heartrate, average_watts, calories, laps: [...] }
-import { env, responde, corpo, usuario, banco, rota } from './_lib.js';
+import { env, responde, corpo, usuario, banco, rota, stravaApp } from './_lib.js';
 // A partir de 01/06/2027 os ids do Strava podem passar de 2^53 e perder precisão como número no JavaScript:
 // usa o id_str (texto) quando vier, e o id numérico só como reserva.
 const idDe = (x) => (x && x.id_str) || String(x && x.id);
@@ -12,10 +12,12 @@ async function tokenValido(uid) {
   const [t] = await banco('strava_tokens?select=*&user_id=eq.' + uid);
   if (!t) throw Object.assign(new Error('Strava não conectado'), { status: 409, code: 'strava_desconectado' });
   if (t.expires_at > Date.now() / 1000 + 120) return t.access_token;
+  const app = await stravaApp(uid);
+  if (!app) throw Object.assign(new Error('Cadastre o seu app do Strava'), { status: 409, code: 'strava_desconectado' });
   const r = await fetch('https://www.strava.com/oauth/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ client_id: env('STRAVA_CLIENT_ID'), client_secret: env('STRAVA_CLIENT_SECRET'), grant_type: 'refresh_token', refresh_token: t.refresh_token })
+    body: JSON.stringify({ client_id: app.id, client_secret: app.segredo, grant_type: 'refresh_token', refresh_token: t.refresh_token })
   });
   const n = await r.json();
   if (!r.ok) throw Object.assign(new Error('Reconecte o Strava'), { status: 409, code: 'strava_desconectado' });

@@ -117,3 +117,12 @@ export async function chaveDe(u) {
   if (u.admin) return { chave: env('ANTHROPIC_API_KEY'), propria: false };
   return null;
 }
+
+// App do Strava usado por cada pessoa: o dela (cadastrado no Peleja) ou, para o administrador, o do servidor.
+export async function stravaApp(uid) {
+  const r = await banco('strava_apps?select=client_id,segredo&user_id=eq.' + uid);
+  if (r && r[0]) { try { return { id: r[0].client_id, segredo: decifra(r[0].segredo), proprio: true }; } catch (e) { console.error('app strava ilegível', uid); } }
+  const p = await banco('perfis?select=admin&user_id=eq.' + uid);
+  if (p && p[0] && p[0].admin) return { id: env('STRAVA_CLIENT_ID'), segredo: env('STRAVA_CLIENT_SECRET'), proprio: false };
+  return null;
+}

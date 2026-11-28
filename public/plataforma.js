@@ -393,6 +393,7 @@
     b.id = 'pl-strava'; b.type = 'button'; b.textContent = 'Conectar Strava';
     b.setAttribute('style', 'position:fixed;right:12px;bottom:12px;z-index:9000;font:inherit;font-weight:700;padding:10px 14px;border-radius:999px;border:0;background:#fc4c02;color:#fff');
     b.addEventListener('click', function () {
+      if (window.abreStrava) { window.abreStrava(); return; }
       api('/api/strava-conectar', {}).then(function (j) { location.href = j.url; }, function (e) { alert('Não consegui iniciar a conexão: ' + e.message); });
     });
     document.body.appendChild(b);
@@ -401,7 +402,7 @@
     var d = document.createElement('details');
     d.className = 'conta-menu';
     d.innerHTML = '<summary aria-label="Conta"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg><span>Conta</span></summary>' +
-      '<div class="conta-pop"><button type="button" id="pl-uso">Uso da IA</button><button type="button" id="pl-con">Conectar ou reconectar Strava</button><button type="button" id="pl-hc">Health Connect (balança e relógio)</button><div class="pl-tema" role="group" aria-label="Tema"><span>Tema</span><button type="button" data-tema="auto">Automático</button><button type="button" data-tema="claro">Claro</button><button type="button" data-tema="escuro">Escuro</button></div><button type="button" id="pl-cfg">Configurações</button><button type="button" id="pl-tour">Tour do app</button><button type="button" id="pl-senha">Trocar senha</button><button type="button" id="pl-pessoas" hidden>Pessoas</button><button type="button" id="pl-sugestoes" hidden>Exercícios sugeridos</button><button type="button" id="pl-sair">Sair</button></div>';
+      '<div class="conta-pop"><button type="button" id="pl-uso">Uso da IA</button><button type="button" id="pl-con">Conectar Strava</button><button type="button" id="pl-hc">Health Connect (balança e relógio)</button><div class="pl-tema" role="group" aria-label="Tema"><span>Tema</span><button type="button" data-tema="auto">Automático</button><button type="button" data-tema="claro">Claro</button><button type="button" data-tema="escuro">Escuro</button></div><button type="button" id="pl-cfg">Configurações</button><button type="button" id="pl-tour">Tour do app</button><button type="button" id="pl-senha">Trocar senha</button><button type="button" id="pl-pessoas" hidden>Pessoas</button><button type="button" id="pl-sugestoes" hidden>Exercícios sugeridos</button><button type="button" id="pl-sair">Sair</button></div>';
     var rec = document.getElementById('t-receitas');
     if (rec && rec.parentNode) {
       var col = document.createElement('div');
@@ -413,7 +414,7 @@
       document.body.appendChild(d);
     }
     document.addEventListener('click', function (e) { if (d.open && !d.contains(e.target)) d.open = false; });
-    d.querySelector('#pl-con').addEventListener('click', function () { api('/api/strava-conectar', {}).then(function (j) { location.href = j.url; }); });
+    d.querySelector('#pl-con').addEventListener('click', function () { d.open = false; if (window.abreStrava) window.abreStrava(); else api('/api/strava-conectar', {}).then(function (j) { location.href = j.url; }); });
     d.querySelector('#pl-uso').addEventListener('click', function () { d.open = false; painelUso(sb); });
     d.querySelector('#pl-hc').addEventListener('click', function () { d.open = false; painelHC(); });
     function marcaTema() { var t = window.dtTema ? window.dtTema.atual() : 'auto'; d.querySelectorAll('[data-tema]').forEach(function (b) { b.setAttribute('aria-pressed', String(b.getAttribute('data-tema') === t)); }); }

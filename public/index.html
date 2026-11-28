@@ -765,11 +765,16 @@ input, textarea { padding: 10px 12px; }
 .cfg-acoes { display: flex; gap: 10px; } .cfg-acoes .go { flex: 1; }
 .cfg-aviso { margin: 0; color: var(--warn); font-weight: 600; min-height: 1em; }
 .fi-sug { justify-self: start; max-width: none; text-align: left; } .fi-ex textarea, .fi-ex > input { width: 100%; box-sizing: border-box; font: inherit; min-height: 44px; }
+#strava-ov { z-index: 9300; }
 #cf-ia { width: 100%; box-sizing: border-box; min-height: 46px; font: inherit; }
 .tour-box { min-height: 100%; align-content: start; }
 .tour-card { display: grid; gap: 12px; padding: 20px 4px 8px; }
 .tour-card h1 { margin: 0; font-size: 1.6rem; } .tour-card p { margin: 0; font-size: 1.05rem; line-height: 1.5; }
 .tour-ic { font-size: 3rem; line-height: 1; } .tour-pq { color: var(--muted); } .tour-card .howbtn { justify-self: start; margin-top: 4px; }
+.st-passos { margin: 0; padding-left: 0; list-style: none; display: grid; gap: 16px; } .st-passo { display: grid; gap: 8px; } .st-passo p { margin: 0; }
+.st-code { display: block; padding: 10px 12px; border-radius: 10px; background: var(--mat); font-size: 1rem; overflow-wrap: anywhere; }
+.st-copia, .st-link { justify-self: start; } .st-corpo { padding: 0; max-width: none; } #st-trocar, #st-rm { justify-self: start; max-width: none; text-align: left; }
+.st-passo input { width: 100%; box-sizing: border-box; min-height: 46px; font: inherit; }
 #pi-editar { width: 100%; margin-bottom: 12px; }
 .stage.fotos { background: #fff; } .stage.fotos .flip img { max-height: min(27vh, 240px); } .stage.vazio { display: none; }
 .gym-top .fi-edita { margin-top: 10px; width: 100%; }
@@ -3108,7 +3113,7 @@ window.MOVES = (function () {
     }
     function secCon() {
       var st = h('button', { type: 'button', class: 'howbtn', text: 'Conectar Strava' });
-      st.addEventListener('click', function () { var b = document.getElementById('pl-con'); if (b) b.click(); });
+      st.addEventListener('click', function () { abreStrava(); });
       var hc = h('button', { type: 'button', class: 'howbtn', text: 'Health Connect (balança e relógio)' });
       hc.addEventListener('click', function () { var b = document.getElementById('pl-hc'); if (b) { fecha(); b.click(); } });
       return h('section', { class: 'cfg-sec' }, h('h2', { text: 'Conexões' }),
@@ -3650,7 +3655,7 @@ window.MOVES = (function () {
     if (pratica('pilates')) P.push(['🧘', 'Seu pilates', 'Na aba Pilates, "Editar meu pilates" deixa você escolher os exercícios, as séries e os tempos, importar uma sessão ou gerar uma com IA.', 'Por quê: a sessão fica do seu jeito, com cronômetro nos exercícios de segurar.', ['Editar meu pilates', vai('lombar', function () { abrePilates(); })]]);
     P.push(['🍽️', 'Refeições', 'Descreva o que comeu ("2 ovos e 1 pão francês"), mande uma foto ou os dois. Use a Observação para detalhes, como "sem balança" ou "metade do prato". O app aprende os alimentos que você repete e calcula sozinho da próxima vez.', 'Por quê: quanto mais certo o registro, mais certa a leitura do seu dia.', ['Ir para Refeições', vai('refeicoes')]]);
     P.push(['✨', 'Chave de IA', adm ? 'Você usa a chave do servidor. Quem você convidar cadastra a própria chave em Configurações.' : 'Em Configurações > Conexões você cadastra uma chave da Anthropic. Com ela, a IA calcula refeições por foto, monta fichas e analisa a semana.', adm ? 'Assim cada pessoa paga só o próprio uso.' : 'Por quê: cada pessoa paga só o que usa (em geral poucos reais por mês) e a chave fica cifrada no servidor. Sem chave, o app funciona com o cálculo próprio.', adm ? null : ['Cadastrar chave', function () { fecha(); abreConfig(false); setTimeout(function () { var c = document.getElementById('cf-ia'); if (c) c.scrollIntoView({ block: 'center' }); }, 300); }]]);
-    if (temCardio()) P.push(['🏃', 'Strava', 'Conecte o Strava pelo menu Conta para trazer corridas, pedaladas e caminhadas com distância, ritmo e frequência cardíaca, sem digitar nada.', 'Por quê: o app compara cada atividade com as anteriores e mostra se você está evoluindo. Pela regra do Strava, esses dados são analisados pelo cálculo do app, sem IA.', ['Conectar Strava', menu('pl-con')]]);
+    if (temCardio()) P.push(['🏃', 'Strava', 'Conecte o Strava pelo menu Conta para trazer corridas, pedaladas e caminhadas com distância, ritmo e frequência cardíaca, sem digitar nada. Na primeira vez, o app mostra o passo a passo para você criar o seu acesso no Strava (uns 5 minutos, de graça).', 'Por quê: o app compara cada atividade com as anteriores e mostra se você está evoluindo. Pela regra do Strava, esses dados são analisados pelo cálculo do app, sem IA.', ['Conectar Strava', function () { fecha(); abreStrava(); }]]);
     P.push(['⌚', 'Health Connect (Android)', 'Pelo menu Conta você liga o Health Connect: peso e composição da balança, sono e frequência cardíaca do relógio chegam sozinhos.', 'Por quê: a curva de peso e o gasto do dia ficam mais certos sem você anotar.', ['Ver como ligar', menu('pl-hc')]]);
     if (pratica('academia') || pratica('pilates')) P.push(['🔔', 'Aviso do descanso', 'No Treino, abra "Como usar, som e vibração" e ative o aviso com o app em segundo plano. Teste o som e ajuste o volume.', 'Por quê: o celular vibra quando o descanso acaba, mesmo com a tela bloqueada ou vendo vídeo.', ['Ir para o Treino', vai(pratica('academia') ? 'academia' : 'lombar')]]);
     P.push(['📲', 'Instale na tela inicial', 'No navegador do celular, toque no menu e em "Adicionar à tela inicial" (ou "Instalar app").', 'Por quê: o Peleja abre como um app, mais rápido, e os avisos funcionam melhor.']);
@@ -3677,6 +3682,81 @@ window.MOVES = (function () {
     desenha();
   }
   window.abreTour = abreTour;
+
+  /* Strava: cada pessoa cadastra o próprio app no Strava (de graça) e conecta por ele. */
+  function abreStrava() {
+    if (document.getElementById('strava-ov')) return;
+    if (!window.Plataforma) { salvoOk('Disponível só no app instalado'); return; }
+    var host = location.host, site = location.origin;
+    var ov = h('div', { class: 'cfg-ov', id: 'strava-ov', role: 'dialog', 'aria-label': 'Conectar Strava' }), bb = h('div', { class: 'cfg-box' });
+    ov.appendChild(bb); document.body.appendChild(ov); document.body.style.overflow = 'hidden';
+    function fecha() { ov.remove(); document.body.style.overflow = ''; }
+    var x = h('button', { type: 'button', class: 'cfg-x', 'aria-label': 'Fechar', text: '✕' }); x.addEventListener('click', fecha);
+    bb.appendChild(h('div', { class: 'cfg-top' }, h('h1', { text: 'Conectar Strava' }), x));
+    var st = h('p', { class: 'tip', text: 'Conferindo…' }), corpo = h('div', { class: 'cfg-box st-corpo' });
+    bb.appendChild(h('p', { text: 'O Strava traz corridas, pedaladas e caminhadas com distância, ritmo e frequência cardíaca, sem você digitar nada.' }));
+    bb.appendChild(st); bb.appendChild(corpo);
+    function copia(txt, rot) {
+      var b = h('button', { type: 'button', class: 'howbtn st-copia', text: '📋 ' + rot });
+      b.addEventListener('click', function () { (navigator.clipboard ? navigator.clipboard.writeText(txt) : Promise.reject()).then(function () { b.textContent = '✓ Copiado'; setTimeout(function () { b.textContent = '📋 ' + rot; }, 1800); }, function () { b.textContent = txt; }); });
+      return b;
+    }
+    function conecta(btn, msg) {
+      btn.disabled = true; msg.textContent = 'Abrindo o Strava…';
+      window.Plataforma.api('/api/strava-conectar', {}).then(function (j) { location.href = j.url; }, function (e) { btn.disabled = false; msg.textContent = e.message || 'Não consegui abrir o Strava.'; });
+    }
+    function passo(n, tit) { var li = h('li', { class: 'st-passo' }, h('b', { text: n + '. ' + tit })); for (var i = 2; i < arguments.length; i++) if (arguments[i]) li.appendChild(typeof arguments[i] === 'string' ? h('p', { text: arguments[i] }) : arguments[i]); return li; }
+    function guia(s) {
+      corpo.textContent = '';
+      var cid = h('input', { type: 'text', id: 'st-id', inputmode: 'numeric', autocomplete: 'off', placeholder: 'Ex.: 123456' });
+      var sec = h('input', { type: 'password', id: 'st-sec', autocomplete: 'off', placeholder: '40 letras e números' });
+      var ok = h('button', { type: 'button', class: 'go', id: 'st-salvar', text: 'Salvar e conectar' }), msg = h('p', { class: 'cfg-aviso', role: 'status' });
+      ok.addEventListener('click', function () {
+        ok.disabled = true; msg.textContent = 'Salvando…';
+        window.Plataforma.api('/api/chave', { acao: 'strava_salvar', client_id: cid.value, client_secret: sec.value }).then(function () { conecta(ok, msg); })
+          .catch(function (e) { ok.disabled = false; msg.textContent = e.message || 'Não consegui salvar.'; });
+      });
+      corpo.appendChild(h('section', { class: 'cfg-sec' }, h('h2', { text: 'Passo a passo (uns 5 minutos)' }),
+        h('p', { class: 'tip', text: 'O Strava só deixa cada app ler os dados do próprio dono. Por isso cada pessoa cria o seu app no Strava, de graça, e o Peleja conecta por ele. Seus dados ficam entre você e o Strava.' }),
+        h('ol', { class: 'st-passos' },
+          passo(1, 'Abra a página de apps do Strava', 'Faça pelo navegador (no celular, ative "Versão para computador" se a página não abrir). Entre com a sua conta do Strava.',
+            h('a', { class: 'howbtn st-link', href: 'https://www.strava.com/settings/api', target: '_blank', rel: 'noopener', text: 'Abrir strava.com/settings/api ↗' })),
+          passo(2, 'Preencha o formulário', 'Application Name: Peleja de ' + (PERFIL.nome || 'seu nome') + '. Category: Training. Website: o endereço abaixo. Application Description: Uso pessoal.', copia(site, 'Copiar o endereço do site')),
+          passo(3, 'Campo "Authorization Callback Domain"', 'Cole exatamente isto, sem https e sem barra:', h('code', { class: 'st-code', text: host }), copia(host, 'Copiar o domínio')),
+          passo(4, 'Aceite os termos e crie o app', 'O Strava pede um ícone. Pode usar o do Peleja:', h('a', { class: 'yt', href: '/icons/app-512.png', download: 'peleja.png', text: 'Baixar o ícone do Peleja' })),
+          passo(5, 'Copie os dois códigos', 'Na página do app aparecem o Client ID (um número) e o Client Secret (toque em "show" para ver). Cole aqui:',
+            h('div', { class: 'cfg-campo' }, h('label', { for: 'st-id', text: 'Client ID' }), cid),
+            h('div', { class: 'cfg-campo' }, h('label', { for: 'st-sec', text: 'Client Secret' }), sec)),
+          passo(6, 'Salvar e conectar', 'O Strava abre pedindo permissão. Marque todas as opções e toque em Autorizar. Você volta para o Peleja já conectado.', ok, msg)),
+        h('p', { class: 'tip', text: 'O Client Secret fica cifrado no servidor e não volta para o aparelho. Se trocar de app no Strava, é só repetir o passo 5.' })));
+    }
+    function mostra(s) {
+      corpo.textContent = '';
+      if (s.conectado) st.textContent = '✓ Strava conectado' + (s.app ? ' pelo seu app (Client ID ' + s.app + ').' : ' pelo app do servidor.');
+      else if (s.app) st.textContent = 'Seu app do Strava está cadastrado (Client ID ' + s.app + '), mas falta autorizar.';
+      else if (s.padrao) st.textContent = 'Você é o administrador e pode conectar pelo app do servidor.';
+      else st.textContent = 'Ainda não conectado.';
+      if (s.conectado || s.app || s.padrao) {
+        var b = h('button', { type: 'button', class: 'go', id: 'st-conectar', text: s.conectado ? 'Reconectar' : 'Conectar agora' }), m = h('p', { class: 'cfg-aviso', role: 'status' });
+        b.addEventListener('click', function () { conecta(b, m); });
+        var ac = h('div', { class: 'cfg-acoes' }, b); corpo.appendChild(ac); corpo.appendChild(m);
+        var tr = h('button', { type: 'button', class: 'link', id: 'st-trocar', text: s.app ? 'Trocar ou remover meu app do Strava' : 'Usar o meu próprio app do Strava' });
+        tr.addEventListener('click', function () { guia(s); if (s.app) corpo.appendChild(rmBt()); });
+        corpo.appendChild(tr);
+      } else guia(s);
+    }
+    function rmBt() {
+      var rm = h('button', { type: 'button', class: 'link', id: 'st-rm', text: 'Remover meu app e desconectar' });
+      rm.addEventListener('click', function () {
+        if (!rm.dataset.sure) { rm.dataset.sure = '1'; rm.textContent = 'Confirmar: desconectar o Strava'; return; }
+        window.Plataforma.api('/api/chave', { acao: 'strava_remover' }).then(carrega);
+      });
+      return rm;
+    }
+    function carrega() { window.Plataforma.api('/api/chave', { acao: 'strava_status' }).then(mostra).catch(function () { st.textContent = 'Não consegui conferir agora.'; guia({}); }); }
+    carrega();
+  }
+  window.abreStrava = abreStrava;
 
   /* Ficha pela IA: importar (foto, PDF ou texto) ou gerar pelo objetivo. A IA devolve nomes; o app casa com a base. */
   function casaEx(nome, en, base) {
@@ -8659,7 +8739,7 @@ window.MOVES = (function () {
   (function () {
     var q = new URLSearchParams(location.search), st = q.get('strava'); if (!st) return;
     var T = { ok: 'Strava conectado. Toque em Atualizar para trazer suas atividades.', erro: 'Não consegui conectar o Strava. Tente de novo pelo menu Conta.',
-      limite: 'O Strava ainda não liberou mais pessoas neste app. Avise quem te convidou para pedir a liberação ao Strava.' };
+      limite: 'O Strava recusou a conexão. Confira o passo a passo em Conta > Conectar Strava.', semapp: 'Cadastre o seu app do Strava em Conta > Conectar Strava.' };
     setTimeout(function () { var n = $('notice'); if (n) { n.textContent = T[st] || T.erro; n.hidden = false; setTimeout(function () { n.hidden = true; }, 12000); } }, 800);
     try { history.replaceState(null, '', location.pathname + location.hash); } catch (e) {}
   })();

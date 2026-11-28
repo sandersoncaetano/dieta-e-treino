@@ -1,5 +1,5 @@
 // Retorno do Strava depois da autorização: troca o código pelos tokens e guarda no banco.
-import { env, banco, confere, rota } from './_lib.js';
+import { env, banco, confere, rota, stravaApp } from './_lib.js';
 
 export default rota(async (req, res) => {
   const url = new URL(req.url, 'http://x');
@@ -7,10 +7,12 @@ export default rota(async (req, res) => {
   const code = url.searchParams.get('code');
   const base = env('APP_URL').replace(/\/$/, '');
   if (!uid || !code) { res.writeHead(302, { Location: base + '/?strava=erro#historico' }); return res.end(); }
+  const app = await stravaApp(uid);
+  if (!app) { res.writeHead(302, { Location: base + '/?strava=semapp#historico' }); return res.end(); }
   const r = await fetch('https://www.strava.com/oauth/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ client_id: env('STRAVA_CLIENT_ID'), client_secret: env('STRAVA_CLIENT_SECRET'), code, grant_type: 'authorization_code' })
+    body: JSON.stringify({ client_id: app.id, client_secret: app.segredo, code, grant_type: 'authorization_code' })
   });
   const t = await r.json();
   if (!r.ok) {
