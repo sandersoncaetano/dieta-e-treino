@@ -763,6 +763,8 @@ input, textarea { padding: 10px 12px; }
 .cfg-con { display: grid; gap: 6px; padding: 12px; border-radius: 14px; background: var(--mat); } .cfg-con .howbtn { justify-self: start; }
 .cfg-acoes { display: flex; gap: 10px; } .cfg-acoes .go { flex: 1; }
 .cfg-aviso { margin: 0; color: var(--warn); font-weight: 600; min-height: 1em; }
+#pi-editar { width: 100%; margin-bottom: 12px; }
+.stage.fotos { background: #fff; } .stage.fotos .flip img { max-height: min(27vh, 240px); } .stage.vazio { display: none; }
 .gym-top .fi-edita { margin-top: 10px; width: 100%; }
 .fi-lista { display: grid; gap: 10px; }
 .fi-ex { display: grid; gap: 8px; padding: 12px; border-radius: 14px; background: var(--mat); }
@@ -920,6 +922,7 @@ input, textarea { padding: 10px 12px; }
   </section>
 
   <section class="view" id="v-lombar" hidden>
+    <button type="button" class="howbtn fi-edita" id="pi-editar" onclick="window.abrePilates && window.abrePilates()">✎ Editar meu pilates</button>
     <p class="lede">Pilates em casa, duas vezes por semana, em cerca de 20 minutos. Toque nas séries conforme terminar.</p>
     <div class="bar"><div class="col">
       <div class="track" role="progressbar" aria-label="Exercícios concluídos" aria-valuemin="0" aria-valuemax="6" aria-valuenow="0" id="track"><i id="fill"></i></div>
@@ -1458,9 +1461,10 @@ var Store = (function () {
       var first = list.querySelector('.ex:not(.feito)');
       if (first) first.classList.add('now');
     }
-    var c = EX.filter(function (e) { return (state.done[e.id] || 0) >= e.min; }).length;
-    document.getElementById('count').textContent = c + ' de ' + EX.length;
-    document.getElementById('fill').style.width = (c / EX.length * 100) + '%';
+    var c = CUR.ex.filter(function (e) { return (state.done[e.id] || 0) >= e.min; }).length;
+    document.getElementById('count').textContent = c + ' de ' + CUR.ex.length;
+    document.getElementById('fill').style.width = (CUR.ex.length ? c / CUR.ex.length * 100 : 0) + '%';
+    document.getElementById('track').setAttribute('aria-valuemax', CUR.ex.length);
     document.getElementById('track').setAttribute('aria-valuenow', c);
   }
   function setDone(x, n) { state.done[x.id] = Math.max(0, Math.min(x.sets, n)); save(); renderPips(x); }
@@ -1541,8 +1545,9 @@ var Store = (function () {
 
   function textBlock(x, body) {
     var ul = document.createElement('ul');
-    x.cues.forEach(function (c) { var li = document.createElement('li'); li.textContent = c; ul.appendChild(li); });
-    body.appendChild(ul);
+    (x.cues || []).forEach(function (c) { var li = document.createElement('li'); li.textContent = c; ul.appendChild(li); });
+    if (ul.firstChild) body.appendChild(ul);
+    if (!x.avoid) return;
     var a = document.createElement('p'); a.className = 'avoid';
     var b = document.createElement('b'); b.textContent = 'Atenção: ';
     a.appendChild(b); a.appendChild(document.createTextNode(x.avoid));
@@ -1572,10 +1577,40 @@ var Store = (function () {
     nextBtn.addEventListener('click', lombNext(x));
     body.appendChild(nextBtn);
   }
-  var list = document.getElementById('list');
-  EX.forEach(function (x, i) {
+  function palco(x, card) {
+    if (x.A) { mountStage(x, card); return; }
+    // Exercício da base (fotos alternadas) ou próprio (sem imagem): um "palco" no mesmo lugar da animação.
+    var st = document.createElement('div'); st.className = 'stage' + (x.img && x.img.length ? ' fotos' : ' vazio');
+    if (x.img && x.img.length) {
+      var f = document.createElement('div'); f.className = 'flip';
+      x.img.slice(0, 2).forEach(function (u) { var im = document.createElement('img'); im.src = u; im.alt = ''; im.loading = 'lazy'; f.appendChild(im); });
+      st.appendChild(f);
+    }
+    card.appendChild(st);
+  }
+  // Ficha do pilates: itens que apontam para os exercícios embutidos (com animação) ou para a base.
+  var LIB = {}; EX.concat(CARE).forEach(function (x) { LIB[x.id] = x; });
+  function resolve(it) {
+    var b = LIB[it.id], x = {}, k;
+    if (b) for (k in b) x[k] = b[k];
+    for (k in it) if (it[k] !== null && it[k] !== undefined && it[k] !== '') x[k] = it[k];
+    x.sets = Math.max(1, Number(x.sets) || 3); x.min = Math.min(x.sets, Number(x.min) || x.sets);
+    if (!x.dose) x.dose = x.sets + ' séries' + (x.reps ? ' de ' + x.reps : '');
+    if (x.timer && !Array.isArray(x.timer)) x.timer = [Number(x.timer)];
+    if (x.timer && !x.timer.filter(Boolean).length) delete x.timer;
+    if (x.tip && !x.cues) x.cues = [x.tip];
+    return x;
+  }
+  var CUR = { ex: EX, care: CARE };
+  function monta(ficha) {
+    CUR = ficha && ficha.ex && ficha.ex.length ? { ex: ficha.ex.map(resolve), care: (ficha.care || []).map(function (c) { var r = resolve(c); r.care = true; return r; }) } : { ex: EX, care: CARE };
+    var list = document.getElementById('list'), care = document.getElementById('care');
+    window.Fig.cards = window.Fig.cards.filter(function (c) { return !list.contains(c.card) && !care.contains(c.card); });
+    list.textContent = ''; care.textContent = ''; pipsets = {};
+    care.previousElementSibling.hidden = care.hidden = !CUR.care.length;
+  CUR.ex.forEach(function (x, i) {
     var card = document.createElement('article'); card.className = 'ex';
-    mountStage(x, card);
+    palco(x, card);
     var body = document.createElement('div'); body.className = 'ex-body';
     var head = document.createElement('div'); head.className = 'ex-head';
     var num = document.createElement('div'); num.className = 'num'; num.textContent = i + 1;
@@ -1601,10 +1636,9 @@ var Store = (function () {
     window.Fig.cards.push({ x: x, card: card });
   });
 
-  var care = document.getElementById('care');
-  CARE.forEach(function (x) {
+  CUR.care.forEach(function (x) {
     var card = document.createElement('article'); card.className = 'ex';
-    mountStage(x, card);
+    palco(x, card);
     var body = document.createElement('div'); body.className = 'ex-body';
     var h = document.createElement('h3'); h.textContent = x.name;
     var d = document.createElement('div'); d.className = 'dose'; d.textContent = x.dose;
@@ -1617,18 +1651,22 @@ var Store = (function () {
     care.appendChild(card);
     window.Fig.cards.push({ x: x, card: card });
   });
+    if (window.PIL && window.PIL.depois) window.PIL.depois();
+  }
+  monta(null);
+  window.PIL = { lib: LIB, padrao: { ex: EX, care: CARE }, monta: function (f) { monta(f); window.renderLombar(); }, atual: function () { return CUR; } };
 
   window.renderLombar = function () {
     var d = Store.get('lombar', today);
     state.done = d && d.done ? d.done : {};
     var pw = document.getElementById('peso-ponte'), pc = Store.get('cargas', 'ponte');
     if (pw && pc && document.activeElement !== pw) pw.value = pc.kg;
-    EX.concat(CARE).forEach(renderPips);
+    CUR.ex.concat(CUR.care).forEach(renderPips);
   };
   window.setLombarDay = function (d) { today = d; window.renderLombar(); };
   window.renderLombar();
   document.getElementById('reset').addEventListener('click', function () {
-    state.done = {}; save(); EX.forEach(renderPips);
+    state.done = {}; save(); CUR.ex.concat(CUR.care).forEach(renderPips);
   });
 })();
 </script>
@@ -2140,10 +2178,12 @@ window.MOVES = (function () {
   var lombMedia = [];
   function buildLombarMedia() {
     window.Fig.cards.forEach(function (c) {
+      if (c.card.dataset.midia) return; c.card.dataset.midia = '1';
       var x = c.x, stage = c.card.querySelector('.stage');
+      var vazio = stage.classList.contains('vazio');
       var box = h('div', { class: 'photo' });
       var gifBtn = h('button', { type: 'button', class: 'dur', id: 'gif-' + x.id, text: 'GIF' });
-      var aniBtn = h('button', { type: 'button', class: 'dur', id: 'ani-' + x.id, text: 'Animação' });
+      var aniBtn = h('button', { type: 'button', class: 'dur', id: 'ani-' + x.id, text: stage.classList.contains('fotos') ? 'Fotos' : 'Animação', hidden: vazio ? '' : null });
       var chosen = false;
       function mode(m) {
         box.hidden = m !== 'gif'; stage.hidden = m !== 'ani';
@@ -2165,11 +2205,12 @@ window.MOVES = (function () {
       body.appendChild(mais);
       function sync() {
         fillPhoto(x.id, x.name, box, gestao);
-        if (!chosen) mode(Store.get('imagens', x.id) ? 'gif' : 'ani');
+        if (!chosen) mode(Store.get('imagens', x.id) || vazio ? 'gif' : 'ani');
       }
       lombMedia.push(sync); sync();
     });
   }
+  if (window.PIL) window.PIL.depois = function () { lombMedia = []; buildLombarMedia(); try { syncLombarClose(); } catch (e) {} };
 
   /* Academia */
   var gymDate = today;
@@ -2928,8 +2969,11 @@ window.MOVES = (function () {
         try { buildGymTop(); renderGym(); } catch (e) {}
       }
     }
+    var fp = Store.get('perfil', 'ficha_pilates'), nfp = JSON.stringify(fp && fp.ex && fp.ex.length ? fp : null);
+    if (nfp !== pilAplicada) { pilAplicada = nfp; if (window.PIL) window.PIL.monta(JSON.parse(nfp)); }
     aplicaTelas();
   }
+  var pilAplicada = 'null';
   // Modalidades → o que aparece. "cardio" (perfil antigo) vale corrida e bike.
   var MODALIDADES = [['academia', 'Academia'], ['pilates', 'Pilates'], ['corrida', 'Corrida'], ['caminhada', 'Caminhada'], ['bike', 'Bike'], ['natacao', 'Natação'], ['outros', 'Outros']];
   function pratica(m) {
@@ -3132,8 +3176,8 @@ window.MOVES = (function () {
   }
   function miniEx(id, img, nome) {
     if (img && img[0]) return h('img', { class: 'fi-th', src: img[0], alt: '', loading: 'lazy' });
-    var mv = window.MOVES[id], sp = h('span', { class: 'fi-th' });
-    if (mv) { try { mv.name = nome; var f = window.Fig.build(mv, true); f.draw(mv.B); sp.appendChild(f.svg); sp.classList.add('fi-svg'); return sp; } catch (e) {} }
+    var pl = window.PIL && window.PIL.lib[id], mv = window.MOVES[id] || pl, sp = h('span', { class: 'fi-th' });
+    if (mv) { try { if (!pl) mv.name = nome; var f = window.Fig.build(mv, true); f.draw(mv.B); sp.appendChild(f.svg); sp.classList.add('fi-svg'); return sp; } catch (e) {} }
     sp.textContent = '•'; return sp;
   }
   // Demonstração do exercício: fotos da base ou animação do app, músculos, equipamento e passo a passo.
@@ -3142,9 +3186,9 @@ window.MOVES = (function () {
     ov.appendChild(bb); document.body.appendChild(ov);
     var fx = h('button', { type: 'button', class: 'cfg-x', 'aria-label': 'Voltar', text: '✕' }); fx.addEventListener('click', function () { ov.remove(); });
     bb.appendChild(h('div', { class: 'cfg-top' }, h('h1', { text: x.n }), fx));
-    var mv = window.MOVES[x.id], img = x.img && x.img.length ? x.img : null;
+    var mv = x.mv || window.MOVES[x.id], img = x.img && x.img.length ? x.img : null;
     if (img) bb.appendChild(fotosEx(img, x.n));
-    else if (mv) { var a = h('div', { class: 'howto' }); mv.name = x.n; bb.appendChild(a); window.Fig.mount(mv, a); }
+    else if (mv) { var a = h('div', { class: 'howto' }); if (!x.mv) mv.name = x.n; bb.appendChild(a); window.Fig.mount(mv, a); }
     else bb.appendChild(h('p', { class: 'tip', text: 'Este exercício ainda não tem imagem. Depois de salvar, você pode anexar uma foto ou GIF seu na tela do treino.' }));
     var info = [];
     if (x.g && x.g.length) info.push(['Trabalha', x.g.join(', ') + (x.s && x.s.length ? ' (e também ' + x.s.join(', ') + ')' : '')]);
@@ -3152,6 +3196,7 @@ window.MOVES = (function () {
     if (x.nv) info.push(['Nível', x.nv]);
     if (info.length) { var dl = h('dl', { class: 'fi-info' }); info.forEach(function (r) { dl.appendChild(h('dt', { text: r[0] })); dl.appendChild(h('dd', { text: r[1] })); }); bb.appendChild(dl); }
     if (mv && mv.how) bb.appendChild(h('p', { text: mv.how }));
+    if (mv && mv.cues) { var cu = h('ul', {}); mv.cues.forEach(function (c) { cu.appendChild(h('li', { text: c })); }); bb.appendChild(cu); if (mv.avoid) bb.appendChild(h('p', { class: 'tip', text: 'Atenção: ' + mv.avoid })); }
     if (x.i && x.i.length) {
       var ol = h('ol', { class: 'fi-passos', lang: 'en' }); x.i.forEach(function (t) { ol.appendChild(h('li', { text: t })); });
       bb.appendChild(h('details', { class: 'mais' }, h('summary', { text: 'Passo a passo (em inglês por enquanto)' }), ol));
@@ -3322,6 +3367,124 @@ window.MOVES = (function () {
   }
   window.abreFicha = abreFicha;
 
+  /* Ficha do pilates: mesma ideia da academia, uma sessão só (exercícios e alongamentos do fim). */
+  var PIL_EQ = ['peso do corpo', 'bola suíça', 'elástico', 'rolo de espuma', 'nenhum', 'medicine ball', 'outros'];
+  function pilDoApp() { var L = window.PIL ? window.PIL.lib : {}; return Object.keys(L).map(function (k) { return { id: k, n: L[k].name, k: normTxt(L[k].name), pil: 1, mv: L[k], dose: L[k].dose, sets: L[k].sets, timer: L[k].timer, bilateral: L[k].bilateral, care: !!L[k].care }; }); }
+  function pilDose(e) { return e.sets + (e.sets === 1 ? ' série' : ' séries') + ' de ' + (e.timer && e.timer[0] ? e.timer[0] + ' s' : (e.reps || '10')) + (e.bilateral ? ' por lado' : ''); }
+  function pilItem(x) { var e = { id: x.id, name: x.name || x.n, sets: x.sets || 3 }; ['min', 'dose', 'timer', 'bilateral', 'reps', 'cat', 'img', 'tip', 'proprio', 'sideNote', 'weight'].forEach(function (k) { if (x[k] !== undefined && x[k] !== null && x[k] !== '') e[k] = x[k]; }); return e; }
+  var pilAberto = false;
+  function abrePilates() {
+    if (pilAberto || !window.PIL) return; pilAberto = true;
+    var cur = window.PIL.atual(), F = { ex: cur.ex.map(pilItem), care: cur.care.map(pilItem) }, mudou = false;
+    var ov = h('div', { class: 'cfg-ov', role: 'dialog', 'aria-label': 'Editar pilates' }), box = h('div', { class: 'cfg-box' });
+    ov.appendChild(box); document.body.appendChild(ov); document.body.style.overflow = 'hidden';
+    function fecha() { ov.remove(); document.body.style.overflow = ''; pilAberto = false; }
+    function aviso(t) { var p = box.querySelector('.cfg-aviso'); if (p) p.textContent = t; }
+    function desenha() {
+      var y = ov.scrollTop; box.textContent = '';
+      var x = h('button', { type: 'button', class: 'cfg-x', 'aria-label': 'Fechar', text: '✕' });
+      x.addEventListener('click', function () { if (mudou && !x.dataset.sure) { x.dataset.sure = '1'; aviso('Há mudanças não salvas. Toque no ✕ de novo para sair sem salvar.'); return; } fecha(); });
+      box.appendChild(h('div', { class: 'cfg-top' }, h('h1', { text: 'Meu pilates' }), x));
+      var iab = h('button', { type: 'button', class: 'howbtn', id: 'pi-ia', text: '✨ Importar ou gerar com IA' });
+      iab.addEventListener('click', function () { fichaIA(function (novo) { F = novo; mudou = true; desenha(); aviso('Sessão montada pela IA. Confira e toque em Salvar.'); }, 1, 'pilates'); });
+      box.appendChild(iab);
+      box.appendChild(secao('ex', 'Exercícios', 'Contam no progresso do dia.'));
+      box.appendChild(secao('care', 'Alongamentos no fim', 'Opcionais. Não contam no progresso.'));
+      var pad = h('button', { type: 'button', class: 'link', id: 'pi-padrao', text: 'Voltar para a sessão padrão do app' });
+      pad.addEventListener('click', function () { if (!pad.dataset.sure) { pad.dataset.sure = '1'; pad.textContent = 'Confirmar: voltar para a padrão'; return; } F = { ex: window.PIL.padrao.ex.map(pilItem), care: window.PIL.padrao.care.map(pilItem) }; mudou = true; desenha(); });
+      box.appendChild(pad);
+      box.appendChild(h('p', { class: 'cfg-aviso', role: 'status' }));
+      var ok = h('button', { type: 'button', class: 'go', id: 'pi-salvar', text: 'Salvar' }); ok.addEventListener('click', salvar);
+      box.appendChild(h('div', { class: 'cfg-acoes' }, ok));
+      ov.scrollTop = y;
+    }
+    function secao(qual, tit, dica) {
+      var l = F[qual], lista = h('div', { class: 'fi-lista' });
+      l.forEach(function (e, i) { lista.appendChild(linha(l, e, i, qual)); });
+      if (!l.length) lista.appendChild(h('p', { class: 'tip', text: 'Nenhum ainda.' }));
+      var add = h('button', { type: 'button', class: 'howbtn', id: 'pi-add-' + qual, text: '+ Adicionar' }); add.addEventListener('click', function () { busca(l, qual); });
+      return h('section', { class: 'cfg-sec' }, h('h2', { text: tit }), h('p', { class: 'tip', text: dica }), lista, add);
+    }
+    function linha(l, e, i, qual) {
+      var p = 'pi-' + qual + '-' + i + '-';
+      function campo(id, rot, el) { return h('div', { class: 'cfg-campo' }, h('label', { for: id, text: rot }), el); }
+      function muda() { e.dose = pilDose(e); delete e.sideNote; mudou = true; }
+      var se = h('input', { type: 'number', id: p + 'sets', inputmode: 'numeric', min: '1', max: '10' }); se.value = e.sets;
+      se.addEventListener('input', function () { e.sets = Math.max(1, Number(se.value) || 1); e.min = Math.min(e.min || e.sets, e.sets); muda(); });
+      var rp = h('input', { type: 'text', id: p + 'reps', maxlength: '20', placeholder: 'Ex.: 10' }); rp.value = e.timer ? '' : (e.reps || '');
+      var tm = h('input', { type: 'number', id: p + 'seg', inputmode: 'numeric', min: '0', placeholder: '—' }); tm.value = e.timer ? e.timer[0] : '';
+      rp.addEventListener('input', function () { e.reps = rp.value; if (rp.value) { delete e.timer; tm.value = ''; } muda(); });
+      tm.addEventListener('input', function () { var v = Number(tm.value); if (v > 0) { e.timer = [v]; rp.value = ''; delete e.reps; } else delete e.timer; muda(); });
+      var bl = h('input', { type: 'checkbox', id: p + 'lado' }); bl.checked = !!e.bilateral;
+      bl.addEventListener('change', function () { if (bl.checked) e.bilateral = true; else delete e.bilateral; muda(); });
+      function mv(d) { var j = i + d; if (j < 0 || j >= l.length) return; var a = l[i]; l[i] = l[j]; l[j] = a; mudou = true; desenha(); }
+      var up = h('button', { type: 'button', class: 'fi-ico', 'aria-label': 'Subir', text: '↑' }); up.addEventListener('click', function () { mv(-1); });
+      var dn = h('button', { type: 'button', class: 'fi-ico', 'aria-label': 'Descer', text: '↓' }); dn.addEventListener('click', function () { mv(1); });
+      var rm = h('button', { type: 'button', class: 'fi-ico', 'aria-label': 'Remover ' + e.name, text: '✕' });
+      rm.addEventListener('click', function () { if (!rm.dataset.sure) { rm.dataset.sure = '1'; rm.textContent = '?'; return; } l.splice(i, 1); mudou = true; desenha(); });
+      var nm = h('input', { type: 'text', id: p + 'nome', maxlength: '60', 'aria-label': 'Nome do exercício' }); nm.value = e.name;
+      nm.addEventListener('input', function () { e.name = nm.value; mudou = true; });
+      var th = h('button', { type: 'button', class: 'fi-thb', 'aria-label': 'Ver demonstração de ' + e.name }, miniEx(e.id, e.img, e.name));
+      th.addEventListener('click', function () {
+        var L = window.PIL.lib[e.id];
+        if (L) { verEx({ id: e.id, n: e.name, mv: L }); return; }
+        if (!e.cat) { verEx({ id: e.id, n: e.name }); return; }
+        catalogo().then(function (c) { verEx(c.ex.filter(function (y) { return y.id === e.cat; })[0] || { id: e.id, n: e.name, img: e.img }); }).catch(function () { verEx({ id: e.id, n: e.name, img: e.img }); });
+      });
+      return h('div', { class: 'fi-ex' }, h('div', { class: 'fi-cab' }, th, nm, up, dn, rm),
+        h('div', { class: 'fi-3' }, campo(p + 'sets', 'Séries', se), campo(p + 'reps', 'Repetições', rp), campo(p + 'seg', 'ou segundos', tm)),
+        h('label', { class: 'cfg-chk' }, bl, h('span', { text: 'Fazer dos dois lados' })),
+        h('p', { class: 'tip', text: e.dose || pilDose(e) }));
+    }
+    function busca(l, qual) {
+      var bx = h('div', { class: 'cfg-ov fi-busca', role: 'dialog', 'aria-label': 'Adicionar exercício' }), bb = h('div', { class: 'cfg-box' });
+      bx.appendChild(bb); document.body.appendChild(bx);
+      var q = h('input', { type: 'search', id: 'fi-q', placeholder: qual === 'care' ? 'Ex.: alongamento, posterior, quadril' : 'Ex.: prancha, ponte, abdominal', autocomplete: 'off' });
+      var x = h('button', { type: 'button', class: 'cfg-x', 'aria-label': 'Voltar', text: '✕' }); x.addEventListener('click', function () { bx.remove(); });
+      var res = h('div', { class: 'fi-res', id: 'fi-res' }), st = h('p', { class: 'tip', text: 'Carregando a base de exercícios…' });
+      bb.appendChild(h('div', { class: 'cfg-top' }, h('h1', { text: 'Adicionar exercício' }), x)); bb.appendChild(q); bb.appendChild(st); bb.appendChild(res);
+      var APP = pilDoApp(), lista = APP.slice();
+      function poe(it) {
+        var e = it.pil ? pilItem({ id: it.id, name: it.n, sets: it.sets, timer: it.timer, bilateral: it.bilateral, dose: it.dose }) : it.cat ? { id: it.id, name: it.n, cat: it.id, img: it.img, sets: 3 } : { id: it.id, name: it.n, proprio: true, sets: 3 };
+        if (!it.pil) { if (it.c === 'alongamento' || qual === 'care') e.timer = [30]; else e.reps = '10'; e.dose = pilDose(e); }
+        if (F.ex.concat(F.care).some(function (z) { return z.id === e.id; })) { st.textContent = 'Esse exercício já está no pilates.'; return; }
+        l.push(e); mudou = true; bx.remove(); desenha();
+      }
+      function mostra() {
+        var k = normTxt(q.value), ws = k ? k.split(' ') : [];
+        res.textContent = '';
+        var achou = lista.filter(function (x) { return ws.every(function (w) { return x.k.indexOf(w) >= 0; }); });
+        function nota(x) { var n = normTxt(x.n); return (x.pil ? 0 : 4) + (qual === 'care' && x.c === 'alongamento' ? -1 : 0) + (k ? (n.indexOf(k) === 0 ? 0 : n.indexOf(k) > 0 ? 1 : 2) : 0); }
+        achou.sort(function (a, b) { return nota(a) - nota(b) || a.n.length - b.n.length; });
+        achou.slice(0, 40).forEach(function (x) {
+          var ja = F.ex.concat(F.care).some(function (z) { return z.id === x.id; });
+          var b = h('button', { type: 'button', class: 'fi-item' + (ja ? ' ja' : '') }, miniEx(x.id, x.img, x.n),
+            h('span', {}, h('b', { text: x.n }), h('small', { text: ja ? '✓ Já está no pilates' : x.pil ? 'Com animação do app · ' + x.dose : [x.g.join(', '), x.eq].filter(Boolean).join(' · ') })));
+          b.addEventListener('click', function () { verEx(x, ja ? null : ['+ Adicionar', function () { poe(x); }]); });
+          res.appendChild(b);
+        });
+        if (q.value.trim().length >= 3) {
+          var nomeP = q.value.trim().slice(0, 60), own = h('button', { type: 'button', class: 'howbtn', id: 'fi-proprio', text: 'Criar exercício próprio: "' + nomeP + '"' });
+          own.addEventListener('click', function () { poe({ id: 'p_' + normTxt(nomeP).replace(/ /g, '_').slice(0, 40), n: nomeP.charAt(0).toUpperCase() + nomeP.slice(1) }); });
+          res.appendChild(own);
+        }
+      }
+      q.addEventListener('input', mostra); mostra(); setTimeout(function () { q.focus(); }, 50);
+      catalogo().then(function (c) {
+        lista = APP.concat(c.ex.filter(function (x) { return x.c === 'alongamento' || PIL_EQ.indexOf(x.eq) >= 0; }).map(function (x) { return Object.assign({ cat: 1 }, x); }));
+        st.textContent = 'Exercícios do app e da base (alongamentos e exercícios com o peso do corpo, bola ou elástico).'; mostra();
+      }).catch(function () { st.textContent = 'Sem conexão para carregar a base. Dá para usar os exercícios do app ou criar o seu.'; });
+    }
+    function salvar() {
+      if (!F.ex.length) { aviso('Coloque pelo menos um exercício.'); return; }
+      function limpa(e) { e.name = String(e.name || '').trim() || 'Exercício'; e.sets = Math.max(1, Math.round(e.sets || 3)); if (!e.min || e.min > e.sets) e.min = e.sets; if (!e.dose) e.dose = pilDose(e); return e; }
+      Store.set('perfil', 'ficha_pilates', { ex: F.ex.map(limpa), care: F.care.map(limpa), origem: 'editor', atualizado: new Date().toISOString() });
+      mudou = false; aplicaPerfil(); fecha(); salvoOk('Pilates salvo');
+    }
+    desenha();
+  }
+  window.abrePilates = abrePilates;
+
   /* Ficha pela IA: importar (foto, PDF ou texto) ou gerar pelo objetivo. A IA devolve nomes; o app casa com a base. */
   function casaEx(nome, en, base) {
     var n = normTxt(nome), e = normTxt(en || ''), app = exDoApp();
@@ -3373,17 +3536,47 @@ window.MOVES = (function () {
     if (!out.length) throw new Error('vazio');
     return { treinos: out, stats: stats, obs: String(r.observacao || '') };
   }
-  function fichaIA(aplica, temTreinos) {
+  function pilPrompt(o) {
+    var app = pilDoApp().map(function (x) { return x.n; }).join('; ');
+    var formato = 'Responda com {"exercicios":[{"nome":"nome em português","en":"nome em inglês","series":número,"reps":"texto, ex.: 10" ou "","segundos":número ou null (para exercícios de segurar),"por_lado":true ou false,"alongamento":true se for alongamento do fim,"obs":"dica curta de execução ou vazio"}],"observacao":"uma ou duas frases para a pessoa"}.';
+    var base = 'Você está montando uma sessão de pilates em casa para ' + pessoaTxt() + ' de ' + (PERFIL.nasc ? idadeDe(PERFIL.nasc) + ' anos' : 'idade não informada') + '.\nQuando o exercício for um destes do app, use exatamente este nome: ' + app + '.\n';
+    if (o.modo === 'importar') return base + 'Transcreva a sessão que a pessoa enviou (nas imagens, no PDF ou no texto abaixo), sem inventar exercícios. Mantenha a ordem, as séries, as repetições e os tempos escritos. Se não der para ler algo, diga na observação.\n' + (o.texto ? 'Texto enviado:\n' + o.texto.slice(0, 8000) + '\n' : '') + formato;
+    return base + 'Crie uma sessão de ' + o.tempo + ' minutos para quem é ' + o.nivel + ', com o objetivo de ' + o.obj + ', ' + o.local + '.' + (o.rest ? ' Cuidados e limitações: ' + o.rest + '.' : '') + ' Use de 5 a 8 exercícios seguros, do mais fácil ao mais difícil, e termine com 2 a 4 alongamentos. ' + formato;
+  }
+  function pilDaIA(r, base) {
+    var ls = r && (r.exercicios || r.ex); if (typeof ls === 'string') { try { ls = JSON.parse(ls); } catch (e) { ls = null; } }
+    if (!Array.isArray(ls) || !ls.length) throw new Error('vazio');
+    var app = pilDoApp(), stats = { foto: 0, ani: 0, prop: 0 }, F = { ex: [], care: [] }, ids = {};
+    ls.slice(0, 16).forEach(function (x) {
+      var nm = String(x.nome || '').trim().slice(0, 60); if (!nm) return;
+      var n = normTxt(nm), a = app.filter(function (y) { return y.k === n; })[0], e;
+      if (a) { e = pilItem({ id: a.id, name: a.n, sets: a.sets, timer: a.timer, bilateral: a.bilateral }); stats.ani++; }
+      else { var m = base ? casaEx(nm, x.en, base) : null; if (m && m.app) m = null;
+        if (m) { e = { id: m.id, name: m.n, cat: m.id, img: m.img }; stats.foto++; } else { e = { id: 'p_' + n.replace(/ /g, '_').slice(0, 40), name: nm.charAt(0).toUpperCase() + nm.slice(1), proprio: true }; stats.prop++; } }
+      if (ids[e.id]) return; ids[e.id] = 1;
+      e.sets = Math.max(1, Math.min(10, Math.round(Number(x.series) || e.sets || 3)));
+      if (Number(x.segundos) > 0) { e.timer = [Number(x.segundos)]; delete e.reps; } else if (x.reps) { e.reps = String(x.reps).slice(0, 20); delete e.timer; }
+      if (x.por_lado === true) e.bilateral = true; else if (x.por_lado === false) delete e.bilateral;
+      if (x.obs) e.tip = String(x.obs).slice(0, 200);
+      e.min = e.sets; e.dose = pilDose(e); delete e.sideNote;
+      (x.alongamento ? F.care : F.ex).push(e);
+    });
+    if (!F.ex.length) { F.ex = F.care; F.care = []; }
+    if (!F.ex.length) throw new Error('vazio');
+    return { ficha: F, stats: stats, obs: String(r.observacao || '') };
+  }
+  function fichaIA(aplica, temTreinos, tipo) {
+    var PI = tipo === 'pilates';
     var ov = h('div', { class: 'cfg-ov fi-busca', role: 'dialog', 'aria-label': 'Ficha com IA' }), bb = h('div', { class: 'cfg-box' });
     ov.appendChild(bb); document.body.appendChild(ov);
-    var modo = 'importar', arqs = [], o = { dias: 3, tempo: 60, nivel: 'iniciante', obj: 'emagrecer', local: 'academia completa', rest: '' };
+    var modo = 'importar', arqs = [], o = PI ? { tempo: 20, nivel: 'iniciante', obj: 'fortalecer o core e cuidar da postura', local: 'só com tapete', rest: '' } : { dias: 3, tempo: 60, nivel: 'iniciante', obj: 'emagrecer', local: 'academia completa', rest: '' };
     function fecha() { ov.remove(); }
     function sel(id, ops, val, fn) { var e = h('select', { id: id }); ops.forEach(function (x) { var op = h('option', { value: x[0], text: x[1] }); if (String(x[0]) === String(val)) op.selected = true; e.appendChild(op); }); e.addEventListener('change', function () { fn(e.value); }); return e; }
     function campo(id, rot, el) { return h('div', { class: 'cfg-campo' }, h('label', { for: id, text: rot }), el); }
     function desenha() {
       bb.textContent = '';
       var x = h('button', { type: 'button', class: 'cfg-x', 'aria-label': 'Voltar', text: '✕' }); x.addEventListener('click', fecha);
-      bb.appendChild(h('div', { class: 'cfg-top' }, h('h1', { text: 'Ficha com IA' }), x));
+      bb.appendChild(h('div', { class: 'cfg-top' }, h('h1', { text: PI ? 'Pilates com IA' : 'Ficha com IA' }), x));
       var seg = h('div', { class: 'durs', role: 'group' });
       [['importar', 'Importar a minha'], ['gerar', 'Gerar uma nova']].forEach(function (m) {
         var b = h('button', { type: 'button', class: 'dur', id: 'fia-' + m[0], text: m[1], 'aria-pressed': modo === m[0] ? 'true' : 'false' });
@@ -3392,7 +3585,7 @@ window.MOVES = (function () {
       bb.appendChild(seg);
       var sec = h('section', { class: 'cfg-sec' });
       if (modo === 'importar') {
-        sec.appendChild(h('p', { class: 'tip', text: 'Mande fotos ou PDF da ficha que você já tem (até 4 arquivos), ou cole o texto. A IA transcreve e o app liga cada exercício à base com fotos.' }));
+        sec.appendChild(h('p', { class: 'tip', text: 'Mande fotos ou PDF da ' + (PI ? 'sessão de pilates' : 'ficha') + ' que você já tem (até 4 arquivos), ou cole o texto. A IA transcreve e o app liga cada exercício à animação do app ou à base com fotos.' }));
         var fi = h('input', { type: 'file', id: 'fia-arq', accept: 'image/*,application/pdf', multiple: '', hidden: '' });
         var pick = h('button', { type: 'button', class: 'howbtn', text: arqs.length ? 'Trocar arquivos' : '📎 Escolher fotos ou PDF' });
         pick.addEventListener('click', function () { fi.click(); });
@@ -3402,6 +3595,16 @@ window.MOVES = (function () {
         var tx = h('textarea', { id: 'fia-texto', rows: '6', placeholder: 'Ou cole aqui. Ex.:\nTreino A – Peito\nSupino reto 4x10 30kg\nCrucifixo 3x12' }); tx.value = o.texto || '';
         tx.addEventListener('input', function () { o.texto = tx.value; });
         sec.appendChild(campo('fia-texto', 'Texto da ficha', tx));
+      } else if (PI) {
+        sec.appendChild(h('div', { class: 'cfg-2' },
+          campo('fia-obj', 'Objetivo', sel('fia-obj', [['fortalecer o core e cuidar da postura', 'Core e postura'], ['aliviar e prevenir dor lombar', 'Dor lombar'], ['ganhar flexibilidade e mobilidade', 'Flexibilidade'], ['condicionamento e tônus', 'Condicionamento']], o.obj, function (v) { o.obj = v; })),
+          campo('fia-niv', 'Experiência', sel('fia-niv', [['iniciante', 'Iniciante'], ['intermediário', 'Intermediário'], ['avançado', 'Avançado']], o.nivel, function (v) { o.nivel = v; }))));
+        sec.appendChild(h('div', { class: 'cfg-2' },
+          campo('fia-tempo', 'Duração', sel('fia-tempo', [[15, '15 min'], [20, '20 min'], [30, '30 min'], [45, '45 min']], o.tempo, function (v) { o.tempo = Number(v); })),
+          campo('fia-local', 'Material', sel('fia-local', [['só com tapete', 'Só tapete'], ['com tapete e bola suíça', 'Tapete e bola'], ['com tapete e elástico', 'Tapete e elástico'], ['com tapete e um peso leve', 'Tapete e peso leve']], o.local, function (v) { o.local = v; }))));
+        var rs2 = h('textarea', { id: 'fia-rest', rows: '3', placeholder: 'Ex.: dor lombar, joelho, ombro' }); rs2.value = o.rest; rs2.addEventListener('input', function () { o.rest = rs2.value; });
+        sec.appendChild(campo('fia-rest', 'Dores ou limitações (opcional)', rs2));
+        sec.appendChild(h('p', { class: 'tip', text: 'É uma sugestão para começar. Com dor ou alguma condição de saúde, mostre a sessão a um fisioterapeuta.' }));
       } else {
         sec.appendChild(h('div', { class: 'cfg-2' },
           campo('fia-obj', 'Objetivo', sel('fia-obj', [['emagrecer', 'Emagrecer'], ['ganhar massa muscular', 'Ganhar massa'], ['ganhar força', 'Ganhar força'], ['condicionamento e saúde', 'Saúde em geral']], o.obj, function (v) { o.obj = v; })),
@@ -3427,19 +3630,19 @@ window.MOVES = (function () {
           if (arqs.some(function (f) { return f.type === 'application/pdf' && f.size > 3e6; })) throw new Error('pdf');
           return Promise.all(modo === 'importar' ? arqs.map(function (f) { return f.type === 'application/pdf' ? f : shrink(f, 1600).then(toBlob).catch(function () { return f; }); }) : []).then(function (bs) {
             if (bs.length) opts.images = bs;
-            return sample.json(fichaPrompt(Object.assign({ modo: modo }, o)), opts);
-          }).then(function (res) { return fichaDaIA(res, r[1] && r[1].ex); });
+            return sample.json(PI ? pilPrompt(Object.assign({ modo: modo }, o)) : fichaPrompt(Object.assign({ modo: modo }, o)), opts);
+          }).then(function (res) { return PI ? pilDaIA(res, r[1] && r[1].ex) : fichaDaIA(res, r[1] && r[1].ex); });
         }).then(function (f) {
-          fecha(); aplica(f.treinos, m);
+          fecha(); aplica(PI ? f.ficha : f.treinos, m);
           var p = document.querySelector('.cfg-ov .cfg-aviso');
-          if (p) p.textContent = (f.obs ? f.obs + ' ' : '') + 'Com fotos: ' + f.stats.foto + ', com animação: ' + f.stats.ani + ', sem imagem: ' + f.stats.prop + '. Confira cada treino e toque em Salvar ficha.';
+          if (p) p.textContent = (f.obs ? f.obs + ' ' : '') + 'Com fotos: ' + f.stats.foto + ', com animação: ' + f.stats.ani + ', sem imagem: ' + f.stats.prop + '. Confira ' + (PI ? 'a sessão e toque em Salvar.' : 'cada treino e toque em Salvar ficha.');
         }).catch(function (e) {
           ac.querySelectorAll('button').forEach(function (b) { b.disabled = false; });
           msg.textContent = e && e.message === 'pdf' ? 'O PDF passa de 3 MB. Mande fotos das páginas no lugar.' : e && e.message === 'indisponivel' ? 'A IA não está disponível agora.' : e && e.message === 'vazio' ? 'A IA não encontrou exercícios. Tente uma foto mais nítida ou cole o texto.' : 'Não consegui agora. Tente de novo.';
         });
       }
-      var b1 = h('button', { type: 'button', class: 'go', id: 'fia-trocar', text: temTreinos ? 'Substituir minha ficha' : 'Montar ficha' }); b1.addEventListener('click', function () { vai('trocar'); }); ac.appendChild(b1);
-      if (temTreinos && temTreinos < 7) { var b2 = h('button', { type: 'button', class: 'howbtn', id: 'fia-somar', text: 'Somar aos treinos' }); b2.addEventListener('click', function () { vai('somar'); }); ac.appendChild(b2); }
+      var b1 = h('button', { type: 'button', class: 'go', id: 'fia-trocar', text: PI ? 'Montar a sessão' : temTreinos ? 'Substituir minha ficha' : 'Montar ficha' }); b1.addEventListener('click', function () { vai('trocar'); }); ac.appendChild(b1);
+      if (!PI && temTreinos && temTreinos < 7) { var b2 = h('button', { type: 'button', class: 'howbtn', id: 'fia-somar', text: 'Somar aos treinos' }); b2.addEventListener('click', function () { vai('somar'); }); ac.appendChild(b2); }
       bb.appendChild(ac);
       if (temTreinos) bb.appendChild(h('p', { class: 'tip', text: 'Nada é gravado antes de você conferir e tocar em Salvar ficha.' }));
     }
@@ -5116,6 +5319,7 @@ window.MOVES = (function () {
       var it = r.v.itens || {}; Object.keys(it).forEach(function (k) { soma(k, it[k].nome || k, it[k].series || 0, r.v.data); });
     });
     var nomesPil = { gato: 'Gato e vaca', birddog: 'Bird dog', ponte: 'Ponte de glúteos', prancha: 'Prancha', lateral: 'Prancha lateral' };
+    if (window.PIL) { var pa = window.PIL.atual(); pa.ex.concat(pa.care).forEach(function (x) { if (!nomesPil[x.id]) nomesPil[x.id] = x.name; }); }
     var lo = Store.all('lombar');
     Object.keys(lo).forEach(function (d) {
       if (d < d0 || d > hoje) return;

@@ -12,7 +12,7 @@ function tipoDe(p) {
   if (p.includes('Analise a semana')) return 'semana';
   if (p.includes('Feche a semana')) return 'fechamento';
   if (p.includes('estimando uma refeição')) return 'refeicao';
-  if (p.includes('montando uma ficha de academia')) return 'ficha';
+  if (p.includes('montando uma ficha de academia') || p.includes('montando uma sessão de pilates')) return 'ficha';
   return 'outro';
 }
 
