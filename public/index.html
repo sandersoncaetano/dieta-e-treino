@@ -1048,7 +1048,7 @@ input, textarea { padding: 10px 12px; }
 
 <script>
 var Store = (function () {
-  var COLLS = ['treinos', 'cardio', 'lombar', 'cargas', 'imagens', 'refeicoes', 'descansos', 'dias', 'peso', 'strava', 'receitas', 'analises', 'medidas', 'composicao', 'saude_dia', 'semanas', 'fechamentos', 'treinador', 'alimentos', 'agua', 'eventos', 'perfil'];
+  var COLLS = ['treinos', 'cardio', 'lombar', 'cargas', 'imagens', 'refeicoes', 'descansos', 'dias', 'peso', 'strava', 'receitas', 'analises', 'medidas', 'composicao', 'saude_dia', 'semanas', 'fechamentos', 'treinador', 'alimentos', 'agua', 'eventos', 'perfil', 'hc_ignorar'];
   var KEY = 'caderno-treino';
   var cache = {}; COLLS.forEach(function (c) { cache[c] = {}; });
   var subs = [], db = null, mode = 'loading';
@@ -2905,7 +2905,12 @@ window.MOVES = (function () {
       h('p', { class: 'tip', text: 'Trazido do Strava' })));
     var del = h('button', { type: 'button', class: 'link', id: 'del-' + id, text: 'Apagar' });
     del.addEventListener('click', function () {
-      if (del.dataset.sure) { Store.del('cardio', id); renderCardio(); renderHist(); return; }
+      if (del.dataset.sure) {
+        // Atividade do Health Connect: guarda que foi apagada, para o próximo envio do relógio não trazer de volta.
+        var cv = Store.get('cardio', id);
+        if (cv && cv.origem === 'health-connect') Store.set('hc_ignorar', id, { data: cv.data, ini_iso: cv.ini_iso || null, fim_iso: cv.fim_iso || null, apagado: new Date().toISOString() });
+        Store.del('cardio', id); renderCardio(); renderHist(); return;
+      }
       del.dataset.sure = '1'; del.textContent = 'Confirmar exclusão';
     });
     return h('li', { class: 'row' },

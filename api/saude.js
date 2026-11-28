@@ -156,13 +156,19 @@ async function recebe(uid, p) {
       const dias = [...new Set(sessoes.map((x) => diaLocal(x.start_time)))];
       const exist = await banco('docs?select=id,data&user_id=eq.' + uid + '&colecao=eq.cardio&id=like.hc_*&data->>data=in.(' + dias.map((d) => '"' + d + '"').join(',') + ')');
       const lista = (exist || []).map((d) => ({ id: d.id, ini: new Date(d.data.ini_iso || 0).getTime(), fim: new Date(d.data.fim_iso || 0).getTime(), prio: d.data.prio || 1, seg: d.data.segundos || 0, doc: d.data, velho: true }));
+      // Apagadas pela pessoa no app: não voltam, nem pela outra fonte (bloqueiam o mesmo horário).
+      const ign = await banco('docs?select=id,data&user_id=eq.' + uid + '&colecao=eq.hc_ignorar&data->>data=in.(' + dias.map((d) => '"' + d + '"').join(',') + ')');
+      const ignorados = new Set((ign || []).map((d) => d.id));
+      (ign || []).forEach((d) => { if (d.data.ini_iso && d.data.fim_iso) lista.push({ id: d.id, ini: new Date(d.data.ini_iso).getTime(), fim: new Date(d.data.fim_iso).getTime(), prio: 99, seg: 1e9, ignorado: true }); });
       const sobrepoe = (a, b) => Math.min(a.fim, b.fim) - Math.max(a.ini, b.ini) > 0.5 * Math.min(a.fim - a.ini, b.fim - b.ini);
       const grava1 = {}, apaga = new Set();
       for (const x of sessoes) {
         const c = { id: 'hc_' + String((x.metadata && x.metadata.id) || x.start_time).replace(/[^A-Za-z0-9_-]/g, '').slice(0, 60), ini: new Date(x.start_time).getTime(), fim: new Date(x.end_time).getTime(), prio: prioEx(x.metadata && x.metadata.data_origin), seg: Number(x.duration_seconds), x };
+        if (ignorados.has(c.id)) continue;
         const rival = lista.find((o) => o.id !== c.id && !apaga.has(o.id) && sobrepoe(o, c));
         if (rival) {
           if (rival.prio > c.prio || (rival.prio === c.prio && rival.seg >= c.seg)) continue;
+          if (rival.ignorado) continue;
           apaga.add(rival.id); delete grava1[rival.id];
         }
         const ant = lista.find((o) => o.id === c.id);
