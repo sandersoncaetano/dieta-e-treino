@@ -3721,7 +3721,7 @@ window.MOVES = (function () {
         h('ol', { class: 'st-passos' },
           passo(1, 'Abra a página de apps do Strava', 'Faça pelo navegador (no celular, ative "Versão para computador" se a página não abrir). Entre com a sua conta do Strava.',
             h('a', { class: 'howbtn st-link', href: 'https://www.strava.com/settings/api', target: '_blank', rel: 'noopener', text: 'Abrir strava.com/settings/api ↗' })),
-          passo(2, 'Preencha o formulário', 'Application Name: Peleja de ' + (PERFIL.nome || 'seu nome') + '. Category: Training. Website: o endereço abaixo. Application Description: Uso pessoal.', copia(site, 'Copiar o endereço do site')),
+          passo(2, 'Preencha o formulário', 'Application Name: Peleja de ' + (PERFIL.nome || 'seu nome') + '. Category: a que mais combinar (por exemplo, Training). Website: o endereço abaixo. Application Description: Uso pessoal.', copia(site, 'Copiar o endereço do site')),
           passo(3, 'Campo "Authorization Callback Domain"', 'Cole exatamente isto, sem https e sem barra:', h('code', { class: 'st-code', text: host }), copia(host, 'Copiar o domínio')),
           passo(4, 'Aceite os termos e crie o app', 'O Strava pede um ícone. Pode usar o do Peleja:', h('a', { class: 'yt', href: '/icons/app-512.png', download: 'peleja.png', text: 'Baixar o ícone do Peleja' })),
           passo(5, 'Copie os dois códigos', 'Na página do app aparecem o Client ID (um número) e o Client Secret (toque em "show" para ver). Cole aqui:',
