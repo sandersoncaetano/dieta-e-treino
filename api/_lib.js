@@ -94,3 +94,26 @@ export async function avisaAdmins(titulo, texto) {
     await Promise.all((subs || []).map((s) => webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, msg, { TTL: 86400 }).catch(() => {})));
   }
 }
+
+// Chave de IA de cada pessoa: cifrada (AES-256-GCM) antes de ir para o banco.
+function segredoChaves() {
+  const base = process.env.CHAVE_IA_SEGREDO || env('SUPABASE_SERVICE_ROLE_KEY');
+  return Buffer.from(crypto.hkdfSync('sha256', base, 'peleja', 'chave-ia', 32));
+}
+export function cifra(txt) {
+  const iv = crypto.randomBytes(12), c = crypto.createCipheriv('aes-256-gcm', segredoChaves(), iv);
+  const dados = Buffer.concat([c.update(String(txt), 'utf8'), c.final()]);
+  return [iv, c.getAuthTag(), dados].map((b) => b.toString('base64')).join('.');
+}
+export function decifra(s) {
+  const [iv, tag, dados] = String(s).split('.').map((x) => Buffer.from(x, 'base64'));
+  const d = crypto.createDecipheriv('aes-256-gcm', segredoChaves(), iv); d.setAuthTag(tag);
+  return Buffer.concat([d.update(dados), d.final()]).toString('utf8');
+}
+// Chave que vale para a pessoa: a dela; sem ela, a do servidor só para o administrador.
+export async function chaveDe(u) {
+  const r = await banco('chaves_ia?select=cifrada&user_id=eq.' + u.id);
+  if (r && r[0]) { try { return { chave: decifra(r[0].cifrada), propria: true }; } catch (e) { console.error('chave ilegível', u.id); } }
+  if (u.admin) return { chave: env('ANTHROPIC_API_KEY'), propria: false };
+  return null;
+}

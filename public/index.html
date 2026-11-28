@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0e1116">
 <script>
+window.semChave = function () { var c = window.CHAVE_IA; return c && !c.tem && !c.usaServidor ? ' Para usar a IA, cadastre sua chave em Conta > Configurações.' : ''; };
 /* Tema escolhido (claro, escuro ou automático pelo aparelho), aplicado antes de desenhar a página. */
 (function () {
   function aplica(t) {
@@ -764,6 +765,7 @@ input, textarea { padding: 10px 12px; }
 .cfg-acoes { display: flex; gap: 10px; } .cfg-acoes .go { flex: 1; }
 .cfg-aviso { margin: 0; color: var(--warn); font-weight: 600; min-height: 1em; }
 .fi-sug { justify-self: start; max-width: none; text-align: left; } .fi-ex textarea, .fi-ex > input { width: 100%; box-sizing: border-box; font: inherit; min-height: 44px; }
+#cf-ia { width: 100%; box-sizing: border-box; min-height: 46px; font: inherit; }
 #pi-editar { width: 100%; margin-bottom: 12px; }
 .stage.fotos { background: #fff; } .stage.fotos .flip img { max-height: min(27vh, 240px); } .stage.vazio { display: none; }
 .gym-top .fi-edita { margin-top: 10px; width: 100%; }
@@ -789,7 +791,7 @@ input, textarea { padding: 10px 12px; }
 .flip img + img { position: absolute; inset: 0; height: 100%; max-height: none; animation: flipx 1.6s steps(1) infinite; }
 @keyframes flipx { 0% { opacity: 0; } 50% { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .flip img + img { animation-duration: 4s; } }
-#fi-rm { justify-self: start; max-width: none; text-align: left; }
+#fi-rm, #cf-ia-rm, #pi-padrao { justify-self: start; max-width: none; text-align: left; }
 .fi-busca textarea { width: 100%; box-sizing: border-box; font: inherit; }
 #fi-ia { width: 100%; }
 .fi-passos { margin: 0; padding-left: 20px; display: grid; gap: 6px; }
@@ -1163,6 +1165,7 @@ var Store = (function () {
       if (!mcpP) mcpP = window.claude && window.claude.use ? window.claude.use('mcp').catch(function () { return null; }) : Promise.resolve(null);
       return mcpP;
     },
+    resetIA: function () { sampleP = null; },
     sample: function () {
       if (!sampleP) sampleP = window.claude && window.claude.use ? window.claude.use('sample').catch(function () { return null; }) : Promise.resolve(null);
       return sampleP;
@@ -3103,7 +3106,41 @@ window.MOVES = (function () {
         h('p', { class: 'tip', text: 'Tudo aqui é opcional e pode ser feito depois, pelo menu Conta.' }),
         h('div', { class: 'cfg-con' }, h('b', { text: 'Strava' }), h('span', { class: 'tip', text: 'Traz corridas, pedais e caminhadas.' }), st),
         h('div', { class: 'cfg-con' }, h('b', { text: 'Health Connect (Android)' }), h('span', { class: 'tip', text: 'Traz peso, composição corporal, sono e frequência cardíaca do relógio e da balança.' }), hc),
-        h('div', { class: 'cfg-con' }, h('b', { text: 'Chave de IA' }), h('span', { class: 'tip', text: 'Para calcular refeições por texto e foto e ter as análises da IA. Chega na próxima atualização; até lá o app funciona com o cálculo próprio.' })));
+        secChave());
+    }
+    function secChave() {
+      var st = h('span', { class: 'tip', id: 'cf-ia-st', text: 'Conferindo…' }), campo = h('input', { type: 'password', id: 'cf-ia', autocomplete: 'off', placeholder: 'sk-ant-…', 'aria-label': 'Chave de IA' });
+      var sv = h('button', { type: 'button', class: 'howbtn', id: 'cf-ia-ok', text: 'Salvar chave' }), rm = h('button', { type: 'button', class: 'link', id: 'cf-ia-rm', text: 'Remover chave', hidden: '' }), msg = h('span', { class: 'tip', role: 'status' });
+      var box = h('div', { class: 'cfg-con' }, h('b', { text: 'Chave de IA (Anthropic)' }),
+        h('span', { class: 'tip', text: 'A IA calcula refeições por texto e foto, monta fichas e faz as análises. Cada pessoa usa a própria chave e paga só o que usar. Sem chave, o app funciona com o cálculo próprio.' }),
+        st, campo, sv, msg, rm,
+        h('details', { class: 'mais' }, h('summary', { text: 'Como conseguir uma chave' }),
+          h('ol', { class: 'fi-passos' }, h('li', { text: 'Crie uma conta em console.anthropic.com.' }), h('li', { text: 'Em Billing, coloque um crédito.' }), h('li', { text: 'Em API Keys, crie uma chave e copie.' }), h('li', { text: 'Cole aqui e toque em Salvar chave.' })),
+          h('a', { class: 'yt', href: 'https://console.anthropic.com/settings/keys', target: '_blank', rel: 'noopener', text: 'Abrir o console da Anthropic' })),
+        h('p', { class: 'tip', text: 'A chave é guardada cifrada no servidor e não volta para o aparelho.' }));
+      function mostra(s) {
+        window.CHAVE_IA = s;
+        st.textContent = s.tem ? 'Chave cadastrada, terminando em …' + s.final + '.' : s.usaServidor ? 'Você usa a chave do servidor (administrador). Cadastrar a sua é opcional.' : 'Nenhuma chave cadastrada.';
+        rm.hidden = !s.tem; sv.textContent = s.tem ? 'Trocar chave' : 'Salvar chave';
+      }
+      if (window.Plataforma) window.Plataforma.api('/api/chave', { acao: 'status' }).then(mostra).catch(function () { st.textContent = 'Não consegui conferir agora.'; });
+      else st.textContent = 'Disponível no app instalado.';
+      function recarrega() { if (window.Plataforma.recarregaIA) window.Plataforma.recarregaIA(); Store.resetIA(); }
+      sv.addEventListener('click', function () {
+        var v = campo.value.trim(); if (!v) { msg.textContent = 'Cole a chave no campo.'; return; }
+        sv.disabled = true; msg.textContent = 'Testando a chave…';
+        window.Plataforma.api('/api/chave', { acao: 'salvar', chave: v }).then(function (r) {
+          campo.value = ''; msg.textContent = 'Chave salva e testada.'; mostra({ tem: true, final: r.final }); recarrega();
+        }).catch(function (e) { msg.textContent = e.message || 'Não consegui salvar.'; }).then(function () { sv.disabled = false; });
+      });
+      rm.addEventListener('click', function () {
+        if (!rm.dataset.sure) { rm.dataset.sure = '1'; rm.textContent = 'Confirmar: remover a chave'; return; }
+        window.Plataforma.api('/api/chave', { acao: 'remover' }).then(function () {
+          delete rm.dataset.sure; rm.textContent = 'Remover chave'; msg.textContent = 'Chave removida.';
+          window.Plataforma.api('/api/chave', { acao: 'status' }).then(mostra); recarrega();
+        }).catch(function (e) { msg.textContent = e.message; });
+      });
+      return box;
     }
     var SEC = [secSobre, secPratica, secMetas, secCon];
     function salvar() {
@@ -3543,7 +3580,7 @@ window.MOVES = (function () {
           'Responda com {"aprovar":true ou false,"duplicado":"nome do existente igual ou vazio","risco":"baixo", "medio" ou "alto","nome_sugerido":"nome melhor ou vazio","comentario":"uma ou duas frases para a pessoa"}.', { modelTier: 'default', cache: false });
       }).then(function (t) {
         ok.disabled = false;
-        if (!t) { msg.textContent = 'A IA não está disponível. Pode enviar assim mesmo.'; tri = { sem_ia: true }; ok.textContent = 'Enviar para aprovação'; return; }
+        if (!t) { msg.textContent = 'A IA não está disponível. Pode enviar assim mesmo.' + window.semChave(); tri = { sem_ia: true }; ok.textContent = 'Enviar para aprovação'; return; }
         tri = { aprovar: !!t.aprovar, duplicado: String(t.duplicado || ''), risco: String(t.risco || ''), nome_sugerido: String(t.nome_sugerido || ''), comentario: String(t.comentario || '') };
         res.textContent = '';
         var cls = tri.duplicado || !tri.aprovar || tri.risco === 'alto' ? 'verdict atencao' : 'verdict bom';
@@ -3741,7 +3778,7 @@ window.MOVES = (function () {
           if (p) p.textContent = (f.obs ? f.obs + ' ' : '') + 'Com fotos: ' + f.stats.foto + ', com animação: ' + f.stats.ani + ', sem imagem: ' + f.stats.prop + '. Confira ' + (PI ? 'a sessão e toque em Salvar.' : 'cada treino e toque em Salvar ficha.');
         }).catch(function (e) {
           ac.querySelectorAll('button').forEach(function (b) { b.disabled = false; });
-          msg.textContent = e && e.message === 'pdf' ? 'O PDF passa de 3 MB. Mande fotos das páginas no lugar.' : e && e.message === 'indisponivel' ? 'A IA não está disponível agora.' : e && e.message === 'vazio' ? 'A IA não encontrou exercícios. Tente uma foto mais nítida ou cole o texto.' : 'Não consegui agora. Tente de novo.';
+          msg.textContent = e && e.message === 'pdf' ? 'O PDF passa de 3 MB. Mande fotos das páginas no lugar.' : e && e.message === 'indisponivel' ? ('A IA não está disponível agora.' + window.semChave()) : e && e.message === 'vazio' ? 'A IA não encontrou exercícios. Tente uma foto mais nítida ou cole o texto.' : 'Não consegui agora. Tente de novo.';
         });
       }
       var b1 = h('button', { type: 'button', class: 'go', id: 'fia-trocar', text: PI ? 'Montar a sessão' : temTreinos ? 'Substituir minha ficha' : 'Montar ficha' }); b1.addEventListener('click', function () { vai('trocar'); }); ac.appendChild(b1);
@@ -4734,7 +4771,7 @@ window.MOVES = (function () {
       });
     }).catch(function (e) {
       if (antes) Store.set('analises', id, antes); else Store.del('analises', id);
-      anaMsg[id] = e && e.message === 'indisponivel' ? 'A análise automática não está disponível aqui.' : 'Não consegui analisar agora. Toque em Analisar.';
+      anaMsg[id] = e && e.message === 'indisponivel' ? ('A análise automática não está disponível aqui.' + window.semChave()) : 'Não consegui analisar agora. Toque em Analisar.';
     }).then(function () { delete anaBusy[id]; renderAtiv(); renderCardio(); });
   }
   function anaPendentes() {
@@ -5186,7 +5223,7 @@ window.MOVES = (function () {
         comeu: Math.round(r.comeu), saldo: Math.round(r.saldo), nReg: r.nReg, criado: new Date().toISOString()
       });
     }).catch(function (e) {
-      fechMsg = e && e.message === 'indisponivel' ? 'A análise automática não está disponível aqui.' : 'Não consegui analisar agora. Tente de novo.';
+      fechMsg = e && e.message === 'indisponivel' ? ('A análise automática não está disponível aqui.' + window.semChave()) : 'Não consegui analisar agora. Tente de novo.';
     }).then(function () { fechBusy = false; renderFech(); renderDay(); });
   }
   function irParaFechamento(seg) {
@@ -6414,7 +6451,7 @@ window.MOVES = (function () {
         Store.set('refeicoes', id, cur);
       }).catch(function (e) {
         foodMsg[id] = e && e.message === 'indisponivel'
-          ? 'O cálculo automático não está disponível aqui. Preencha os valores ou me mande a refeição na conversa.'
+          ? ('O cálculo automático não está disponível. Preencha os valores.' + window.semChave())
           : 'Não consegui calcular agora. Toque em Recalcular ou preencha os valores.';
       }).then(function () { delete foodBusy[id]; renderFood(); });
       return;
@@ -6452,7 +6489,7 @@ window.MOVES = (function () {
       Store.set('refeicoes', id, cur);
     }).catch(function (e) {
       foodMsg[id] = e && e.message === 'indisponivel'
-        ? 'O cálculo automático não está disponível aqui. Preencha os valores ou me mande a refeição na conversa.'
+        ? ('O cálculo automático não está disponível. Preencha os valores.' + window.semChave())
         : 'Não consegui calcular agora. Toque em Recalcular ou preencha os valores.';
     }).then(function () { delete foodBusy[id]; renderFood(); });
   }
@@ -6933,7 +6970,7 @@ window.MOVES = (function () {
       });
     }).catch(function (e) {
       Store.del('semanas', dPes);
-      semMsg = e && e.message === 'indisponivel' ? 'A análise automática não está disponível aqui.' : 'Não consegui analisar agora. Tente de novo.';
+      semMsg = e && e.message === 'indisponivel' ? ('A análise automática não está disponível aqui.' + window.semChave()) : 'Não consegui analisar agora. Tente de novo.';
     }).then(function () { semBusy = false; renderSaude(); renderAnaSemana(); });
   }
   function blocoSemana(box, dPes, titulo) {
@@ -7526,7 +7563,7 @@ window.MOVES = (function () {
       if (!c.nome) c.nome = String(x.nome || 'Receita').slice(0, 80);
       Store.set('receitas', id, c);
     }).catch(function (e) {
-      recMsg[id] = e && e.message === 'indisponivel' ? 'O cálculo automático não está disponível aqui.' : 'Não consegui calcular agora. Toque em Recalcular.';
+      recMsg[id] = e && e.message === 'indisponivel' ? ('O cálculo automático não está disponível aqui.' + window.semChave()) : 'Não consegui calcular agora. Toque em Recalcular.';
     }).then(function () { delete recBusy[id]; renderRec(); renderRecPick(); });
   }
   var REC_TAGS = [['cafe', 'Café da manhã'], ['almoco', 'Almoço e jantar'], ['lanche', 'Lanche'], ['sobremesa', 'Doce'], ['marmita', 'Marmita'], ['rapida', 'Rápida']];
@@ -8232,7 +8269,7 @@ window.MOVES = (function () {
         estimativa_seg: Number(r.estimativa_seg) || null, chance: String(r.chance || ''), alertas: (Array.isArray(r.alertas) ? r.alertas : []).slice(0, 3).map(String),
         semanas: sem, ultima: ult, ate: per.fim, meta: trMeta(), criado: new Date().toISOString() });
     }).catch(function (e) {
-      trMsg = e && e.message === 'indisponivel' ? 'O treinador automático não está disponível aqui.' : 'Não consegui montar o plano agora. Tente de novo.';
+      trMsg = e && e.message === 'indisponivel' ? ('O treinador automático não está disponível aqui.' + window.semChave()) : 'Não consegui montar o plano agora. Tente de novo.';
     }).then(function () { trBusy = false; renderTreinador(); });
   }
   // Retorno de cada corrida contra a sessão planejada, calculado no app (sem IA).

@@ -1,6 +1,6 @@
 // Cálculo por IA (refeições, receitas, avaliação do dia, análise das atividades).
 // Recebe { prompt, imagens: [{ tipo, base64 }] } e devolve { resultado } com o JSON pedido no prompt.
-import { env, responde, corpo, usuario, banco, rota } from './_lib.js';
+import { env, responde, corpo, usuario, banco, rota, chaveDe } from './_lib.js';
 
 export const config = { maxDuration: 120 };
 
@@ -91,12 +91,15 @@ export default rota(async (req, res) => {
     { type: 'text', text: prompt + '\n\nEntregue a resposta chamando a ferramenta responder com o objeto JSON pedido, sem escrever nada antes nem fora dela. Dentro dos textos, use aspas simples em vez de aspas duplas.' }
   ];
   const tipo = tipoDe(String(prompt)), esc = escolhe(tipo, imagens.length > 0);
+  // Cada pessoa usa a própria chave; a do servidor é só do administrador.
+  const ch = await chaveDe(u);
+  if (!ch) return responde(res, 402, { erro: 'Cadastre sua chave de IA em Configurações para usar a IA.', code: 'sem_chave' });
 
   const chama = async (msgs) => {
     const r = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
-        'x-api-key': env('ANTHROPIC_API_KEY'),
+        'x-api-key': ch.chave,
         'anthropic-version': '2023-06-01',
         'content-type': 'application/json'
       },

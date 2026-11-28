@@ -637,9 +637,16 @@
     return servicos;
   }
 
-  window.Plataforma = { api: api };
+  // IA só para quem tem chave própria (ou o administrador, que usa a do servidor).
+  var iaP = null;
+  function iaPronta() {
+    if (!iaP) iaP = api('/api/chave', { acao: 'status' }).then(function (st) { window.CHAVE_IA = st; return st.tem || st.usaServidor ? criaSample() : null; }).catch(function () { return criaSample(); });
+    return iaP;
+  }
+  window.Plataforma = { api: api, recarregaIA: function () { iaP = null; } };
   window.claude = {
     use: function (nome) {
+      if (nome === 'sample') return prontos().then(iaPronta);
       return prontos().then(function (s) { return s[nome] || null; });
     }
   };
