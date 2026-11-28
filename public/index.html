@@ -774,6 +774,9 @@ input, textarea { padding: 10px 12px; }
 .fi-busca { z-index: 9100; } .fi-busca input[type=search] { width: 100%; box-sizing: border-box; min-height: 48px; font: inherit; }
 .fi-res { display: grid; gap: 8px; }
 .fi-item { display: flex; align-items: center; gap: 12px; text-align: left; padding: 8px 10px; border-radius: 14px; border: 0; background: var(--surface); color: var(--fg); font: inherit; min-height: 60px; }
+.fi-ver { z-index: 9200; } .fi-ver .flip img { max-height: 46vh; }
+.fi-thb { flex: none; padding: 0; border: 0; background: none; border-radius: 10px; }
+.fi-info { display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; margin: 0; } .fi-info dt { color: var(--muted); font-weight: 600; } .fi-info dd { margin: 0; }
 .fi-item.ja { opacity: .55; } .fi-item.ja small { color: var(--accent); }
 .fi-svg { background: var(--mat); padding: 2px; box-sizing: border-box; } .fi-svg svg { width: 100%; height: 100%; }
 .fi-item .fi-th { width: 56px; height: 56px; }
@@ -3131,6 +3134,29 @@ window.MOVES = (function () {
     if (mv) { try { mv.name = nome; var f = window.Fig.build(mv, true); f.draw(mv.B); sp.appendChild(f.svg); sp.classList.add('fi-svg'); return sp; } catch (e) {} }
     sp.textContent = '•'; return sp;
   }
+  // Demonstração do exercício: fotos da base ou animação do app, músculos, equipamento e passo a passo.
+  function verEx(x, acao) {
+    var ov = h('div', { class: 'cfg-ov fi-ver', role: 'dialog', 'aria-label': 'Demonstração: ' + x.n }), bb = h('div', { class: 'cfg-box' });
+    ov.appendChild(bb); document.body.appendChild(ov);
+    var fx = h('button', { type: 'button', class: 'cfg-x', 'aria-label': 'Voltar', text: '✕' }); fx.addEventListener('click', function () { ov.remove(); });
+    bb.appendChild(h('div', { class: 'cfg-top' }, h('h1', { text: x.n }), fx));
+    var mv = window.MOVES[x.id], img = x.img && x.img.length ? x.img : null;
+    if (img) bb.appendChild(fotosEx(img, x.n));
+    else if (mv) { var a = h('div', { class: 'howto' }); mv.name = x.n; bb.appendChild(a); window.Fig.mount(mv, a); }
+    else bb.appendChild(h('p', { class: 'tip', text: 'Este exercício ainda não tem imagem. Depois de salvar, você pode anexar uma foto ou GIF seu na tela do treino.' }));
+    var info = [];
+    if (x.g && x.g.length) info.push(['Trabalha', x.g.join(', ') + (x.s && x.s.length ? ' (e também ' + x.s.join(', ') + ')' : '')]);
+    if (x.eq) info.push(['Equipamento', x.eq]);
+    if (x.nv) info.push(['Nível', x.nv]);
+    if (info.length) { var dl = h('dl', { class: 'fi-info' }); info.forEach(function (r) { dl.appendChild(h('dt', { text: r[0] })); dl.appendChild(h('dd', { text: r[1] })); }); bb.appendChild(dl); }
+    if (mv && mv.how) bb.appendChild(h('p', { text: mv.how }));
+    if (x.i && x.i.length) {
+      var ol = h('ol', { class: 'fi-passos', lang: 'en' }); x.i.forEach(function (t) { ol.appendChild(h('li', { text: t })); });
+      bb.appendChild(h('details', { class: 'mais' }, h('summary', { text: 'Passo a passo (em inglês por enquanto)' }), ol));
+    }
+    bb.appendChild(h('a', { class: 'yt', target: '_blank', rel: 'noopener', text: 'Ver vídeos no YouTube', href: 'https://www.youtube.com/results?search_query=' + encodeURIComponent(x.n + ' execução') }));
+    if (acao) { var ok = h('button', { type: 'button', class: 'go', id: 'fi-ver-ok', text: acao[0] }); ok.addEventListener('click', function () { ov.remove(); acao[1](); }); bb.appendChild(h('div', { class: 'cfg-acoes' }, ok)); }
+  }
   function repsAlvo(t) { var m = String(t || '').match(/\d+/g); return m ? Number(m[m.length - 1]) : 10; }
   var fichaAberta = false;
   function abreFicha() {
@@ -3209,7 +3235,11 @@ window.MOVES = (function () {
       rm.addEventListener('click', function () { if (!rm.dataset.sure) { rm.dataset.sure = '1'; rm.textContent = '?'; rm.setAttribute('aria-label', 'Confirmar remoção'); return; } t.ex.splice(i, 1); mudou = true; desenha(); });
       var nome = h('input', { type: 'text', id: p + 'nome', maxlength: '60', 'aria-label': 'Nome do exercício' }); nome.value = e.name;
       nome.addEventListener('input', function () { e.name = nome.value; mudou = true; });
-      var th = miniEx(e.id, e.img, e.name);
+      var th = h('button', { type: 'button', class: 'fi-thb', 'aria-label': 'Ver demonstração de ' + e.name }, miniEx(e.id, e.img, e.name));
+      th.addEventListener('click', function () {
+        if (!e.cat) { verEx({ id: e.id, n: e.name }); return; }
+        catalogo().then(function (c) { verEx(c.ex.filter(function (y) { return y.id === e.cat; })[0] || { id: e.id, n: e.name, img: e.img }); }).catch(function () { verEx({ id: e.id, n: e.name, img: e.img }); });
+      });
       return h('div', { class: 'fi-ex' },
         h('div', { class: 'fi-cab' }, th, nome, up, dn, rm),
         h('div', { class: 'fi-3' }, num(p + 'sets', 'Séries', e.sets, function (v) { e.sets = v; }, { inputmode: 'numeric', step: '1' }),
@@ -3246,7 +3276,7 @@ window.MOVES = (function () {
           var b = h('button', { type: 'button', class: 'fi-item' + (ja ? ' ja' : '') },
             miniEx(x.id, x.img, x.n),
             h('span', {}, h('b', { text: x.n }), h('small', { text: ja ? '✓ Já está neste treino' : x.app ? 'Com animação do app' : [x.g.join(', '), x.eq].filter(Boolean).join(' · ') })));
-          if (ja) b.setAttribute('aria-disabled', 'true'); else b.addEventListener('click', function () { poe(x); });
+          b.addEventListener('click', function () { verEx(x, ja ? null : ['+ Adicionar ao treino ' + letra, function () { poe(x); }]); });
           res.appendChild(b);
         });
         if (q.value.trim().length >= 3) {
