@@ -111,6 +111,7 @@
         '<label for="pa-email">Seu e-mail</label><input id="pa-email" type="email" required autocomplete="email" style="' + EST_IN + '">' +
         '<label for="pa-senha">Crie uma senha (mínimo 8 caracteres)</label><input id="pa-senha" type="password" required minlength="8" autocomplete="new-password" style="' + EST_IN + '">' +
         '<label for="pa-senha2">Repita a senha</label><input id="pa-senha2" type="password" required minlength="8" autocomplete="new-password" style="' + EST_IN + '">' +
+        '<label style="display:flex;gap:10px;align-items:flex-start;font-weight:400"><input id="pa-termos" type="checkbox" required style="width:22px;height:22px;flex:none;margin-top:2px"><span>Li e aceito os <a href="/termos.html" target="_blank" rel="noopener">termos de uso e privacidade</a>.</span></label>' +
         '<button type="submit" style="' + EST_BT + '">Criar meu acesso</button>' +
         '<p id="pa-msg" aria-live="polite" style="margin:0"></p>';
       f.querySelector('#pa-nome').value = x.j.nome || '';
@@ -120,8 +121,9 @@
         ev.preventDefault();
         var email = f.querySelector('#pa-email').value.trim().toLowerCase(), senha = f.querySelector('#pa-senha').value;
         if (senha !== f.querySelector('#pa-senha2').value) { msg.textContent = 'As senhas não são iguais.'; return; }
+        if (!f.querySelector('#pa-termos').checked) { msg.textContent = 'Para criar o acesso, aceite os termos de uso.'; return; }
         msg.textContent = 'Criando...';
-        post({ acao: 'aceitar', codigo: codigo, nome: f.querySelector('#pa-nome').value.trim(), email: email, senha: senha }).then(function (y) {
+        post({ acao: 'aceitar', codigo: codigo, nome: f.querySelector('#pa-nome').value.trim(), email: email, senha: senha, termos: true }).then(function (y) {
           if (!y.ok) { msg.textContent = y.j.erro || 'Não consegui criar o acesso.'; return; }
           msg.textContent = 'Pronto! Entrando...';
           semConvite();
@@ -402,7 +404,7 @@
     var d = document.createElement('details');
     d.className = 'conta-menu';
     d.innerHTML = '<summary aria-label="Conta"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg><span>Conta</span></summary>' +
-      '<div class="conta-pop"><button type="button" id="pl-uso">Uso da IA</button><button type="button" id="pl-con">Conectar Strava</button><button type="button" id="pl-hc">Health Connect (balança e relógio)</button><div class="pl-tema" role="group" aria-label="Tema"><span>Tema</span><button type="button" data-tema="auto">Automático</button><button type="button" data-tema="claro">Claro</button><button type="button" data-tema="escuro">Escuro</button></div><button type="button" id="pl-cfg">Configurações</button><button type="button" id="pl-tour">Tour do app</button><button type="button" id="pl-senha">Trocar senha</button><button type="button" id="pl-pessoas" hidden>Pessoas</button><button type="button" id="pl-sugestoes" hidden>Exercícios sugeridos</button><button type="button" id="pl-sair">Sair</button></div>';
+      '<div class="conta-pop"><button type="button" id="pl-uso">Uso da IA</button><button type="button" id="pl-con">Conectar Strava</button><button type="button" id="pl-hc">Health Connect (balança e relógio)</button><div class="pl-tema" role="group" aria-label="Tema"><span>Tema</span><button type="button" data-tema="auto">Auto</button><button type="button" data-tema="claro">Claro</button><button type="button" data-tema="escuro">Escuro</button></div><button type="button" id="pl-cfg">Configurações</button><button type="button" id="pl-tour">Tour do app</button><button type="button" id="pl-termos">Termos e privacidade</button><button type="button" id="pl-senha">Trocar senha</button><button type="button" id="pl-pessoas" hidden>Pessoas</button><button type="button" id="pl-sugestoes" hidden>Exercícios sugeridos</button><button type="button" id="pl-sair">Sair</button></div>';
     var rec = document.getElementById('t-receitas');
     if (rec && rec.parentNode) {
       var col = document.createElement('div');
@@ -422,6 +424,7 @@
     marcaTema();
     d.querySelector('#pl-cfg').addEventListener('click', function () { d.open = false; if (window.abreConfig) window.abreConfig(); });
     d.querySelector('#pl-tour').addEventListener('click', function () { d.open = false; if (window.abreTour) window.abreTour(); });
+    d.querySelector('#pl-termos').addEventListener('click', function () { d.open = false; window.open('/termos.html', '_blank', 'noopener'); });
     d.querySelector('#pl-senha').addEventListener('click', function () { d.open = false; painelSenha(sb); });
     var bp = d.querySelector('#pl-pessoas');
     if (window.PERFIL_ACESSO && window.PERFIL_ACESSO.admin) { bp.hidden = false; bp.addEventListener('click', function () { d.open = false; painelPessoas(); }); }
@@ -647,7 +650,7 @@
     if (!iaP) iaP = api('/api/chave', { acao: 'status' }).then(function (st) { window.CHAVE_IA = st; return st.tem || st.usaServidor ? criaSample() : null; }).catch(function () { return criaSample(); });
     return iaP;
   }
-  window.Plataforma = { api: api, recarregaIA: function () { iaP = null; } };
+  window.Plataforma = { api: api, recarregaIA: function () { iaP = null; }, sair: function () { return cliente().then(function (sb) { return sb.auth.signOut(); }); } };
   window.claude = {
     use: function (nome) {
       if (nome === 'sample') return prontos().then(iaPronta);

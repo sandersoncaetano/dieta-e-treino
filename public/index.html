@@ -94,7 +94,7 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 .conta-menu[open] summary { border-color: var(--accent); background: var(--mat); }
 .pl-tema { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; padding: 6px 4px 2px; border-top: 1px solid var(--line); }
 .pl-tema span { grid-column: 1 / -1; font-size: .85rem; color: var(--muted); font-weight: 700; }
-.conta-menu .conta-pop .pl-tema button { min-height: 40px; padding: 4px; font-size: .85rem; border-radius: 8px; border: 2px solid var(--line); background: var(--bg); color: var(--fg); font-weight: 700; }
+.conta-menu .conta-pop .pl-tema button { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: center; justify-content: center; min-height: 40px; padding: 4px 2px; font-size: .85rem; border-radius: 8px; border: 2px solid var(--line); background: var(--bg); color: var(--fg); font-weight: 700; }
 .conta-menu .conta-pop .pl-tema button[aria-pressed="true"] { border-color: var(--accent); background: var(--accent); color: var(--on-accent); }
 .conta-menu .conta-pop { position: absolute; right: 0; top: calc(100% + 6px); z-index: 50; display: grid; gap: 6px; min-width: 230px; background: var(--bg); border: 2px solid var(--line); border-radius: 12px; padding: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.15); }
 .conta-menu .conta-pop button { font: inherit; font-weight: 700; text-align: left; padding: 10px 12px; border-radius: 10px; border: 0; background: var(--surface); color: var(--fg); }
@@ -766,6 +766,7 @@ input, textarea { padding: 10px 12px; }
 .cfg-aviso { margin: 0; color: var(--warn); font-weight: 600; min-height: 1em; }
 .fi-sug { justify-self: start; max-width: none; text-align: left; } .fi-ex textarea, .fi-ex > input { width: 100%; box-sizing: border-box; font: inherit; min-height: 44px; }
 #strava-ov { z-index: 9300; }
+#cf-excluir { justify-self: start; max-width: none; color: var(--warn); } #cf-exc-txt { width: 100%; box-sizing: border-box; min-height: 46px; font: inherit; }
 #cf-ia { width: 100%; box-sizing: border-box; min-height: 46px; font: inherit; }
 .tour-box { min-height: 100%; align-content: start; }
 .tour-card { display: grid; gap: 12px; padding: 20px 4px 8px; }
@@ -3161,6 +3162,25 @@ window.MOVES = (function () {
       });
       return box;
     }
+    function secConta() {
+      var bt = h('button', { type: 'button', class: 'link', id: 'cf-excluir', text: 'Excluir minha conta' }), area = h('div', { class: 'cfg-con', hidden: '' });
+      var conf = h('input', { type: 'text', id: 'cf-exc-txt', autocomplete: 'off', placeholder: 'EXCLUIR' }), go = h('button', { type: 'button', class: 'howbtn', id: 'cf-exc-ok', text: 'Excluir tudo de forma definitiva' }), msg = h('p', { class: 'cfg-aviso', role: 'status' });
+      area.appendChild(h('p', { text: 'Isso apaga para sempre seus registros, fotos, fichas, conexões (Strava, Health Connect), chave de IA e o seu login. Não dá para desfazer.' }));
+      area.appendChild(h('label', { for: 'cf-exc-txt', text: 'Para confirmar, digite EXCLUIR' })); area.appendChild(conf); area.appendChild(go); area.appendChild(msg);
+      bt.addEventListener('click', function () { area.hidden = !area.hidden; });
+      go.addEventListener('click', function () {
+        if (conf.value.trim().toUpperCase() !== 'EXCLUIR') { msg.textContent = 'Digite EXCLUIR para confirmar.'; return; }
+        if (!window.Plataforma) { msg.textContent = 'Disponível só no app instalado.'; return; }
+        go.disabled = true; msg.textContent = 'Excluindo…';
+        window.Plataforma.api('/api/acesso', { acao: 'excluir', confirma: 'EXCLUIR' }).then(function () {
+          try { localStorage.clear(); } catch (e) {}
+          msg.textContent = 'Conta excluída.';
+          window.Plataforma.sair().catch(function () {}).then(function () { location.replace('/'); });
+        }).catch(function (e) { go.disabled = false; msg.textContent = e.message || 'Não consegui excluir agora.'; });
+      });
+      return h('section', { class: 'cfg-sec' }, h('h2', { text: 'Sua conta' }),
+        h('a', { class: 'yt', href: '/termos.html', target: '_blank', rel: 'noopener', text: 'Termos de uso e privacidade' }), bt, area);
+    }
     var SEC = [secSobre, secPratica, secMetas, secCon];
     function salvar() {
       if (!c.nome || !c.nasc || !c.altura || !c.peso) { passo = 0; desenha(); toastCfg('Preencha nome, nascimento, altura e peso.'); return false; }
@@ -3195,7 +3215,7 @@ window.MOVES = (function () {
         box.appendChild(h('p', { class: 'tip', text: 'Passo ' + (passo + 1) + ' de 4 · ' + PASSOS[passo] }));
         var bar = h('div', { class: 'track' }), bi = h('i', {}); bi.style.width = ((passo + 1) / 4 * 100) + '%'; bar.appendChild(bi); box.appendChild(bar);
         box.appendChild(SEC[passo]());
-      } else SEC.forEach(function (f) { box.appendChild(f()); });
+      } else { SEC.forEach(function (f) { box.appendChild(f()); }); box.appendChild(secConta()); }
       box.appendChild(h('p', { class: 'cfg-aviso', role: 'status' }));
       var ac = h('div', { class: 'cfg-acoes' });
       if (wizard && passo > 0) { var vt = h('button', { type: 'button', class: 'howbtn', text: 'Voltar' }); vt.addEventListener('click', function () { passo--; desenha(); }); ac.appendChild(vt); }

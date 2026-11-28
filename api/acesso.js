@@ -54,17 +54,42 @@ export default rota(async (req, res) => {
     if (r.v.email && r.v.email !== email) return responde(res, 400, { erro: 'Este convite é para outro e-mail.' });
     if (nome.length < 2) return responde(res, 400, { erro: 'Informe seu nome.' });
     if (senha.length < 8) return responde(res, 400, { erro: 'A senha precisa ter pelo menos 8 caracteres.' });
+    if (b.termos !== true) return responde(res, 400, { erro: 'Para criar o acesso, aceite os termos de uso.' });
     const ja = await banco('perfis?select=status&email=eq.' + enc(email));
     if (ja && ja[0]) return responde(res, 400, { erro: 'Já existe uma conta com este e-mail. Entre com e-mail e senha.' });
     const u = await authAdmin('users', { method: 'POST', body: JSON.stringify({ email, password: senha, email_confirm: true, user_metadata: { nome } }) });
     const quem = r.v.criado_por ? await banco('perfis?select=nome&user_id=eq.' + r.v.criado_por) : null;
-    await banco('perfis', { method: 'POST', body: JSON.stringify({ user_id: u.id, email, nome, indicado_por: (quem && quem[0] && quem[0].nome) || null, status: 'aprovado', aprovado_em: new Date().toISOString() }), headers: { Prefer: 'return=minimal' } });
+    await banco('perfis', { method: 'POST', body: JSON.stringify({ user_id: u.id, email, nome, indicado_por: (quem && quem[0] && quem[0].nome) || null, status: 'aprovado', aprovado_em: new Date().toISOString(), termos_em: new Date().toISOString() }), headers: { Prefer: 'return=minimal' } });
     await banco('convites?codigo=eq.' + enc(r.v.codigo), { method: 'PATCH', body: JSON.stringify({ usado_por: u.id, usado_em: new Date().toISOString() }), headers: { Prefer: 'return=minimal' } });
     await avisaAdmins('Convite aceito', nome + ' (' + email + ') criou a conta.').catch(() => {});
     return responde(res, 200, { ok: true });
   }
 
   const u = await usuario(req);
+
+  // Excluir a própria conta: apaga tudo da pessoa (registros, fotos, conexões, chave) e o login.
+  if (b.acao === 'excluir') {
+    if (b.confirma !== 'EXCLUIR') return responde(res, 400, { erro: 'Confirmação inválida.' });
+    if (u.admin) return responde(res, 400, { erro: 'O administrador não pode excluir a própria conta por aqui.' });
+    const id = enc(u.id), chave = env('SUPABASE_SERVICE_ROLE_KEY');
+    const cab = { apikey: chave, ...(chave.startsWith('sb_') ? {} : { Authorization: 'Bearer ' + chave }), 'Content-Type': 'application/json' };
+    // Fotos no armazenamento (pasta com o id da pessoa).
+    try {
+      for (let i = 0; i < 20; i++) {
+        const l = await fetch(env('SUPABASE_URL') + '/storage/v1/object/list/fotos', { method: 'POST', headers: cab, body: JSON.stringify({ prefix: u.id, limit: 1000 }) }).then((r) => r.json());
+        if (!Array.isArray(l) || !l.length) break;
+        await fetch(env('SUPABASE_URL') + '/storage/v1/object/fotos', { method: 'DELETE', headers: cab, body: JSON.stringify({ prefixes: l.map((o) => u.id + '/' + o.name) }) });
+        if (l.length < 1000) break;
+      }
+    } catch (e) { console.error('fotos', e.message); }
+    for (const t of ['docs', 'uso_ia', 'strava_cache', 'strava_tokens', 'strava_apps', 'saude_registros', 'saude_tokens', 'push_inscricoes', 'alertas', 'chaves_ia', 'contribuicoes', 'perfis']) {
+      await banco(t + '?user_id=eq.' + id, { method: 'DELETE', headers: { Prefer: 'return=minimal' } }).catch((e) => console.error('excluir', t, e.message));
+    }
+    await authAdmin('users/' + id, { method: 'DELETE' });
+    await avisaAdmins('Conta excluída', 'Uma pessoa excluiu a própria conta.').catch(() => {});
+    return responde(res, 200, { ok: true });
+  }
+
   if (!u.admin) return responde(res, 403, { erro: 'Só o administrador pode fazer isso.' });
 
   if (b.acao === 'lista') {
