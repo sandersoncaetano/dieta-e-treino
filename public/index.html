@@ -766,6 +766,10 @@ input, textarea { padding: 10px 12px; }
 .cfg-aviso { margin: 0; color: var(--warn); font-weight: 600; min-height: 1em; }
 .fi-sug { justify-self: start; max-width: none; text-align: left; } .fi-ex textarea, .fi-ex > input { width: 100%; box-sizing: border-box; font: inherit; min-height: 44px; }
 #cf-ia { width: 100%; box-sizing: border-box; min-height: 46px; font: inherit; }
+.tour-box { min-height: 100%; align-content: start; }
+.tour-card { display: grid; gap: 12px; padding: 20px 4px 8px; }
+.tour-card h1 { margin: 0; font-size: 1.6rem; } .tour-card p { margin: 0; font-size: 1.05rem; line-height: 1.5; }
+.tour-ic { font-size: 3rem; line-height: 1; } .tour-pq { color: var(--muted); } .tour-card .howbtn { justify-self: start; margin-top: 4px; }
 #pi-editar { width: 100%; margin-bottom: 12px; }
 .stage.fotos { background: #fff; } .stage.fotos .flip img { max-height: min(27vh, 240px); } .stage.vazio { display: none; }
 .gym-top .fi-edita { margin-top: 10px; width: 100%; }
@@ -2975,9 +2979,14 @@ window.MOVES = (function () {
     }
     var fp = Store.get('perfil', 'ficha_pilates'), nfp = JSON.stringify(fp && fp.ex && fp.ex.length ? fp : null);
     if (nfp !== pilAplicada) { pilAplicada = nfp; if (window.PIL) window.PIL.monta(JSON.parse(nfp)); }
-    aplicaTelas();
+    aplicaTelas(); tourAuto();
   }
-  var pilAplicada = 'null';
+  var pilAplicada = 'null', tourTentado = false;
+  function tourAuto() {
+    var c = Store.get('perfil', 'config');
+    if (tourTentado || !c || c.legado || c.tour_visto || cfgAberto) return;
+    tourTentado = true; setTimeout(function () { if (!document.querySelector('.cfg-ov')) abreTour(); }, 1500);
+  }
   // Modalidades → o que aparece. "cardio" (perfil antigo) vale corrida e bike.
   var MODALIDADES = [['academia', 'Academia'], ['pilates', 'Pilates'], ['corrida', 'Corrida'], ['caminhada', 'Caminhada'], ['bike', 'Bike'], ['natacao', 'Natação'], ['outros', 'Outros']];
   function pratica(m) {
@@ -3163,6 +3172,7 @@ window.MOVES = (function () {
       if (!novo.legado && (c.modalidades || []).indexOf('academia') >= 0 && !Store.get('perfil', 'ficha_academia')) Store.set('perfil', 'ficha_academia', { treinos: FICHA_INICIAL, origem: 'inicial' });
       aplicaPerfil(); try { renderFood(); } catch (e) {}
       fecha(); salvoOk(wizard ? 'Tudo pronto. Bom treino!' : 'Configurações salvas');
+      if (wizard) setTimeout(function () { abreTour(); }, 900);
       return true;
     }
     function toastCfg(t) { var p = box.querySelector('.cfg-aviso'); if (p) p.textContent = t; }
@@ -3624,6 +3634,49 @@ window.MOVES = (function () {
     }).catch(function (e) { lst.textContent = ''; lst.appendChild(h('p', { class: 'tip', text: e.message || 'Não consegui carregar.' })); });
   }
   window.abreSugestoes = abreSugestoes;
+
+  /* Tour: explica o que dá para configurar e por quê. Abre depois do primeiro acesso e pelo menu Conta. */
+  function abreTour() {
+    if (document.getElementById('tour')) return;
+    function vai(hash, depois) { return function () { fecha(); location.hash = hash; if (depois) setTimeout(depois, 350); }; }
+    function menu(id) { return function () { fecha(); var b = document.getElementById(id); if (b) b.click(); }; }
+    var adm = window.PERFIL_ACESSO && window.PERFIL_ACESSO.admin;
+    var P = [
+      ['👋', 'Bem-vindo ao Peleja', 'Aqui você registra o que come, os treinos e as medidas do corpo, e acompanha a evolução. Vou mostrar em 1 minuto o que dá para ajustar e por que vale a pena.', 'Seus registros são só seus: ninguém mais vê.'],
+      ['🎯', 'Seu perfil e suas metas', 'Em Configurações ficam peso, altura, idade e objetivo. Com eles o app calcula quantas calorias e quanta proteína você deve comer por dia.', 'Por quê: toda conta do app (o que falta comer, o balanço da semana) parte dessas metas. Atualize quando mudar de objetivo.', ['Abrir Configurações', function () { fecha(); abreConfig(false); }]],
+      ['🧩', 'Só o que você pratica', 'Marque em Configurações o que você faz: academia, pilates, corrida, caminhada, bike. Dá para esconder Receitas e Água se não usar.', 'Por quê: o app mostra só o que interessa e fica mais simples no dia a dia.']
+    ];
+    if (pratica('academia')) P.push(['🏋️', 'Sua ficha da academia', 'No Treino, toque em "Editar minha ficha". Você pode montar os treinos com a busca de 780 exercícios (com demonstração), importar a ficha que já tem por foto, PDF ou texto, ou pedir para a IA criar uma pelo seu objetivo.', 'Por quê: com a sua ficha, o app sabe o treino do dia, guarda as cargas e mostra a evolução de cada exercício.', ['Editar minha ficha', vai('academia', function () { abreFicha(); })]]);
+    if (pratica('pilates')) P.push(['🧘', 'Seu pilates', 'Na aba Pilates, "Editar meu pilates" deixa você escolher os exercícios, as séries e os tempos, importar uma sessão ou gerar uma com IA.', 'Por quê: a sessão fica do seu jeito, com cronômetro nos exercícios de segurar.', ['Editar meu pilates', vai('lombar', function () { abrePilates(); })]]);
+    P.push(['🍽️', 'Refeições', 'Descreva o que comeu ("2 ovos e 1 pão francês"), mande uma foto ou os dois. Use a Observação para detalhes, como "sem balança" ou "metade do prato". O app aprende os alimentos que você repete e calcula sozinho da próxima vez.', 'Por quê: quanto mais certo o registro, mais certa a leitura do seu dia.', ['Ir para Refeições', vai('refeicoes')]]);
+    P.push(['✨', 'Chave de IA', adm ? 'Você usa a chave do servidor. Quem você convidar cadastra a própria chave em Configurações.' : 'Em Configurações > Conexões você cadastra uma chave da Anthropic. Com ela, a IA calcula refeições por foto, monta fichas e analisa a semana.', adm ? 'Assim cada pessoa paga só o próprio uso.' : 'Por quê: cada pessoa paga só o que usa (em geral poucos reais por mês) e a chave fica cifrada no servidor. Sem chave, o app funciona com o cálculo próprio.', adm ? null : ['Cadastrar chave', function () { fecha(); abreConfig(false); setTimeout(function () { var c = document.getElementById('cf-ia'); if (c) c.scrollIntoView({ block: 'center' }); }, 300); }]]);
+    if (temCardio()) P.push(['🏃', 'Strava', 'Conecte o Strava pelo menu Conta para trazer corridas, pedaladas e caminhadas com distância, ritmo e frequência cardíaca, sem digitar nada.', 'Por quê: o app compara cada atividade com as anteriores e mostra se você está evoluindo. Pela regra do Strava, esses dados são analisados pelo cálculo do app, sem IA.', ['Conectar Strava', menu('pl-con')]]);
+    P.push(['⌚', 'Health Connect (Android)', 'Pelo menu Conta você liga o Health Connect: peso e composição da balança, sono e frequência cardíaca do relógio chegam sozinhos.', 'Por quê: a curva de peso e o gasto do dia ficam mais certos sem você anotar.', ['Ver como ligar', menu('pl-hc')]]);
+    if (pratica('academia') || pratica('pilates')) P.push(['🔔', 'Aviso do descanso', 'No Treino, abra "Como usar, som e vibração" e ative o aviso com o app em segundo plano. Teste o som e ajuste o volume.', 'Por quê: o celular vibra quando o descanso acaba, mesmo com a tela bloqueada ou vendo vídeo.', ['Ir para o Treino', vai(pratica('academia') ? 'academia' : 'lombar')]]);
+    P.push(['📲', 'Instale na tela inicial', 'No navegador do celular, toque no menu e em "Adicionar à tela inicial" (ou "Instalar app").', 'Por quê: o Peleja abre como um app, mais rápido, e os avisos funcionam melhor.']);
+    P.push(['📈', 'Histórico e Evolução', 'O Histórico mostra cada dia. A Evolução mostra peso, medidas e a tendência das semanas.', 'Por quê: é ali que você vê o resultado do esforço. Registre o peso pelo menos uma vez por semana.', ['Ver Evolução', vai('evolucao')]]);
+    P.push(['✅', 'Pronto', 'Você pode rever este tour quando quiser pelo menu Conta > Tour do app. Tema claro ou escuro, senha e conexões também ficam lá.', 'Boa peleja!']);
+    var i = 0, ov = h('div', { class: 'cfg-ov tour-ov', id: 'tour', role: 'dialog', 'aria-label': 'Tour do app' }), bb = h('div', { class: 'cfg-box tour-box' });
+    ov.appendChild(bb); document.body.appendChild(ov); document.body.style.overflow = 'hidden';
+    function fecha() {
+      ov.remove(); document.body.style.overflow = '';
+      var c = Store.get('perfil', 'config'); if (c && !c.tour_visto) { c.tour_visto = true; Store.set('perfil', 'config', c); }
+    }
+    function desenha() {
+      var p = P[i]; bb.textContent = '';
+      var x = h('button', { type: 'button', class: 'cfg-x', 'aria-label': 'Fechar o tour', text: '✕' }); x.addEventListener('click', fecha);
+      bb.appendChild(h('div', { class: 'cfg-top' }, h('span', { class: 'tip', text: (i + 1) + ' de ' + P.length }), x));
+      var bar = h('div', { class: 'track' }), bi = h('i', {}); bi.style.width = ((i + 1) / P.length * 100) + '%'; bar.appendChild(bi); bb.appendChild(bar);
+      bb.appendChild(h('div', { class: 'tour-card' }, h('div', { class: 'tour-ic', 'aria-hidden': 'true', text: p[0] }), h('h1', { text: p[1] }), h('p', { text: p[2] }), h('p', { class: 'tour-pq', text: p[3] }),
+        p[4] ? h('button', { type: 'button', class: 'howbtn', id: 'tour-acao', text: p[4][0], on: { click: p[4][1] } }) : null));
+      var ac = h('div', { class: 'cfg-acoes' });
+      if (i > 0) ac.appendChild(h('button', { type: 'button', class: 'howbtn', id: 'tour-volta', text: 'Voltar', on: { click: function () { i--; desenha(); } } }));
+      ac.appendChild(h('button', { type: 'button', class: 'go', id: 'tour-prox', text: i < P.length - 1 ? 'Próximo' : 'Começar', on: { click: function () { if (i < P.length - 1) { i++; desenha(); } else fecha(); } } }));
+      bb.appendChild(ac);
+    }
+    desenha();
+  }
+  window.abreTour = abreTour;
 
   /* Ficha pela IA: importar (foto, PDF ou texto) ou gerar pelo objetivo. A IA devolve nomes; o app casa com a base. */
   function casaEx(nome, en, base) {
@@ -4752,6 +4805,9 @@ window.MOVES = (function () {
   }
   function analisar(id) {
     var m = anaMet(id); if (!m || anaBusy[id]) return Promise.resolve();
+    if (semIAStrava() && (Store.get('strava', id) || (Store.get('cardio', id) || {}).strava)) {
+      analisaLocal(id); anaMsg[id] = 'Atividades do Strava são analisadas pelo cálculo do app, sem IA (regra do Strava).'; renderAtiv(); renderCardio(); return Promise.resolve();
+    }
     var ant = anaAnteriores(m, 6);
     anaBusy[id] = true; anaMsg[id] = ''; renderAtiv(); renderCardio();
     // Trava: avisa outros aparelhos ou abas que esta análise já está sendo feita.
@@ -8196,8 +8252,10 @@ window.MOVES = (function () {
   var trBusy = false, trMsg = '', trTentou = {}, trEdita = false;
   function trMeta() { var m = Object.assign({}, TR_META0, Store.get('treinador', 'meta') || {}); m.dias = Object.assign({}, TR_DIAS0, m.dias || {}); return m; }
   function trPlano() { return Store.get('treinador', 'plano'); }
-  function trCorridas() {
-    return cardioTudo().filter(function (r) { return r.v.tipo === 'corrida' && r.v.distancia_km >= 1 && r.v.segundos > 0; })
+  // Regra do Strava: dados vindos de lá não vão para a IA (só o administrador, dono do app no Strava).
+  function semIAStrava() { return !!window.PLATAFORMA_PROPRIA && !(window.PERFIL_ACESSO && window.PERFIL_ACESSO.admin); }
+  function trCorridas(paraIA) {
+    return cardioTudo().filter(function (r) { return r.v.tipo === 'corrida' && r.v.distancia_km >= 1 && r.v.segundos > 0 && !(paraIA && r.v.strava && semIAStrava()); })
       .map(function (r) {
         var st = r.v.strava ? Store.get('strava', r.id) : null;
         return { id: r.id, data: r.v.data, km: r.v.distancia_km, seg: r.v.segundos, pace: Math.round(r.v.segundos / r.v.distancia_km), fc: r.v.fc_media || null, fcmax: r.v.fc_max || null,
@@ -8215,7 +8273,7 @@ window.MOVES = (function () {
     return { ini: ini, fim: fim };
   }
   function trPrompt() {
-    var m = trMeta(), hoje = Store.day(), rs = trCorridas().filter(function (r) { return r.data >= addDias(hoje, -60); });
+    var m = trMeta(), hoje = Store.day(), rs = trCorridas(true).filter(function (r) { return r.data >= addDias(hoje, -60); });
     var bikes = cardioTudo().filter(function (r) { return r.v.tipo === 'bike' && r.v.data >= addDias(hoje, -28); })
       .map(function (r) { return { data: r.v.data, km: r.v.distancia_km, min: Math.round(r.v.segundos / 60), fc: r.v.fc_media }; });
     var gym = treinosOk().filter(function (r) { return r.v.data >= addDias(hoje, -14); }).map(function (r) { return r.v.data; });
@@ -8598,6 +8656,13 @@ window.MOVES = (function () {
 
   $('hoje').textContent = diaTxt(Store.day());
   renderWeek();
+  (function () {
+    var q = new URLSearchParams(location.search), st = q.get('strava'); if (!st) return;
+    var T = { ok: 'Strava conectado. Toque em Atualizar para trazer suas atividades.', erro: 'Não consegui conectar o Strava. Tente de novo pelo menu Conta.',
+      limite: 'O Strava ainda não liberou mais pessoas neste app. Avise quem te convidou para pedir a liberação ao Strava.' };
+    setTimeout(function () { var n = $('notice'); if (n) { n.textContent = T[st] || T.erro; n.hidden = false; setTimeout(function () { n.hidden = true; }, 12000); } }, 800);
+    try { history.replaceState(null, '', location.pathname + location.hash); } catch (e) {}
+  })();
   buildGymTop(); buildCardio(); buildFood(); buildPeso(); buildLombarClose(); buildLombarMedia(); show();
   pickDefault(); renderGym(); renderCardio(); renderHist(); renderFood();
 

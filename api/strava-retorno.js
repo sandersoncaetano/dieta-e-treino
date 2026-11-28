@@ -13,7 +13,12 @@ export default rota(async (req, res) => {
     body: JSON.stringify({ client_id: env('STRAVA_CLIENT_ID'), client_secret: env('STRAVA_CLIENT_SECRET'), code, grant_type: 'authorization_code' })
   });
   const t = await r.json();
-  if (!r.ok) { res.writeHead(302, { Location: base + '/?strava=erro#historico' }); return res.end(); }
+  if (!r.ok) {
+    // Com o app do Strava ainda limitado a poucos atletas, o Strava recusa quem passa do limite.
+    const limite = /limit|capacity|exceeded/i.test(JSON.stringify(t || {}));
+    console.error('Strava recusou', r.status, JSON.stringify(t).slice(0, 300));
+    res.writeHead(302, { Location: base + '/?strava=' + (limite ? 'limite' : 'erro') + '#historico' }); return res.end();
+  }
   await banco('strava_tokens', {
     method: 'POST',
     body: JSON.stringify({ user_id: uid, access_token: t.access_token, refresh_token: t.refresh_token, expires_at: t.expires_at, athlete_id: t.athlete && (t.athlete.id_str || t.athlete.id) })

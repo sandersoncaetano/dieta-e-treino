@@ -192,6 +192,7 @@
             return '<div style="background:var(--surface,#f5f5f5);border-radius:16px;padding:12px 14px;display:grid;gap:8px">' +
               '<div style="display:flex;justify-content:space-between;gap:8px;align-items:baseline"><strong>' + esc(p.nome || p.email) + '</strong><span style="font-size:.8rem;font-weight:700;color:' + (p.status === 'pendente' ? 'var(--warn,#a86a12)' : p.status === 'aprovado' ? 'var(--accent,#0e7c4d)' : 'var(--muted,#555)') + '">' + NOME[p.status] + '</span></div>' +
               '<span style="font-size:.85rem;color:var(--muted,#555);overflow-wrap:anywhere">' + esc(p.email) + (p.indicado_por ? ' · indicado por ' + esc(p.indicado_por) : '') + ' · pediu em ' + new Date(p.criado).toLocaleDateString('pt-BR') + '</span>' +
+              (p.con ? '<span style="font-size:.85rem;color:var(--muted,#555)">' + [p.con.chave ? 'chave de IA ✓' : (p.admin ? 'chave do servidor' : 'sem chave de IA'), p.con.strava ? 'Strava ✓' : 'sem Strava', p.con.hc ? 'Health Connect ✓' : 'sem Health Connect', p.con.ia30 + ' usos de IA em 30 dias'].join(' · ') + '</span>' : '') +
               '<div style="display:flex;gap:8px;flex-wrap:wrap">' + bts + '</div></div>';
           }).join('');
         function mostraLink(codigo, onde) {
@@ -400,7 +401,7 @@
     var d = document.createElement('details');
     d.className = 'conta-menu';
     d.innerHTML = '<summary aria-label="Conta"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg><span>Conta</span></summary>' +
-      '<div class="conta-pop"><button type="button" id="pl-uso">Uso da IA</button><button type="button" id="pl-con">Conectar ou reconectar Strava</button><button type="button" id="pl-hc">Health Connect (balança e relógio)</button><div class="pl-tema" role="group" aria-label="Tema"><span>Tema</span><button type="button" data-tema="auto">Automático</button><button type="button" data-tema="claro">Claro</button><button type="button" data-tema="escuro">Escuro</button></div><button type="button" id="pl-cfg">Configurações</button><button type="button" id="pl-senha">Trocar senha</button><button type="button" id="pl-pessoas" hidden>Pessoas</button><button type="button" id="pl-sugestoes" hidden>Exercícios sugeridos</button><button type="button" id="pl-sair">Sair</button></div>';
+      '<div class="conta-pop"><button type="button" id="pl-uso">Uso da IA</button><button type="button" id="pl-con">Conectar ou reconectar Strava</button><button type="button" id="pl-hc">Health Connect (balança e relógio)</button><div class="pl-tema" role="group" aria-label="Tema"><span>Tema</span><button type="button" data-tema="auto">Automático</button><button type="button" data-tema="claro">Claro</button><button type="button" data-tema="escuro">Escuro</button></div><button type="button" id="pl-cfg">Configurações</button><button type="button" id="pl-tour">Tour do app</button><button type="button" id="pl-senha">Trocar senha</button><button type="button" id="pl-pessoas" hidden>Pessoas</button><button type="button" id="pl-sugestoes" hidden>Exercícios sugeridos</button><button type="button" id="pl-sair">Sair</button></div>';
     var rec = document.getElementById('t-receitas');
     if (rec && rec.parentNode) {
       var col = document.createElement('div');
@@ -419,6 +420,7 @@
     d.querySelectorAll('[data-tema]').forEach(function (b) { b.addEventListener('click', function () { if (window.dtTema) window.dtTema.muda(b.getAttribute('data-tema')); marcaTema(); }); });
     marcaTema();
     d.querySelector('#pl-cfg').addEventListener('click', function () { d.open = false; if (window.abreConfig) window.abreConfig(); });
+    d.querySelector('#pl-tour').addEventListener('click', function () { d.open = false; if (window.abreTour) window.abreTour(); });
     d.querySelector('#pl-senha').addEventListener('click', function () { d.open = false; painelSenha(sb); });
     var bp = d.querySelector('#pl-pessoas');
     if (window.PERFIL_ACESSO && window.PERFIL_ACESSO.admin) { bp.hidden = false; bp.addEventListener('click', function () { d.open = false; painelPessoas(); }); }

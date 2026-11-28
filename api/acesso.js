@@ -70,6 +70,15 @@ export default rota(async (req, res) => {
   if (b.acao === 'lista') {
     const ps = await banco('perfis?select=user_id,email,nome,status,admin,indicado_por,criado,aprovado_em&order=criado.desc');
     const cs = await banco('convites?select=codigo,nome,email,criado,expira&usado_por=is.null&cancelado=eq.false&expira=gt.' + enc(new Date().toISOString()) + '&order=criado.desc');
+    // Situação das conexões de cada pessoa (sem nenhum dado delas), para ajudar quem estiver com dificuldade.
+    const desde = new Date(Date.now() - 30 * 864e5).toISOString();
+    const [ch, st, hc, uso] = await Promise.all([
+      banco('chaves_ia?select=user_id'), banco('strava_tokens?select=user_id'), banco('saude_tokens?select=user_id,ultimo_envio'),
+      banco('uso_ia?select=user_id&modelo=neq.local&criado=gte.' + enc(desde) + '&limit=50000')
+    ].map((p) => p.catch(() => [])));
+    const tem = (l) => { const m = {}; (l || []).forEach((x) => { m[x.user_id] = (m[x.user_id] || 0) + 1; }); return m; };
+    const mc = tem(ch), ms = tem(st), mu = tem(uso), mh = {}; (hc || []).forEach((x) => { if (x.ultimo_envio) mh[x.user_id] = 1; });
+    (ps || []).forEach((p) => { p.con = { chave: !!mc[p.user_id], strava: !!ms[p.user_id], hc: !!mh[p.user_id], ia30: mu[p.user_id] || 0 }; });
     return responde(res, 200, { perfis: ps || [], convites: cs || [] });
   }
 
