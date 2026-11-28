@@ -3,7 +3,13 @@ package app.dietaetreino.sync
 import android.content.Context
 import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.permission.HealthPermission
+import androidx.health.connect.client.aggregate.AggregateMetric
+import androidx.health.connect.client.records.ActiveCaloriesBurnedRecord
 import androidx.health.connect.client.records.BasalMetabolicRateRecord
+import androidx.health.connect.client.records.DistanceRecord
+import androidx.health.connect.client.records.ExerciseSessionRecord
+import androidx.health.connect.client.records.HeartRateRecord
+import androidx.health.connect.client.records.TotalCaloriesBurnedRecord
 import androidx.health.connect.client.records.BodyFatRecord
 import androidx.health.connect.client.records.BodyWaterMassRecord
 import androidx.health.connect.client.records.BoneMassRecord
@@ -14,6 +20,7 @@ import androidx.health.connect.client.records.SleepSessionRecord
 import androidx.health.connect.client.records.StepsRecord
 import androidx.health.connect.client.records.WeightRecord
 import androidx.health.connect.client.request.AggregateGroupByPeriodRequest
+import androidx.health.connect.client.request.AggregateRequest
 import androidx.health.connect.client.request.ReadRecordsRequest
 import androidx.health.connect.client.time.TimeRangeFilter
 import kotlinx.coroutines.Dispatchers
@@ -39,7 +46,9 @@ object Sincronizador {
     val TIPOS: List<KClass<out Record>> = listOf(
         WeightRecord::class, BodyFatRecord::class, LeanBodyMassRecord::class, BoneMassRecord::class,
         BodyWaterMassRecord::class, BasalMetabolicRateRecord::class, RestingHeartRateRecord::class,
-        SleepSessionRecord::class, StepsRecord::class
+        SleepSessionRecord::class, StepsRecord::class,
+        ExerciseSessionRecord::class, DistanceRecord::class, TotalCaloriesBurnedRecord::class,
+        ActiveCaloriesBurnedRecord::class, HeartRateRecord::class
     )
     const val PERM_FUNDO = "android.permission.health.READ_HEALTH_DATA_IN_BACKGROUND"
     const val PERM_HISTORICO = "android.permission.health.READ_HEALTH_DATA_HISTORY"
@@ -73,6 +82,17 @@ object Sincronizador {
         SleepSessionRecord.STAGE_TYPE_REM -> "REM"
         SleepSessionRecord.STAGE_TYPE_AWAKE_IN_BED -> "AWAKE_IN_BED"
         else -> "UNKNOWN"
+    }
+
+    /** Tipo de atividade no app (corrida, caminhada, bike, natação, academia, pilates ou outros). */
+    private fun tipoExercicio(t: Int): String = when (t) {
+        ExerciseSessionRecord.EXERCISE_TYPE_RUNNING, ExerciseSessionRecord.EXERCISE_TYPE_RUNNING_TREADMILL -> "corrida"
+        ExerciseSessionRecord.EXERCISE_TYPE_WALKING, ExerciseSessionRecord.EXERCISE_TYPE_HIKING -> "caminhada"
+        ExerciseSessionRecord.EXERCISE_TYPE_BIKING, ExerciseSessionRecord.EXERCISE_TYPE_BIKING_STATIONARY -> "bike"
+        ExerciseSessionRecord.EXERCISE_TYPE_SWIMMING_POOL, ExerciseSessionRecord.EXERCISE_TYPE_SWIMMING_OPEN_WATER -> "natacao"
+        ExerciseSessionRecord.EXERCISE_TYPE_STRENGTH_TRAINING, ExerciseSessionRecord.EXERCISE_TYPE_WEIGHTLIFTING -> "academia"
+        ExerciseSessionRecord.EXERCISE_TYPE_PILATES -> "pilates"
+        else -> "outros"
     }
 
     /** Monta o pacote. Na primeira vez lê 30 dias; depois, desde a última vez menos 3 dias (pega registros atrasados). */
@@ -140,6 +160,35 @@ object Sincronizador {
                 }
             })
         }
+        // Atividades do relógio: cada sessão com distância, calorias e frequência cardíaca somadas pelo Health Connect.
+        if (pode(ExerciseSessionRecord::class)) addArr("exercise", JSONArray().apply {
+            le(hc, ExerciseSessionRecord::class, ini, fim).forEach { s ->
+                val metr = mutableSetOf<AggregateMetric<*>>()
+                if (pode(DistanceRecord::class)) metr += DistanceRecord.DISTANCE_TOTAL
+                if (pode(TotalCaloriesBurnedRecord::class)) metr += TotalCaloriesBurnedRecord.ENERGY_TOTAL
+                if (pode(ActiveCaloriesBurnedRecord::class)) metr += ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL
+                if (pode(HeartRateRecord::class)) { metr += HeartRateRecord.BPM_AVG; metr += HeartRateRecord.BPM_MAX }
+                val o = JSONObject()
+                    .put("start_time", iso(s.startTime, s.startZoneOffset))
+                    .put("end_time", iso(s.endTime, s.endZoneOffset))
+                    .put("duration_seconds", Duration.between(s.startTime, s.endTime).seconds)
+                    .put("exercise_type", s.exerciseType)
+                    .put("tipo", tipoExercicio(s.exerciseType))
+                    .put("title", s.title ?: "")
+                    .put("metadata", meta(s))
+                if (metr.isNotEmpty()) {
+                    val a = runCatching { hc.aggregate(AggregateRequest(metr, TimeRangeFilter.between(s.startTime, s.endTime))) }.getOrNull()
+                    if (a != null) {
+                        a[DistanceRecord.DISTANCE_TOTAL]?.let { o.put("distance_m", it.inMeters) }
+                        a[TotalCaloriesBurnedRecord.ENERGY_TOTAL]?.let { o.put("kcal_total", it.inKilocalories) }
+                        a[ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL]?.let { o.put("kcal_ativa", it.inKilocalories) }
+                        a[HeartRateRecord.BPM_AVG]?.let { o.put("fc_media", it) }
+                        a[HeartRateRecord.BPM_MAX]?.let { o.put("fc_max", it) }
+                    }
+                }
+                put(o)
+            }
+        })
         return p
     }
 

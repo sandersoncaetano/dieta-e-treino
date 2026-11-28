@@ -142,7 +142,30 @@ async function recebe(uid, p) {
     }
     await grava(uid, 'saude_dia', novos);
   }
-  return { registros: linhas.length, composicao: dias.length, dias: diasR.length };
+  // 4) Atividades do relógio (corrida, caminhada, bike) viram registros de cardio, para quem não usa o Strava.
+  let ativ = 0;
+  const sessoes = (p.exercise || []).filter((x) => ['corrida', 'caminhada', 'bike'].includes(x.tipo) && x.start_time && Number(x.duration_seconds) >= 300);
+  if (sessoes.length) {
+    const st = await banco('strava_tokens?select=user_id&user_id=eq.' + uid);
+    if (!(st && st[0])) {
+      const ids = sessoes.map((x) => 'hc_' + String((x.metadata && x.metadata.id) || x.start_time).replace(/[^A-Za-z0-9_-]/g, '').slice(0, 60));
+      const ja = await docs(uid, 'cardio', ids), novos = {};
+      sessoes.forEach((x, i) => {
+        const id = ids[i], velho = ja[id];
+        if (velho && velho.origem !== 'health-connect') return;
+        const kcal = Number(x.kcal_ativa) || Number(x.kcal_total) || null;
+        novos[id] = Object.assign({}, velho || {}, {
+          tipo: x.tipo, data: diaLocal(x.start_time), inicio: horaLocal(x.start_time),
+          distancia_km: x.distance_m ? Math.round(Number(x.distance_m) / 10) / 100 : 0, segundos: Math.round(Number(x.duration_seconds)),
+          fc_media: x.fc_media ? Math.round(Number(x.fc_media)) : null, fc_max: x.fc_max ? Math.round(Number(x.fc_max)) : null,
+          kcal_relogio: kcal ? Math.round(kcal) : null, nota: String(x.title || '').slice(0, 120) || (velho && velho.nota) || '',
+          origem: 'health-connect', atualizado: new Date().toISOString()
+        });
+      });
+      await grava(uid, 'cardio', novos); ativ = Object.keys(novos).length;
+    }
+  }
+  return { registros: linhas.length, composicao: dias.length, dias: diasR.length, atividades: ativ };
 }
 
 export default rota(async (req, res) => {
