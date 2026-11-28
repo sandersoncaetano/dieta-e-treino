@@ -5,6 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0e1116">
 <script>
+/* GIFs do Peleja (Fábrica de GIFs): valem para todo mundo. Guardados no aparelho e atualizados ao abrir. */
+window.GIFS_BASE = (function () { try { return JSON.parse(localStorage.getItem('peleja-gifs') || '{}'); } catch (e) { return {}; } })();
+window.gifBase = function (id, nome) {
+  var G = window.GIFS_BASE || {};
+  if (G[id]) return G[id];
+  if (nome) { var k = 'n:' + String(nome).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim(); if (G[k]) return G[k]; }
+  return null;
+};
 window.semChave = function () { var c = window.CHAVE_IA; return c && !c.tem && !c.usaServidor ? ' Para usar a IA, cadastre sua chave em Conta > Configurações.' : ''; };
 /* Tema escolhido (claro, escuro ou automático pelo aparelho), aplicado antes de desenhar a página. */
 (function () {
@@ -766,6 +774,9 @@ input, textarea { padding: 10px 12px; }
 .cfg-aviso { margin: 0; color: var(--warn); font-weight: 600; min-height: 1em; }
 .fi-sug { justify-self: start; max-width: none; text-align: left; } .fi-ex textarea, .fi-ex > input { width: 100%; box-sizing: border-box; font: inherit; min-height: 44px; }
 #strava-ov { z-index: 9300; }
+.fab-bts { display: flex; flex-wrap: wrap; gap: 8px; } .fab-nome { display: grid; } .fab-nome small { color: var(--muted); }
+.fab-prev { width: 100%; max-height: 50vh; object-fit: contain; border-radius: 12px; background: #ebf1f8; }
+#fab-ov textarea { width: 100%; box-sizing: border-box; font: inherit; font-size: .85rem; }
 #cf-excluir { justify-self: start; max-width: none; color: var(--warn); } #cf-exc-txt { width: 100%; box-sizing: border-box; min-height: 46px; font: inherit; }
 #cf-ia { width: 100%; box-sizing: border-box; min-height: 46px; font: inherit; }
 .tour-box { min-height: 100%; align-content: start; }
@@ -2219,7 +2230,7 @@ window.MOVES = (function () {
       body.appendChild(mais);
       function sync() {
         fillPhoto(x.id, x.name, box, gestao);
-        if (!chosen) mode(Store.get('imagens', x.id) || vazio ? 'gif' : 'ani');
+        if (!chosen) mode(Store.get('imagens', x.id) || window.gifBase(x.id, x.name) || vazio ? 'gif' : 'ani');
       }
       lombMedia.push(sync); sync();
     });
@@ -2384,8 +2395,10 @@ window.MOVES = (function () {
           : 'Não consegui usar essa imagem. Tente outra foto.';
       });
     });
+    var gb = !saved && window.gifBase(id, name);
     if (saved) box.appendChild(h('img', { src: saved.url, loading: 'lazy', alt: 'Imagem de ' + name }));
-    var pick = h('button', { type: 'button', class: 'howbtn', id: 'pick-' + id, tabindex: '-1', text: saved ? 'Trocar imagem' : 'Adicionar imagem' });
+    else if (gb) box.appendChild(h('img', { src: gb, loading: 'lazy', alt: 'Demonstração de ' + name }));
+    var pick = h('button', { type: 'button', class: 'howbtn', id: 'pick-' + id, tabindex: '-1', text: saved ? 'Trocar imagem' : gb ? 'Usar uma imagem minha' : 'Adicionar imagem' });
     var row = h('div', { class: 'photo-row' }, h('div', { class: 'pick-wrap' }, pick, input));
     if (saved) {
       var rm = h('button', { type: 'button', class: 'link', id: 'rm-' + id, text: 'Remover' });
@@ -2549,8 +2562,8 @@ window.MOVES = (function () {
       fillPhoto(mv.id, ex.name, box, gestaoImg);
       var bts = [], els = { gif: box, fotos: fot, ani: anim ? ani : null };
       function bt(m, txt) { if (!els[m]) return; var b = h('button', { type: 'button', class: 'dur', id: m + '-' + ex.id, text: txt }); b.dataset.m = m; b.addEventListener('click', function () { howMode[mv.id] = m; mode(m); }); bts.push(b); }
-      var tem = !!Store.get('imagens', mv.id);
-      bt('gif', tem ? 'Minha' : 'GIF'); bt('fotos', 'Fotos'); bt('ani', 'Animação');
+      var minha = !!Store.get('imagens', mv.id), tem = minha || !!window.gifBase(mv.id, ex.name);
+      bt('gif', minha ? 'Minha' : 'GIF'); bt('fotos', 'Fotos'); bt('ani', 'Animação');
       function mode(m) {
         Object.keys(els).forEach(function (k) { if (els[k]) els[k].hidden = k !== m; });
         bts.forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.m === m ? 'true' : 'false'); });
@@ -3782,6 +3795,130 @@ window.MOVES = (function () {
     carrega();
   }
   window.abreStrava = abreStrava;
+
+  /* GIFs do Peleja: carrega a lista e redesenha quando muda. */
+  function chaveNome(n) { return 'n:' + normTxt(n); }
+  function carregaGifs() {
+    if (!window.Plataforma) return Promise.resolve();
+    return window.Plataforma.api('/api/contribuir', { acao: 'gifs' }).then(function (r) {
+      var G = {}; (r.gifs || []).forEach(function (g) { G[g.exercicio_id] = g.url; if (g.nome) G[chaveNome(g.nome)] = g.url; });
+      var novo = JSON.stringify(G); if (novo === JSON.stringify(window.GIFS_BASE || {})) return;
+      window.GIFS_BASE = G; try { localStorage.setItem('peleja-gifs', novo); } catch (e) {}
+      try { renderGym(); } catch (e) {}
+      if (window.PIL) { var a = window.PIL.atual(); window.PIL.monta({ ex: a.ex, care: a.care }); }
+    }).catch(function () {});
+  }
+  setTimeout(carregaGifs, 2500);
+
+  /* Fábrica de GIFs (administrador): o ChatGPT desenha 8 quadros numa folha; o app corta, confere, monta o GIF e publica. */
+  function fabItens() {
+    var m = {}, L = [];
+    function poe(id, nome, extra) { var k = normTxt(nome); if (m[k]) return; m[k] = 1; L.push(Object.assign({ id: id, n: nome }, extra)); }
+    exDoApp().forEach(function (x) { poe(x.id, x.n, { mv: window.MOVES[x.id], tipo: 'academia' }); });
+    if (window.PIL) Object.keys(window.PIL.lib).forEach(function (k) { var x = window.PIL.lib[k]; poe(k, x.name, { mv: x, tipo: x.care ? 'alongamento' : 'pilates' }); });
+    Object.keys(TREINOS).forEach(function (k) { TREINOS[k].ex.forEach(function (e) { if (e.cat) poe(e.id, e.name, { cat: e.cat, tipo: 'academia' }); }); });
+    if (window.PIL) window.PIL.atual().ex.concat(window.PIL.atual().care).forEach(function (e) { if (e.cat) poe(e.id, e.name, { cat: e.cat, tipo: 'pilates' }); });
+    return L;
+  }
+  function fabPrompt(x, cat) {
+    var mv = x.mv || {}, vista = mv.front ? 'de frente, em três quartos' : 'de lado (perfil), levemente em três quartos';
+    var como = mv.how || (mv.cues || []).join(' ') || (cat && cat.i && cat.i.join(' ')) || '';
+    var musc = cat && cat.g && cat.g.length ? cat.g.concat(cat.s || []).join(', ') : 'os principais músculos trabalhados neste exercício';
+    var ini = mv.labelA || 'posição inicial do exercício', fim = mv.labelB || 'posição final, no ponto de maior esforço';
+    return 'Crie UMA imagem estática (PNG, não GIF) com uma FOLHA DE QUADROS do exercício ' + x.n.toUpperCase() + ', no MESMO estilo da imagem anexada (a folha da elevação lateral).\n\n' +
+      'GRADE\n- 4 colunas × 2 linhas = 8 quadros do mesmo tamanho, lado a lado, sem bordas, sem linhas divisórias, sem números e sem textos.\n- Ordem de leitura: da esquerda para a direita, linha de cima e depois linha de baixo.\n- Imagem final em 1536×1024 px (cada quadro com 384×512 px).\n\n' +
+      'REGRA MAIS IMPORTANTE\nEm TODOS os 8 quadros: a mesma figura, do mesmo tamanho, na mesma posição dentro do quadro, com a mesma câmera (' + vista + '). Banco, aparelho ou chão (se houver) ficam exatamente no mesmo lugar em todos os quadros. Só se move o que o exercício movimenta.\n\n' +
+      'ESTILO (igual à imagem anexada)\n- Figura masculina anatômica, músculos em tons de cinza e branco, short preto, descalço. Halteres, barras e aparelhos em preto e cinza, simples.\n- Em vermelho alaranjado: ' + musc + '. O resto do corpo em cinza.\n- Fundo liso cinza azulado muito claro (#EBF1F8), sem chão desenhado, sem logotipo, sem marca d\'água.\n\n' +
+      'O EXERCÍCIO\n' + (como ? '- Como se faz: ' + como + '\n' : '') + '- Quadro 1: ' + ini + '.\n- Quadro 8: ' + fim + '.\n- Quadros 2 a 7: a passagem gradual e uniforme entre o quadro 1 e o 8, em partes iguais.\n- Postura correta e segura em todos os quadros: coluna neutra, sem impulso, sem travar as articulações.';
+  }
+  var fabEnc = null;
+  function gifenc() { if (!fabEnc) fabEnc = import('/vendor/gifenc.esm.js'); return fabEnc; }
+  function fabMonta(file) {
+    return new Promise(function (ok, erro) { var im = new Image(); im.onload = function () { ok(im); }; im.onerror = erro; im.src = URL.createObjectURL(file); }).then(function (im) {
+      var W = im.naturalWidth, H = im.naturalHeight, cw = Math.floor(W / 4), ch = Math.floor(H / 2);
+      var esc = Math.min(1, 384 / cw), ow = Math.round(cw * esc), oh = Math.round(ch * esc);
+      var cv = document.createElement('canvas'); cv.width = ow; cv.height = oh; var cx = cv.getContext('2d', { willReadFrequently: true });
+      var K = [];
+      for (var r = 0; r < 2; r++) for (var c = 0; c < 4; c++) { cx.clearRect(0, 0, ow, oh); cx.drawImage(im, c * cw, r * ch, cw, ch, 0, 0, ow, oh); K.push(cx.getImageData(0, 0, ow, oh).data.slice()); }
+      // Conferência: a parte de baixo (pernas, pés, aparelho) deve ficar parada entre os quadros.
+      function dif(a, b, y0) { var s = 0, n = 0; for (var y = y0; y < oh; y += 2) for (var x = 0; x < ow; x += 2) { var i = (y * ow + x) * 4; s += Math.abs(a[i] - b[i]) + Math.abs(a[i + 1] - b[i + 1]) + Math.abs(a[i + 2] - b[i + 2]); n++; } return s / n / 3; }
+      var y0 = Math.round(oh * 0.7), pior = 0; for (var i = 1; i < 8; i++) pior = Math.max(pior, dif(K[0], K[i], y0));
+      function mistura(a, b) { var o = new Uint8ClampedArray(a.length); for (var i = 0; i < a.length; i++) o[i] = (a[i] + b[i]) >> 1; return o; }
+      var sobe = []; for (var j = 0; j < 7; j++) { sobe.push(K[j]); sobe.push(mistura(K[j], K[j + 1])); } sobe.push(K[7]);
+      var desce = sobe.slice().reverse();
+      var Q = [[sobe[0], 500]]; sobe.slice(1, -1).forEach(function (f) { Q.push([f, 100]); }); Q.push([sobe[sobe.length - 1], 500]); desce.slice(1, -1).forEach(function (f) { Q.push([f, 100]); });
+      return gifenc().then(function (G) {
+        var pal = G.quantize(K[4], 128), enc = G.GIFEncoder();
+        Q.forEach(function (q) { enc.writeFrame(G.applyPalette(q[0], pal), ow, oh, { palette: pal, delay: q[1] }); });
+        enc.finish();
+        var cvp = document.createElement('canvas'); cvp.width = ow; cvp.height = oh; var cpx = cvp.getContext('2d'); var idp = cpx.createImageData(ow, oh); idp.data.set(K[0]); cpx.putImageData(idp, 0, 0);
+        return { blob: new Blob([enc.bytes()], { type: 'image/gif' }), mexeu: pior, proporcao: W / H };
+      });
+    });
+  }
+  function abreFabrica() {
+    if (document.getElementById('fab-ov')) return;
+    var ov = h('div', { class: 'cfg-ov', id: 'fab-ov', role: 'dialog', 'aria-label': 'Fábrica de GIFs' }), bb = h('div', { class: 'cfg-box' });
+    ov.appendChild(bb); document.body.appendChild(ov); document.body.style.overflow = 'hidden';
+    var x = h('button', { type: 'button', class: 'cfg-x', 'aria-label': 'Fechar', text: '✕' }); x.addEventListener('click', function () { ov.remove(); document.body.style.overflow = ''; });
+    bb.appendChild(h('div', { class: 'cfg-top' }, h('h1', { text: 'Fábrica de GIFs' }), x));
+    bb.appendChild(h('details', { class: 'mais', open: '' }, h('summary', { text: 'Como funciona' }),
+      h('ol', { class: 'fi-passos' },
+        h('li', { text: 'Toque em "Copiar prompt" no exercício.' }),
+        h('li', {}, document.createTextNode('No ChatGPT, cole o prompt e anexe a '), h('a', { href: '/fabrica/referencia.jpg', download: 'peleja-referencia.jpg', text: 'imagem de referência' }), document.createTextNode(' (baixe uma vez).')),
+        h('li', { text: 'Baixe a folha com os 8 quadros que ele gerar.' }),
+        h('li', { text: 'Aqui, toque em "Enviar folha". O app monta o GIF e mostra a prévia. Se gostar, aprove: ele passa a valer para todo mundo.' }))));
+    var filtro = 'faltam', lst = h('div', { class: 'fi-lista' }), cont = h('p', { class: 'tip' });
+    var seg = h('div', { class: 'durs', role: 'group' });
+    [['faltam', 'Sem GIF'], ['todos', 'Todos']].forEach(function (f) { var b = h('button', { type: 'button', class: 'dur', text: f[1], 'aria-pressed': f[0] === filtro ? 'true' : 'false' }); b.addEventListener('click', function () { filtro = f[0]; seg.querySelectorAll('button').forEach(function (z) { z.setAttribute('aria-pressed', z === b ? 'true' : 'false'); }); desenha(); }); seg.appendChild(b); });
+    bb.appendChild(seg); bb.appendChild(cont); bb.appendChild(lst);
+    var CATX = null; catalogo().then(function (c) { CATX = c; }).catch(function () {});
+    function desenha() {
+      lst.textContent = '';
+      var L = fabItens(), feitos = L.filter(function (x) { return window.gifBase(x.id, x.n); }).length;
+      cont.textContent = feitos + ' de ' + L.length + ' exercícios com GIF do Peleja.';
+      L.filter(function (x) { return filtro === 'todos' || !window.gifBase(x.id, x.n); }).forEach(function (x) { lst.appendChild(linha(x)); });
+      if (!lst.firstChild) lst.appendChild(h('p', { class: 'tip', text: 'Todos os exercícios já têm GIF.' }));
+    }
+    function linha(x) {
+      var url = window.gifBase(x.id, x.n), st = h('p', { class: 'tip', role: 'status' }), prev = h('div', {});
+      var cp = h('button', { type: 'button', class: 'howbtn', text: '📋 Copiar prompt' });
+      cp.addEventListener('click', function () {
+        var cat = CATX && x.cat ? CATX.ex.filter(function (y) { return y.id === x.cat; })[0] : null;
+        var t = fabPrompt(x, cat);
+        (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(function () { cp.textContent = '✓ Copiado'; setTimeout(function () { cp.textContent = '📋 Copiar prompt'; }, 2000); }, function () { prev.textContent = ''; var ta = h('textarea', { rows: '8', readonly: '' }); ta.value = t; prev.appendChild(ta); ta.select(); });
+      });
+      var fi = h('input', { type: 'file', accept: 'image/*', hidden: '' }), up = h('button', { type: 'button', class: 'howbtn', text: '⬆️ Enviar folha' });
+      up.addEventListener('click', function () { fi.click(); });
+      fi.addEventListener('change', function () {
+        var f = fi.files && fi.files[0]; if (!f) return; fi.value = '';
+        st.textContent = 'Montando o GIF…'; prev.textContent = '';
+        fabMonta(f).then(function (g) {
+          var u = URL.createObjectURL(g.blob), kb = Math.round(g.blob.size / 1024);
+          var avisos = [];
+          if (Math.abs(g.proporcao - 1.5) > 0.08) avisos.push('A folha não tem a proporção 3:2 (4×2 quadros). Confira se o ChatGPT seguiu a grade.');
+          if (g.mexeu > 10) avisos.push('A parte de baixo da figura muda entre os quadros (o boneco pode "pular"). Veja a prévia com atenção.');
+          if (kb > 2000) avisos.push('O GIF ficou com ' + kb + ' KB, acima de 2 MB.');
+          st.textContent = 'Prévia pronta (' + kb + ' KB).' + (avisos.length ? '' : ' A conferência não achou problemas.');
+          var ap = h('button', { type: 'button', class: 'go', text: 'Aprovar para todos' });
+          prev.appendChild(h('img', { src: u, alt: 'Prévia do GIF de ' + x.n, class: 'fab-prev' }));
+          avisos.forEach(function (a) { prev.appendChild(h('div', { class: 'verdict atencao' }, h('p', { text: a }))); });
+          prev.appendChild(h('div', { class: 'cfg-acoes' }, ap));
+          ap.addEventListener('click', function () {
+            ap.disabled = true; st.textContent = 'Publicando…';
+            Store.assets().then(function (A) { if (!A) throw new Error('sem armazenamento'); return A.upload(g.blob); }).then(function (r) {
+              return window.Plataforma.api('/api/contribuir', { acao: 'gif_publicar', id: x.id, nome: x.n, url: r.url, caminho: r.id });
+            }).then(function () { st.textContent = '✓ Publicado.'; prev.textContent = ''; return carregaGifs(); }).then(function () { salvoOk('GIF publicado'); desenha(); })
+              .catch(function (e) { ap.disabled = false; st.textContent = 'Não consegui publicar: ' + (e.message || e); });
+          });
+        }).catch(function () { st.textContent = 'Não consegui ler essa imagem.'; });
+      });
+      var cab = h('div', { class: 'fi-cab' }, url ? h('img', { class: 'fi-th', src: url, alt: '' }) : miniEx(x.id, x.cat ? null : null, x.n), h('span', { class: 'fab-nome' }, h('b', { text: x.n }), h('small', { text: x.tipo + (url ? ' · tem GIF' : '') })));
+      return h('div', { class: 'fi-ex' }, cab, h('div', { class: 'fab-bts' }, cp, up, fi), st, prev);
+    }
+    desenha();
+  }
+  window.abreFabrica = abreFabrica;
 
   /* Ficha pela IA: importar (foto, PDF ou texto) ou gerar pelo objetivo. A IA devolve nomes; o app casa com a base. */
   function casaEx(nome, en, base) {

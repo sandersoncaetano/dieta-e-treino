@@ -404,7 +404,7 @@
     var d = document.createElement('details');
     d.className = 'conta-menu';
     d.innerHTML = '<summary aria-label="Conta"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg><span>Conta</span></summary>' +
-      '<div class="conta-pop"><button type="button" id="pl-uso">Uso da IA</button><button type="button" id="pl-con">Conectar Strava</button><button type="button" id="pl-hc">Health Connect (Android)</button><div class="pl-tema" role="group" aria-label="Tema"><span>Tema</span><button type="button" data-tema="auto">Auto</button><button type="button" data-tema="claro">Claro</button><button type="button" data-tema="escuro">Escuro</button></div><button type="button" id="pl-cfg">Configurações</button><button type="button" id="pl-tour">Tour do app</button><button type="button" id="pl-termos">Termos e privacidade</button><button type="button" id="pl-senha">Trocar senha</button><button type="button" id="pl-pessoas" hidden>Pessoas</button><button type="button" id="pl-sugestoes" hidden>Exercícios sugeridos</button><button type="button" id="pl-sair">Sair</button></div>';
+      '<div class="conta-pop"><button type="button" id="pl-uso">Uso da IA</button><button type="button" id="pl-con">Conectar Strava</button><button type="button" id="pl-hc">Health Connect (Android)</button><div class="pl-tema" role="group" aria-label="Tema"><span>Tema</span><button type="button" data-tema="auto">Auto</button><button type="button" data-tema="claro">Claro</button><button type="button" data-tema="escuro">Escuro</button></div><button type="button" id="pl-cfg">Configurações</button><button type="button" id="pl-tour">Tour do app</button><button type="button" id="pl-termos">Termos e privacidade</button><button type="button" id="pl-senha">Trocar senha</button><button type="button" id="pl-pessoas" hidden>Pessoas</button><button type="button" id="pl-sugestoes" hidden>Exercícios sugeridos</button><button type="button" id="pl-fabrica" hidden>Fábrica de GIFs</button><button type="button" id="pl-sair">Sair</button></div>';
     var rec = document.getElementById('t-receitas');
     if (rec && rec.parentNode) {
       var col = document.createElement('div');
@@ -428,6 +428,8 @@
     d.querySelector('#pl-senha').addEventListener('click', function () { d.open = false; painelSenha(sb); });
     var bp = d.querySelector('#pl-pessoas');
     if (window.PERFIL_ACESSO && window.PERFIL_ACESSO.admin) { bp.hidden = false; bp.addEventListener('click', function () { d.open = false; painelPessoas(); }); }
+    var bf = d.querySelector('#pl-fabrica');
+    if (window.PERFIL_ACESSO && window.PERFIL_ACESSO.admin) { bf.hidden = false; bf.addEventListener('click', function () { d.open = false; if (window.abreFabrica) window.abreFabrica(); }); }
     var bs = d.querySelector('#pl-sugestoes');
     if (window.PERFIL_ACESSO && window.PERFIL_ACESSO.admin) { bs.hidden = false; bs.addEventListener('click', function () { d.open = false; if (window.abreSugestoes) window.abreSugestoes(); }); }
     d.querySelector('#pl-sair').addEventListener('click', function () { sb.auth.signOut().then(function () { location.reload(); }); });

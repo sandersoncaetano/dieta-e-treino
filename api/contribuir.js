@@ -28,6 +28,11 @@ export default rota(async (req, res) => {
     const r = await banco('contribuicoes?select=id,tipo,dados&status=eq.aprovado&order=revisado_em.desc&limit=2000');
     return responde(res, 200, { ex: r || [] });
   }
+  // GIFs do Peleja (feitos na Fábrica de GIFs): valem para todo mundo.
+  if (b.acao === 'gifs') {
+    const r = await banco('gifs_base?select=exercicio_id,nome,url&limit=5000');
+    return responde(res, 200, { gifs: r || [] });
+  }
   if (b.acao === 'minhas') {
     const r = await banco('contribuicoes?select=id,tipo,dados,status,nota,criado&user_id=eq.' + u.id + '&order=criado.desc&limit=100');
     return responde(res, 200, { lista: r || [] });
@@ -47,6 +52,16 @@ export default rota(async (req, res) => {
 
   if (!u.admin) return responde(res, 403, { erro: 'Só o administrador pode fazer isso.' });
 
+  if (b.acao === 'gif_publicar') {
+    const id = txt(b.id, 80), url = String(b.url || '');
+    if (!id || !/^https:\/\/[a-z0-9]+\.supabase\.co\/storage\/v1\/object\/public\/fotos\//.test(url)) return responde(res, 400, { erro: 'Dados inválidos.' });
+    await banco('gifs_base?on_conflict=exercicio_id', { method: 'POST', body: JSON.stringify({ exercicio_id: id, nome: txt(b.nome, 80) || id, url, caminho: txt(b.caminho, 200) || null, criado: new Date().toISOString() }), headers: { Prefer: 'resolution=merge-duplicates,return=minimal' } });
+    return responde(res, 200, { ok: true });
+  }
+  if (b.acao === 'gif_remover') {
+    await banco('gifs_base?exercicio_id=eq.' + enc(txt(b.id, 80)), { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
+    return responde(res, 200, { ok: true });
+  }
   if (b.acao === 'lista') {
     const r = await banco('contribuicoes?select=id,user_id,tipo,dados,triagem,status,criado&status=eq.pendente&order=criado.asc&limit=200');
     const ids = [...new Set((r || []).map((x) => x.user_id))];
