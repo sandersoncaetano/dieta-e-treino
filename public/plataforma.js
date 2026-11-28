@@ -451,11 +451,11 @@
         '<button type="button" data-copia="' + id + '" style="' + est + ';justify-self:start">Copiar</button></div>';
     }
     function mostra(j) {
-      var APK = 'https://github.com/sandersoncaetano/dieta-e-treino/releases/latest/download/dieta-e-treino-sync.apk';
+      var APK = 'https://github.com/sandersoncaetano/dieta-e-treino/releases/latest/download/peleja-sync.apk';
       var link = 'dietaetreino://config?url=' + encodeURIComponent(j.url) + '&chave=' + encodeURIComponent(j.chave);
       var quando = j.ultimoEnvio ? new Date(j.ultimoEnvio).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : 'nenhum ainda';
       c.innerHTML = '<div style="display:grid;gap:14px">' +
-        '<p style="margin:0">O relógio e a balança (Zepp, Samsung Health, Google Fit e outros) gravam no Health Connect peso, composição, sono, frequência cardíaca e atividades. O app Android <strong>Dieta e Treino Sync</strong> lê de lá e envia para cá a cada hora.</p>' +
+        '<p style="margin:0">O relógio e a balança (Zepp, Samsung Health, Google Fit e outros) gravam no Health Connect peso, composição, sono, frequência cardíaca e atividades. O app Android <strong>Peleja Sync</strong> lê de lá e envia para cá a cada hora.</p>' +
         '<p style="margin:0;font-size:.9rem;color:var(--muted,#555)">Corridas, caminhadas e pedaladas do relógio entram no Cardio sozinhas (para quem não conectou o Strava). Se você já usava o app, atualize-o e toque de novo em Permitir leitura, para liberar as atividades.</p>' +
         '<ol style="margin:0;padding-left:1.2em;display:grid;gap:6px">' +
         '<li><a href="' + APK + '">Baixe o app</a> e instale (o Android vai pedir para permitir a instalação pelo navegador).</li>' +

@@ -105,7 +105,7 @@ object Sincronizador {
 
         val p = JSONObject()
             .put("timestamp", iso(fim, null))
-            .put("app_version", "dieta-e-treino-sync")
+            .put("app_version", "peleja-sync")
             .put("timezone", fuso.id)
 
         fun addArr(nome: String, arr: JSONArray) { if (arr.length() > 0) p.put(nome, arr) }

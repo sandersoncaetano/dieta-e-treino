@@ -86,11 +86,11 @@ class MainActivity : ComponentActivity() {
 
     private fun montaTela() {
         val col = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(20), dp(28), dp(20), dp(40)) }
-        col.addView(titulo("Dieta e Treino Sync", 26f))
-        col.addView(texto("Leva peso, composição corporal, sono, frequência cardíaca de repouso e passos do Health Connect (Zepp) para o app Dieta e Treino, a cada hora."))
+        col.addView(titulo("Peleja Sync", 26f))
+        col.addView(texto("Leva peso, composição corporal, sono, frequência cardíaca, passos e atividades do relógio do Health Connect para o Peleja, a cada hora."))
 
         col.addView(titulo("1. Ligar ao app"))
-        col.addView(texto("No Dieta e Treino, abra Conta › Health Connect e toque em \"Configurar app Android\". Ou cole os dados abaixo."))
+        col.addView(texto("No Peleja, abra Conta › Health Connect e toque em \"Configurar app Android\". Ou cole os dados abaixo."))
         urlIn = EditText(this).apply { hint = "Endereço"; inputType = InputType.TYPE_TEXT_VARIATION_URI; setText(cfg.url) }
         chaveIn = EditText(this).apply { hint = "Chave"; inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD; setText(cfg.chave) }
         col.addView(urlIn); col.addView(chaveIn)
@@ -110,7 +110,7 @@ class MainActivity : ComponentActivity() {
         status = texto("")
         col.addView(status)
         col.addView(botao("Sincronizar agora", true) { sincronizaAgora(false) })
-        col.addView(botao("Abrir o Dieta e Treino", false) {
+        col.addView(botao("Abrir o Peleja", false) {
             val base = cfg.url.substringBefore("/api/").ifBlank { "https://dieta-e-treino-lovat.vercel.app" }
             startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(base)))
         })

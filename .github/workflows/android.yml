@@ -1,4 +1,4 @@
-name: App Android (Dieta e Treino Sync)
+name: App Android (Peleja Sync)
 
 on:
   push:
@@ -61,16 +61,16 @@ jobs:
             exit 0
           fi
           gradle -p android assembleRelease --no-daemon 2>&1 | tee build.log
-          cp android/app/build/outputs/apk/release/app-release.apk dieta-e-treino-sync.apk
+          cp android/app/build/outputs/apk/release/app-release.apk peleja-sync.apk
 
       - name: Publicar versão
-        if: hashFiles('dieta-e-treino-sync.apk') != ''
+        if: hashFiles('peleja-sync.apk') != ''
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "android-v${{ github.run_number }}" dieta-e-treino-sync.apk \
-            --title "Dieta e Treino Sync 1.0.${{ github.run_number }}" \
-            --notes "App Android que leva os dados do Health Connect para o Dieta e Treino." --latest
+          gh release create "android-v${{ github.run_number }}" peleja-sync.apk \
+            --title "Peleja Sync 1.0.${{ github.run_number }}" \
+            --notes "App Android que leva os dados do Health Connect para o Peleja." --latest
 
       # Guarda o fim do log num ramo separado para conferir erros de compilação.
       - name: Log

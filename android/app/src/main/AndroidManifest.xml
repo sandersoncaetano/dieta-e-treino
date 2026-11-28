@@ -24,7 +24,7 @@
     </queries>
 
     <application
-        android:label="Dieta e Treino Sync"
+        android:label="Peleja Sync"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher"
         android:allowBackup="false"
