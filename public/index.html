@@ -763,7 +763,7 @@ input, textarea { padding: 10px 12px; }
 .cfg-con { display: grid; gap: 6px; padding: 12px; border-radius: 14px; background: var(--mat); } .cfg-con .howbtn { justify-self: start; }
 .cfg-acoes { display: flex; gap: 10px; } .cfg-acoes .go { flex: 1; }
 .cfg-aviso { margin: 0; color: var(--warn); font-weight: 600; min-height: 1em; }
-.fi-edita { font-size: 1.1rem; color: var(--muted); }
+.gym-top .fi-edita { margin-top: 10px; width: 100%; }
 .fi-lista { display: grid; gap: 10px; }
 .fi-ex { display: grid; gap: 8px; padding: 12px; border-radius: 14px; background: var(--mat); }
 .fi-cab { display: flex; align-items: center; gap: 6px; } .fi-cab input { flex: 1; min-width: 0; min-height: 44px; font: inherit; font-weight: 600; }
@@ -2795,7 +2795,8 @@ window.MOVES = (function () {
         on: { click: function () { sel = k; renderGym(); } } });
       b.dataset.t = k; row.appendChild(b);
     });
-    row.appendChild(h('button', { type: 'button', class: 'letter fi-edita', id: 'tr-editar', text: '✎', 'aria-label': 'Editar ficha', title: 'Editar ficha', on: { click: abreFicha } }));
+    var ed = $('tr-editar'); if (ed) ed.remove();
+    row.parentNode.appendChild(h('button', { type: 'button', class: 'howbtn fi-edita', id: 'tr-editar', text: '✎ Editar minha ficha', on: { click: abreFicha } }));
   }
 
   /* Cardio */
