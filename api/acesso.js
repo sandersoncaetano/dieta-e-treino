@@ -7,8 +7,7 @@
 //  POST {acao:'status', user_id, status}               (administrador) → aprova, recusa, bloqueia ou reativa
 //  POST {acao:'senha', user_id}                         (administrador) → gera uma senha provisória e devolve para você repassar
 import crypto from 'node:crypto';
-import webpush from 'web-push';
-import { env, responde, corpo, usuario, banco, rota } from './_lib.js';
+import { env, responde, corpo, usuario, banco, rota, avisaAdmins } from './_lib.js';
 
 const enc = encodeURIComponent;
 const STATUS = new Set(['pendente', 'aprovado', 'recusado', 'bloqueado']);
@@ -23,18 +22,6 @@ async function authAdmin(caminho, opcoes = {}) {
   let j = {}; try { j = txt ? JSON.parse(txt) : {}; } catch (e) { j = {}; }
   if (!r.ok) throw Object.assign(new Error(j.msg || j.message || j.error_description || 'Falha ao criar a conta'), { status: r.status === 422 ? 409 : 500, code: j.error_code || 'auth' });
   return j;
-}
-
-async function avisaAdmins(titulo, texto) {
-  if (!process.env.VAPID_PUBLIC || !process.env.VAPID_PRIVATE) return;
-  const admins = await banco('perfis?select=user_id,email&admin=eq.true&status=eq.aprovado');
-  if (!admins || !admins.length) return;
-  webpush.setVapidDetails('mailto:' + admins[0].email, env('VAPID_PUBLIC'), env('VAPID_PRIVATE'));
-  const msg = JSON.stringify({ titulo, corpo: texto, tag: 'acesso' });
-  for (const a of admins) {
-    const subs = await banco('push_inscricoes?select=endpoint,p256dh,auth&user_id=eq.' + a.user_id);
-    await Promise.all((subs || []).map((s) => webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, msg, { TTL: 86400 }).catch(() => {})));
-  }
 }
 
 export default rota(async (req, res) => {

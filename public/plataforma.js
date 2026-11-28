@@ -400,7 +400,7 @@
     var d = document.createElement('details');
     d.className = 'conta-menu';
     d.innerHTML = '<summary aria-label="Conta"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg><span>Conta</span></summary>' +
-      '<div class="conta-pop"><button type="button" id="pl-uso">Uso da IA</button><button type="button" id="pl-con">Conectar ou reconectar Strava</button><button type="button" id="pl-hc">Health Connect (balança e relógio)</button><div class="pl-tema" role="group" aria-label="Tema"><span>Tema</span><button type="button" data-tema="auto">Automático</button><button type="button" data-tema="claro">Claro</button><button type="button" data-tema="escuro">Escuro</button></div><button type="button" id="pl-cfg">Configurações</button><button type="button" id="pl-senha">Trocar senha</button><button type="button" id="pl-pessoas" hidden>Pessoas</button><button type="button" id="pl-sair">Sair</button></div>';
+      '<div class="conta-pop"><button type="button" id="pl-uso">Uso da IA</button><button type="button" id="pl-con">Conectar ou reconectar Strava</button><button type="button" id="pl-hc">Health Connect (balança e relógio)</button><div class="pl-tema" role="group" aria-label="Tema"><span>Tema</span><button type="button" data-tema="auto">Automático</button><button type="button" data-tema="claro">Claro</button><button type="button" data-tema="escuro">Escuro</button></div><button type="button" id="pl-cfg">Configurações</button><button type="button" id="pl-senha">Trocar senha</button><button type="button" id="pl-pessoas" hidden>Pessoas</button><button type="button" id="pl-sugestoes" hidden>Exercícios sugeridos</button><button type="button" id="pl-sair">Sair</button></div>';
     var rec = document.getElementById('t-receitas');
     if (rec && rec.parentNode) {
       var col = document.createElement('div');
@@ -422,6 +422,8 @@
     d.querySelector('#pl-senha').addEventListener('click', function () { d.open = false; painelSenha(sb); });
     var bp = d.querySelector('#pl-pessoas');
     if (window.PERFIL_ACESSO && window.PERFIL_ACESSO.admin) { bp.hidden = false; bp.addEventListener('click', function () { d.open = false; painelPessoas(); }); }
+    var bs = d.querySelector('#pl-sugestoes');
+    if (window.PERFIL_ACESSO && window.PERFIL_ACESSO.admin) { bs.hidden = false; bs.addEventListener('click', function () { d.open = false; if (window.abreSugestoes) window.abreSugestoes(); }); }
     d.querySelector('#pl-sair').addEventListener('click', function () { sb.auth.signOut().then(function () { location.reload(); }); });
   }
 
@@ -554,7 +556,7 @@
           '<p style="margin:6px 0 0">Economia estimada: <strong>' + dinheiro(eco) + '</strong>' + (n7 && n7 !== locais.length ? ' (' + dinheiro(eco7) + ' nos últimos 7 dias)' : '') + '.</p>' +
           '<p style="margin:4px 0 0;' + sub + '">Calculada pelo custo médio que cada tipo tinha quando ia para a IA.</p></div>';
       }
-      var nomes = { refeicao: 'Refeições', dia: 'Fechar o dia', receita: 'Receitas', atividade: 'Análise de atividades', semana: 'Análise da pesagem', fechamento: 'Fechamento da semana', treinador: 'Treinador de corrida', ficha: 'Ficha da academia', outro: 'Outros' };
+      var nomes = { refeicao: 'Refeições', dia: 'Fechar o dia', receita: 'Receitas', atividade: 'Análise de atividades', semana: 'Análise da pesagem', fechamento: 'Fechamento da semana', treinador: 'Treinador de corrida', ficha: 'Ficha da academia', triagem: 'Triagem de sugestões', outro: 'Outros' };
       var tipos = {};
       rows.forEach(function (x) { (tipos[x.tipo] = tipos[x.tipo] || []).push(x); });
       h += '<h3 style="margin:16px 0 2px;font-size:1.1rem">Por tipo, desde o início</h3>';
@@ -635,6 +637,7 @@
     return servicos;
   }
 
+  window.Plataforma = { api: api };
   window.claude = {
     use: function (nome) {
       return prontos().then(function (s) { return s[nome] || null; });

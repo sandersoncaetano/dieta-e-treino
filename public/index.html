@@ -763,6 +763,7 @@ input, textarea { padding: 10px 12px; }
 .cfg-con { display: grid; gap: 6px; padding: 12px; border-radius: 14px; background: var(--mat); } .cfg-con .howbtn { justify-self: start; }
 .cfg-acoes { display: flex; gap: 10px; } .cfg-acoes .go { flex: 1; }
 .cfg-aviso { margin: 0; color: var(--warn); font-weight: 600; min-height: 1em; }
+.fi-sug { justify-self: start; max-width: none; text-align: left; } .fi-ex textarea, .fi-ex > input { width: 100%; box-sizing: border-box; font: inherit; min-height: 44px; }
 #pi-editar { width: 100%; margin-bottom: 12px; }
 .stage.fotos { background: #fff; } .stage.fotos .flip img { max-height: min(27vh, 240px); } .stage.vazio { display: none; }
 .gym-top .fi-edita { margin-top: 10px; width: 100%; }
@@ -2553,7 +2554,7 @@ window.MOVES = (function () {
         var pas = h('div', {}); maisBox.appendChild(pas);
         maisBox.addEventListener('toggle', function () {
           if (!maisBox.open || pas.firstChild) return;
-          catalogo().then(function (c) { var x = c.ex.filter(function (y) { return y.id === ex.cat; })[0]; if (!x || !x.i.length) return;
+          catalogo().then(function (c) { var x = c.ex.filter(function (y) { return y.id === ex.cat; })[0]; if (x && x.how) { pas.appendChild(h('p', { text: x.how })); if (x.dica) pas.appendChild(h('p', { class: 'tip', text: x.dica })); return; } if (!x || !x.i.length) return;
             var ol = h('ol', { class: 'fi-passos', lang: 'en' }); x.i.forEach(function (p) { ol.appendChild(h('li', { text: p })); });
             pas.appendChild(h('p', { class: 'tip', text: 'Passo a passo (em inglês por enquanto):' })); pas.appendChild(ol); }).catch(function () {});
         });
@@ -3157,8 +3158,13 @@ window.MOVES = (function () {
   var CAT = null, catP = null;
   function catalogo() {
     if (CAT) return Promise.resolve(CAT);
-    if (!catP) catP = fetch('/exercicios.json').then(function (r) { if (!r.ok) throw new Error('cat'); return r.json(); }).then(function (j) {
+    var com = window.Plataforma ? window.Plataforma.api('/api/contribuir', { acao: 'base' }).catch(function () { return { ex: [] }; }) : Promise.resolve({ ex: [] });
+    if (!catP) catP = Promise.all([fetch('/exercicios.json').then(function (r) { if (!r.ok) throw new Error('cat'); return r.json(); }), com]).then(function (rr) {
+      var j = rr[0];
       j.ex.forEach(function (x) { x.img = x.img.map(function (p) { return j.base + p; }); x.k = normTxt(x.n + ' ' + x.en + ' ' + x.g.join(' ') + ' ' + x.eq); });
+      // Exercícios sugeridos por quem usa o app e aprovados: sem fotos (a imagem fica com quem anexou), com descrição em português.
+      (rr[1].ex || []).forEach(function (c) { var d = c.dados || {}; if (!d.nome) return;
+        j.ex.unshift({ id: 'c_' + c.id.replace(/-/g, '').slice(0, 12), n: d.nome, en: '', g: d.g || [], s: [], eq: d.eq || '', c: c.tipo === 'pilates' ? 'pilates' : 'força', nv: '', img: [], i: [], how: d.how || '', dica: d.dica || '', com: 1, k: normTxt(d.nome + ' ' + (d.g || []).join(' ') + ' ' + (d.eq || '')) }); });
       CAT = j; return j;
     }).catch(function (e) { catP = null; throw e; });
     return catP;
@@ -3196,6 +3202,9 @@ window.MOVES = (function () {
     if (x.nv) info.push(['Nível', x.nv]);
     if (info.length) { var dl = h('dl', { class: 'fi-info' }); info.forEach(function (r) { dl.appendChild(h('dt', { text: r[0] })); dl.appendChild(h('dd', { text: r[1] })); }); bb.appendChild(dl); }
     if (mv && mv.how) bb.appendChild(h('p', { text: mv.how }));
+    if (x.how) bb.appendChild(h('p', { text: x.how }));
+    if (x.dica) bb.appendChild(h('p', { class: 'tip', text: x.dica }));
+    if (x.com) bb.appendChild(h('p', { class: 'tip', text: 'Sugerido por quem usa o Peleja e aprovado.' }));
     if (mv && mv.cues) { var cu = h('ul', {}); mv.cues.forEach(function (c) { cu.appendChild(h('li', { text: c })); }); bb.appendChild(cu); if (mv.avoid) bb.appendChild(h('p', { class: 'tip', text: 'Atenção: ' + mv.avoid })); }
     if (x.i && x.i.length) {
       var ol = h('ol', { class: 'fi-passos', lang: 'en' }); x.i.forEach(function (t) { ol.appendChild(h('li', { text: t })); });
@@ -3296,8 +3305,9 @@ window.MOVES = (function () {
         if (!e.cat) { verEx({ id: e.id, n: e.name }); return; }
         catalogo().then(function (c) { verEx(c.ex.filter(function (y) { return y.id === e.cat; })[0] || { id: e.id, n: e.name, img: e.img }); }).catch(function () { verEx({ id: e.id, n: e.name, img: e.img }); });
       });
+      var sug = e.proprio ? h('button', { type: 'button', class: 'link fi-sug', text: '↗ Sugerir para a base de todos', on: { click: function () { abreSugerir(e, 'academia'); } } }) : null;
       return h('div', { class: 'fi-ex' },
-        h('div', { class: 'fi-cab' }, th, nome, up, dn, rm),
+        h('div', { class: 'fi-cab' }, th, nome, up, dn, rm), sug,
         h('div', { class: 'fi-3' }, num(p + 'sets', 'Séries', e.sets, function (v) { e.sets = v; }, { inputmode: 'numeric', step: '1' }),
           h('div', { class: 'cfg-campo' }, h('label', { for: p + 'reps', text: 'Repetições' }), rp),
           num(p + 'kg', 'Carga (kg)', e.kg, function (v) { e.kg = v; })),
@@ -3431,7 +3441,8 @@ window.MOVES = (function () {
         if (!e.cat) { verEx({ id: e.id, n: e.name }); return; }
         catalogo().then(function (c) { verEx(c.ex.filter(function (y) { return y.id === e.cat; })[0] || { id: e.id, n: e.name, img: e.img }); }).catch(function () { verEx({ id: e.id, n: e.name, img: e.img }); });
       });
-      return h('div', { class: 'fi-ex' }, h('div', { class: 'fi-cab' }, th, nm, up, dn, rm),
+      var sug = e.proprio ? h('button', { type: 'button', class: 'link fi-sug', text: '↗ Sugerir para a base de todos', on: { click: function () { abreSugerir(e, 'pilates'); } } }) : null;
+      return h('div', { class: 'fi-ex' }, h('div', { class: 'fi-cab' }, th, nm, up, dn, rm), sug,
         h('div', { class: 'fi-3' }, campo(p + 'sets', 'Séries', se), campo(p + 'reps', 'Repetições', rp), campo(p + 'seg', 'ou segundos', tm)),
         h('label', { class: 'cfg-chk' }, bl, h('span', { text: 'Fazer dos dois lados' })),
         h('p', { class: 'tip', text: e.dose || pilDose(e) }));
@@ -3471,7 +3482,7 @@ window.MOVES = (function () {
       }
       q.addEventListener('input', mostra); mostra(); setTimeout(function () { q.focus(); }, 50);
       catalogo().then(function (c) {
-        lista = APP.concat(c.ex.filter(function (x) { return x.c === 'alongamento' || PIL_EQ.indexOf(x.eq) >= 0; }).map(function (x) { return Object.assign({ cat: 1 }, x); }));
+        lista = APP.concat(c.ex.filter(function (x) { return x.c === 'alongamento' || x.c === 'pilates' || PIL_EQ.indexOf(x.eq) >= 0; }).map(function (x) { return Object.assign({ cat: 1 }, x); }));
         st.textContent = 'Exercícios do app e da base (alongamentos e exercícios com o peso do corpo, bola ou elástico).'; mostra();
       }).catch(function () { st.textContent = 'Sem conexão para carregar a base. Dá para usar os exercícios do app ou criar o seu.'; });
     }
@@ -3484,6 +3495,98 @@ window.MOVES = (function () {
     desenha();
   }
   window.abrePilates = abrePilates;
+
+  /* Sugestões para a base de todos: a IA de quem sugere faz a triagem e o administrador aprova. */
+  var EQ_OPS = ['peso do corpo', 'halteres', 'barra', 'barra W', 'polia', 'máquina', 'kettlebell', 'elástico', 'bola suíça', 'medicine ball', 'rolo de espuma', 'outros'];
+  function parecidos(nome, base) {
+    var n = normTxt(nome).split(' ').filter(function (w) { return w.length > 2; });
+    return (base || []).map(function (x) { var k = normTxt(x.n).split(' '); return [x, n.filter(function (w) { return k.indexOf(w) >= 0; }).length]; })
+      .filter(function (r) { return r[1] > 0; }).sort(function (a, b) { return b[1] - a[1]; }).slice(0, 10).map(function (r) { return r[0].n; });
+  }
+  function abreSugerir(e, tipo) {
+    if (!window.Plataforma) { salvoOk('Disponível só no app instalado'); return; }
+    var ov = h('div', { class: 'cfg-ov fi-busca', role: 'dialog', 'aria-label': 'Sugerir exercício' }), bb = h('div', { class: 'cfg-box' });
+    ov.appendChild(bb); document.body.appendChild(ov);
+    var d = { nome: e.name, g: '', eq: 'peso do corpo', how: '', dica: e.tip || '' }, tri = null;
+    function campo(id, rot, el) { el.id = id; return h('div', { class: 'cfg-campo' }, h('label', { for: id, text: rot }), el); }
+    function inp(k, extra) { var el = h(extra && extra.area ? 'textarea' : 'input', extra && extra.area ? { rows: '4' } : { type: 'text' }); el.value = d[k]; if (extra && extra.ph) el.placeholder = extra.ph; el.addEventListener('input', function () { d[k] = el.value; tri = null; }); return el; }
+    var eq = h('select', {}); EQ_OPS.forEach(function (o) { eq.appendChild(h('option', { value: o, text: o })); }); eq.addEventListener('change', function () { d.eq = eq.value; tri = null; });
+    var x = h('button', { type: 'button', class: 'cfg-x', 'aria-label': 'Voltar', text: '✕' }); x.addEventListener('click', function () { ov.remove(); });
+    var minhas = h('p', { class: 'tip' }), msg = h('p', { class: 'cfg-aviso', role: 'status' }), res = h('div', {});
+    bb.appendChild(h('div', { class: 'cfg-top' }, h('h1', { text: 'Sugerir exercício' }), x));
+    bb.appendChild(h('p', { class: 'tip', text: 'Depois de aprovado, o exercício aparece na busca de todos, com o nome e a descrição. Uma imagem ou GIF que você anexou continua só no seu perfil.' }));
+    bb.appendChild(h('section', { class: 'cfg-sec' },
+      campo('sg-nome', 'Nome', inp('nome')), campo('sg-g', 'Músculos que trabalha', inp('g', { ph: 'Ex.: glúteos, posterior da coxa' })), campo('sg-eq', 'Equipamento', eq),
+      campo('sg-how', 'Como fazer', inp('how', { area: 1, ph: 'Posição inicial, o movimento e como voltar.' })), campo('sg-dica', 'Cuidado ou dica (opcional)', inp('dica'))));
+    bb.appendChild(res); bb.appendChild(msg);
+    var ok = h('button', { type: 'button', class: 'go', id: 'sg-enviar', text: 'Conferir com a IA' });
+    bb.appendChild(h('div', { class: 'cfg-acoes' }, ok)); bb.appendChild(minhas);
+    window.Plataforma.api('/api/contribuir', { acao: 'minhas' }).then(function (r) {
+      var l = r.lista || [], c = { pendente: 0, aprovado: 0, recusado: 0 }; l.forEach(function (y) { c[y.status]++; });
+      if (l.length) minhas.textContent = 'Suas sugestões: ' + c.aprovado + ' aprovadas, ' + c.pendente + ' esperando, ' + c.recusado + ' recusadas.';
+    }).catch(function () {});
+    function envia() {
+      ok.disabled = true; msg.textContent = 'Enviando…';
+      window.Plataforma.api('/api/contribuir', { acao: 'enviar', tipo: tipo, dados: d, triagem: tri }).then(function () { ov.remove(); salvoOk('Sugestão enviada para aprovação'); })
+        .catch(function (er) { ok.disabled = false; msg.textContent = er.message || 'Não consegui enviar agora.'; });
+    }
+    ok.addEventListener('click', function () {
+      if (String(d.nome).trim().length < 3) { msg.textContent = 'Dê um nome ao exercício.'; return; }
+      if (String(d.how).trim().length < 20) { msg.textContent = 'Descreva como fazer, em uma ou duas frases.'; return; }
+      if (tri) { envia(); return; }
+      ok.disabled = true; msg.textContent = 'A IA está conferindo…';
+      Promise.all([Store.sample(), catalogo().catch(function () { return null; })]).then(function (r) {
+        if (!r[0]) return null;
+        var par = parecidos(d.nome, r[1] && r[1].ex);
+        return r[0].json('Você está triando uma sugestão de exercício para a base de um app de treino. Exercício: ' + JSON.stringify(d) + '. Exercícios parecidos que já existem na base: ' + (par.join('; ') || 'nenhum') + '.\n' +
+          'Avalie: se a descrição é clara, se é seguro para amadores, se é o mesmo que um dos existentes (mesmo movimento com outro nome) e se o nome está como se fala em academia no Brasil. ' +
+          'Responda com {"aprovar":true ou false,"duplicado":"nome do existente igual ou vazio","risco":"baixo", "medio" ou "alto","nome_sugerido":"nome melhor ou vazio","comentario":"uma ou duas frases para a pessoa"}.', { modelTier: 'default', cache: false });
+      }).then(function (t) {
+        ok.disabled = false;
+        if (!t) { msg.textContent = 'A IA não está disponível. Pode enviar assim mesmo.'; tri = { sem_ia: true }; ok.textContent = 'Enviar para aprovação'; return; }
+        tri = { aprovar: !!t.aprovar, duplicado: String(t.duplicado || ''), risco: String(t.risco || ''), nome_sugerido: String(t.nome_sugerido || ''), comentario: String(t.comentario || '') };
+        res.textContent = '';
+        var cls = tri.duplicado || !tri.aprovar || tri.risco === 'alto' ? 'verdict atencao' : 'verdict bom';
+        var bx = h('div', { class: cls }, h('b', { text: tri.duplicado ? 'Parece que já existe: ' + tri.duplicado : tri.aprovar ? 'A IA achou a sugestão boa' : 'A IA recomenda ajustar' }), h('p', { text: tri.comentario }));
+        if (tri.nome_sugerido && normTxt(tri.nome_sugerido) !== normTxt(d.nome)) {
+          var tn = h('button', { type: 'button', class: 'howbtn', text: 'Usar o nome "' + tri.nome_sugerido + '"' });
+          tn.addEventListener('click', function () { d.nome = tri.nome_sugerido; $('sg-nome').value = d.nome; tn.remove(); });
+          bx.appendChild(tn);
+        }
+        res.appendChild(bx); msg.textContent = '';
+        ok.textContent = 'Enviar para aprovação';
+      }).catch(function () { ok.disabled = false; tri = { erro_ia: true }; ok.textContent = 'Enviar para aprovação'; msg.textContent = 'A IA não respondeu. Pode enviar assim mesmo.'; });
+    });
+  }
+  window.abreSugerir = abreSugerir;
+  // Administrador: aprovar ou recusar as sugestões.
+  function abreSugestoes() {
+    var ov = h('div', { class: 'cfg-ov', role: 'dialog', 'aria-label': 'Exercícios sugeridos' }), bb = h('div', { class: 'cfg-box' });
+    ov.appendChild(bb); document.body.appendChild(ov); document.body.style.overflow = 'hidden';
+    var x = h('button', { type: 'button', class: 'cfg-x', 'aria-label': 'Fechar', text: '✕' }); x.addEventListener('click', function () { ov.remove(); document.body.style.overflow = ''; });
+    bb.appendChild(h('div', { class: 'cfg-top' }, h('h1', { text: 'Exercícios sugeridos' }), x));
+    var lst = h('div', { class: 'fi-lista' }, h('p', { class: 'tip', text: 'Carregando…' })); bb.appendChild(lst);
+    window.Plataforma.api('/api/contribuir', { acao: 'lista' }).then(function (r) {
+      lst.textContent = '';
+      if (!(r.lista || []).length) { lst.appendChild(h('p', { class: 'tip', text: 'Nenhuma sugestão esperando.' })); return; }
+      r.lista.forEach(function (c) {
+        var d = c.dados || {}, t = c.triagem || {};
+        var nm = h('input', { type: 'text', maxlength: '60', 'aria-label': 'Nome' }); nm.value = d.nome || '';
+        var hw = h('textarea', { rows: '4', 'aria-label': 'Como fazer' }); hw.value = d.how || '';
+        var nota = h('input', { type: 'text', placeholder: 'Motivo, se recusar (opcional)', 'aria-label': 'Motivo' });
+        var st = h('p', { class: 'tip', role: 'status' });
+        function decide(s) { st.textContent = 'Salvando…'; window.Plataforma.api('/api/contribuir', { acao: 'decidir', id: c.id, status: s, nota: nota.value, dados: Object.assign({}, d, { nome: nm.value, how: hw.value }) }).then(function () { card.remove(); CAT = null; catP = null; salvoOk(s === 'aprovado' ? 'Aprovado' : 'Recusado'); }).catch(function (e) { st.textContent = e.message; }); }
+        var ap = h('button', { type: 'button', class: 'go', text: 'Aprovar' }); ap.addEventListener('click', function () { decide('aprovado'); });
+        var rc = h('button', { type: 'button', class: 'howbtn', text: 'Recusar' }); rc.addEventListener('click', function () { decide('recusado'); });
+        var triTxt = t.sem_ia || t.erro_ia ? 'Sem triagem da IA.' : 'IA: ' + (t.aprovar ? 'recomenda aprovar' : 'recomenda ajustar') + ' · risco ' + (t.risco || '?') + (t.duplicado ? ' · parece igual a ' + t.duplicado : '') + (t.comentario ? '. ' + t.comentario : '');
+        var card = h('div', { class: 'fi-ex' }, h('p', { class: 'tip', text: (c.quem || 'Alguém') + ' · ' + (c.tipo === 'pilates' ? 'Pilates' : 'Academia') + ' · ' + new Date(c.criado).toLocaleDateString('pt-BR') }),
+          nm, h('p', { class: 'tip', text: [(d.g || []).join(', '), d.eq].filter(Boolean).join(' · ') }), hw, d.dica ? h('p', { class: 'tip', text: 'Dica: ' + d.dica }) : null,
+          h('div', { class: t.duplicado || t.risco === 'alto' ? 'verdict atencao' : 'verdict ok' }, h('p', { text: triTxt })), nota, h('div', { class: 'cfg-acoes' }, ap, rc), st);
+        lst.appendChild(card);
+      });
+    }).catch(function (e) { lst.textContent = ''; lst.appendChild(h('p', { class: 'tip', text: e.message || 'Não consegui carregar.' })); });
+  }
+  window.abreSugestoes = abreSugestoes;
 
   /* Ficha pela IA: importar (foto, PDF ou texto) ou gerar pelo objetivo. A IA devolve nomes; o app casa com a base. */
   function casaEx(nome, en, base) {

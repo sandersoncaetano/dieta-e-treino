@@ -1,5 +1,6 @@
 // Funções comuns das rotas do servidor (Vercel). Arquivos com "_" não viram rota.
 import crypto from 'node:crypto';
+import webpush from 'web-push';
 
 export const env = (k) => {
   const v = process.env[k];
@@ -79,4 +80,17 @@ export function rota(fn) {
       responde(res, e.status || 500, { erro: e.message || 'Erro', code: e.code || 'erro' });
     }
   };
+}
+
+// Notificação para os administradores (convites aceitos, sugestões de exercício).
+export async function avisaAdmins(titulo, texto) {
+  if (!process.env.VAPID_PUBLIC || !process.env.VAPID_PRIVATE) return;
+  const admins = await banco('perfis?select=user_id,email&admin=eq.true&status=eq.aprovado');
+  if (!admins || !admins.length) return;
+  webpush.setVapidDetails('mailto:' + admins[0].email, env('VAPID_PUBLIC'), env('VAPID_PRIVATE'));
+  const msg = JSON.stringify({ titulo, corpo: texto, tag: 'acesso' });
+  for (const a of admins) {
+    const subs = await banco('push_inscricoes?select=endpoint,p256dh,auth&user_id=eq.' + a.user_id);
+    await Promise.all((subs || []).map((s) => webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, msg, { TTL: 86400 }).catch(() => {})));
+  }
 }
