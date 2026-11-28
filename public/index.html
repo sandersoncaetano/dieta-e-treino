@@ -3120,12 +3120,12 @@ window.MOVES = (function () {
     function secCon() {
       var st = h('button', { type: 'button', class: 'howbtn', text: 'Conectar Strava' });
       st.addEventListener('click', function () { abreStrava(); });
-      var hc = h('button', { type: 'button', class: 'howbtn', text: 'Health Connect (balança e relógio)' });
+      var hc = h('button', { type: 'button', class: 'howbtn', text: 'Health Connect (Android)' });
       hc.addEventListener('click', function () { var b = document.getElementById('pl-hc'); if (b) { fecha(); b.click(); } });
       return h('section', { class: 'cfg-sec' }, h('h2', { text: 'Conexões' }),
         h('p', { class: 'tip', text: 'Tudo aqui é opcional e pode ser feito depois, pelo menu Conta.' }),
         h('div', { class: 'cfg-con' }, h('b', { text: 'Strava' }), h('span', { class: 'tip', text: 'Traz corridas, pedais e caminhadas.' }), st),
-        h('div', { class: 'cfg-con' }, h('b', { text: 'Health Connect (Android)' }), h('span', { class: 'tip', text: 'Traz peso, composição corporal, sono e frequência cardíaca do relógio e da balança.' }), hc),
+        h('div', { class: 'cfg-con' }, h('b', { text: 'Health Connect (Android)' }), h('span', { class: 'tip', text: 'Traz do relógio e da balança peso, composição corporal, sono, frequência cardíaca e atividades. Precisa do Health Connect e do app Peleja Sync no celular.' }), hc),
         secChave());
     }
     function secChave() {
@@ -3681,7 +3681,7 @@ window.MOVES = (function () {
     P.push(['🍽️', 'Refeições', 'Descreva o que comeu ("2 ovos e 1 pão francês"), mande uma foto ou os dois. Use a Observação para detalhes, como "sem balança" ou "metade do prato". O app aprende os alimentos que você repete e calcula sozinho da próxima vez.', 'Por quê: quanto mais certo o registro, mais certa a leitura do seu dia.', ['Ir para Refeições', vai('refeicoes')]]);
     P.push(['✨', 'Chave de IA', adm ? 'Você usa a chave do servidor. Quem você convidar cadastra a própria chave em Configurações.' : 'Em Configurações > Conexões você cadastra uma chave da Anthropic. Com ela, a IA calcula refeições por foto, monta fichas e analisa a semana.', adm ? 'Assim cada pessoa paga só o próprio uso.' : 'Por quê: cada pessoa paga só o que usa (em geral poucos reais por mês) e a chave fica cifrada no servidor. Sem chave, o app funciona com o cálculo próprio.', adm ? null : ['Cadastrar chave', function () { fecha(); abreConfig(false); setTimeout(function () { var c = document.getElementById('cf-ia'); if (c) c.scrollIntoView({ block: 'center' }); }, 300); }]]);
     if (temCardio()) P.push(['🏃', 'Strava', 'Conecte o Strava pelo menu Conta para trazer corridas, pedaladas e caminhadas com distância, ritmo e frequência cardíaca, sem digitar nada. Na primeira vez, o app mostra o passo a passo para você criar o seu acesso no Strava (uns 5 minutos, de graça).', 'Por quê: o app compara cada atividade com as anteriores e mostra se você está evoluindo. Pela regra do Strava, esses dados são analisados pelo cálculo do app, sem IA.', ['Conectar Strava', function () { fecha(); abreStrava(); }]]);
-    P.push(['⌚', 'Health Connect (Android)', 'Pelo menu Conta você liga o Health Connect: peso e composição da balança, sono e frequência cardíaca do relógio chegam sozinhos.', 'Por quê: a curva de peso e o gasto do dia ficam mais certos sem você anotar.', ['Ver como ligar', menu('pl-hc')]]);
+    P.push(['⌚', 'Health Connect (Android)', 'O Health Connect é um app do Google que reúne os dados do seu relógio e da sua balança. Com ele e o app Peleja Sync instalados, peso, sono, frequência cardíaca e atividades chegam sozinhos. O passo a passo fica em Conta > Health Connect.', 'Por quê: a curva de peso e o gasto do dia ficam mais certos sem você anotar.', ['Ver como ligar', menu('pl-hc')]]);
     if (pratica('academia') || pratica('pilates')) P.push(['🔔', 'Aviso do descanso', 'No Treino, abra "Como usar, som e vibração" e ative o aviso com o app em segundo plano. Teste o som e ajuste o volume.', 'Por quê: o celular vibra quando o descanso acaba, mesmo com a tela bloqueada ou vendo vídeo.', ['Ir para o Treino', vai(pratica('academia') ? 'academia' : 'lombar')]]);
     P.push(['📲', 'Instale na tela inicial', 'No navegador do celular, toque no menu e em "Adicionar à tela inicial" (ou "Instalar app").', 'Por quê: o Peleja abre como um app, mais rápido, e os avisos funcionam melhor.']);
     P.push(['📈', 'Histórico e Evolução', 'O Histórico mostra cada dia. A Evolução mostra peso, medidas e a tendência das semanas.', 'Por quê: é ali que você vê o resultado do esforço. Registre o peso pelo menos uma vez por semana.', ['Ver Evolução', vai('evolucao')]]);
