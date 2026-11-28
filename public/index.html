@@ -746,6 +746,23 @@ input, textarea { padding: 10px 12px; }
 .meal.destaque { animation: destaca 2.2s ease; }
 @keyframes destaca { 0%, 30% { box-shadow: 0 0 0 3px var(--accent); } 100% { box-shadow: 0 0 0 0 transparent; } }
 @media (prefers-reduced-motion: reduce) { .meal-aviso { transition: none; } .ma-ic.load { animation: none; } .meal.destaque { animation: none; outline: 3px solid var(--accent); } }
+.oculto { display: none !important; }
+.cfg-ov { position: fixed; inset: 0; z-index: 9000; background: var(--bg); overflow-y: auto; -webkit-overflow-scrolling: touch; }
+.cfg-box { max-width: 560px; margin: 0 auto; padding: 20px 16px calc(32px + env(safe-area-inset-bottom, 0px)); display: grid; gap: 14px; }
+.cfg-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.cfg-top h1 { margin: 0; }
+.cfg-x { width: 44px; height: 44px; border-radius: 22px; border: 0; background: var(--mat); color: var(--fg); font: inherit; font-weight: 700; }
+.cfg-sec { background: var(--surface); border-radius: 20px; padding: 16px; display: grid; gap: 12px; }
+.cfg-sec h2 { margin: 0; font-size: 1.15rem; } .cfg-sec h3 { margin: 6px 0 0; font-size: 1rem; }
+.cfg-campo { display: grid; gap: 6px; min-width: 0; } .cfg-campo label { font-size: .85rem; font-weight: 600; color: var(--muted); }
+.cfg-campo input, .cfg-campo select { width: 100%; box-sizing: border-box; min-height: 46px; font: inherit; }
+.cfg-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.cfg-chks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.cfg-chk { display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 0 12px; border-radius: 14px; background: var(--mat); font-weight: 600; }
+.cfg-chk input { flex: none; width: 20px; height: 20px; accent-color: var(--accent); }
+.cfg-con { display: grid; gap: 6px; padding: 12px; border-radius: 14px; background: var(--mat); } .cfg-con .howbtn { justify-self: start; }
+.cfg-acoes { display: flex; gap: 10px; } .cfg-acoes .go { flex: 1; }
+.cfg-aviso { margin: 0; color: var(--warn); font-weight: 600; min-height: 1em; }
 .toast { bottom: calc(84px + env(safe-area-inset-bottom, 0px)); border-radius: 22px; }
 </style>
 </head>
@@ -2088,7 +2105,7 @@ window.MOVES = (function () {
     if (window.setLombarDay) window.setLombarDay(d);
     $('lomb-session').hidden = d !== today;
     $('lomb-msg').textContent = '';
-    $('hoje').textContent = DIA[weekday(d)] + (d === today ? '' : ' (' + br(d) + ')');
+    $('hoje').textContent = diaTxt(d) + (d === today ? '' : ' (' + br(d) + ')');
     renderGym(); renderFood(); syncLombarClose(); renderWeek();
   }
 
@@ -2743,7 +2760,7 @@ window.MOVES = (function () {
   }
 
   function buildGymTop() {
-    var row = $('gym-tabs');
+    var row = $('gym-tabs'); row.textContent = '';
     Object.keys(TREINOS).forEach(function (k) {
       var b = h('button', { type: 'button', class: 'letter', id: 'tr-' + k, text: k, 'aria-label': 'Treino ' + k + ': ' + TREINOS[k].name,
         on: { click: function () { sel = k; renderGym(); } } });
@@ -2843,7 +2860,7 @@ window.MOVES = (function () {
   var BAL = { nasc: '1980-01-31', altura: 178, atividade: 1.25, fator: .7, kcalKg: 7700, pesoBase: 104.8 };
   /* Perfil da pessoa (coleção "perfil", doc "config"). Sem doc, valem estes padrões (os do Sanderson). */
   var PERFIL0 = {
-    nome: 'Sanderson', sexo: 'm', nasc: '1980-01-31', altura: 178, atividade: 1.25, pesoBase: 104.8, pesoMeta: 95,
+    nome: 'Sanderson', legado: true, sexo: 'm', nasc: '1980-01-31', altura: 178, atividade: 1.25, pesoBase: 104.8, pesoMeta: 95,
     kcal: { util: 2000, fds: 2800 }, prot: { min: 160, max: 180 },
     modalidades: ['academia', 'pilates', 'cardio'], cidade: 'Itaúna-MG',
     contexto_treino: 'Faz musculação (treinos A a E), pilates em casa e corrida leve. Tem histórico de dor lombar (faz pilates duas vezes por semana).',
@@ -2858,15 +2875,200 @@ window.MOVES = (function () {
     BAL.nasc = PERFIL.nasc; BAL.altura = PERFIL.altura; BAL.atividade = PERFIL.atividade; BAL.pesoBase = PERFIL.pesoBase;
     PESO_META = PERFIL.pesoMeta;
     // Ficha da academia do perfil (mesmo formato de TREINOS); sem ela, a ficha embutida.
-    var fa = Store.get('perfil', 'ficha_academia'), src = fa && fa.treinos && Object.keys(fa.treinos).length ? fa.treinos : TREINOS0;
+    var fa = Store.get('perfil', 'ficha_academia'), src = fa && fa.treinos && Object.keys(fa.treinos).length ? fa.treinos : PERFIL.legado ? TREINOS0 : FICHA_INICIAL;
     var nova = JSON.stringify(src);
     if (nova !== fichaAplicada) {
+      var primeira = fichaAplicada === null;
       fichaAplicada = nova;
       Object.keys(TREINOS).forEach(function (k) { delete TREINOS[k]; });
       Object.assign(TREINOS, JSON.parse(nova));
+      if (!primeira || !TREINOS[sel]) {
+        var dw = weekday(Store.day()), ks = Object.keys(TREINOS);
+        sel = ks.filter(function (k) { return TREINOS[k].day === dw; })[0] || ks[0];
+        try { buildGymTop(); renderGym(); } catch (e) {}
+      }
     }
+    aplicaTelas();
   }
+  // Modalidades → o que aparece. "cardio" (perfil antigo) vale corrida e bike.
+  var MODALIDADES = [['academia', 'Academia'], ['pilates', 'Pilates'], ['corrida', 'Corrida'], ['caminhada', 'Caminhada'], ['bike', 'Bike'], ['natacao', 'Natação'], ['outros', 'Outros']];
+  function pratica(m) {
+    var l = PERFIL.modalidades || [];
+    if (l.indexOf('cardio') >= 0 && ['corrida', 'bike', 'caminhada'].indexOf(m) >= 0) return true;
+    return l.indexOf(m) >= 0;
+  }
+  function temCardio() { return ['corrida', 'caminhada', 'bike', 'natacao', 'outros'].some(pratica); }
+  function telaVisivel(t) { return !(PERFIL.ocultar || []).includes(t); }
+  function abasTreino() { return ['academia', 'cardio', 'lombar'].filter(function (t) { return t === 'academia' ? pratica('academia') : t === 'lombar' ? pratica('pilates') : temCardio(); }); }
+  function aplicaTelas() {
+    var ab = abasTreino();
+    ['academia', 'cardio', 'lombar'].forEach(function (t) { var b = $('ts-' + t); if (b) b.hidden = ab.indexOf(t) < 0; });
+    var seg = document.querySelector('.seg-treino'); if (seg) seg.style.gridTemplateColumns = 'repeat(' + Math.max(1, ab.length) + ', 1fr)';
+    var tr = $('t-receitas'); if (tr) tr.hidden = !telaVisivel('receitas');
+    var ag = $('agua-box'); if (ag) ag.classList.toggle('oculto', !telaVisivel('agua'));
+    var tn = $('treinador'); if (tn) tn.classList.toggle('oculto', !pratica('corrida'));
+    var hj = $('hoje'); if (hj && typeof gymDate !== 'undefined') hj.textContent = diaTxt(Store.day());
+    var v = (location.hash || '').slice(1);
+    if (['academia', 'cardio', 'lombar'].indexOf(v) >= 0 && ab.indexOf(v) < 0 && ab.length) { location.hash = ab[0]; }
+  }
+  var DIAS_SEM = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
+  function diaTxt(d) {
+    var w = weekday(d);
+    if (PERFIL.legado) return DIA[w];
+    var k = pratica('academia') ? Object.keys(TREINOS).filter(function (x) { return TREINOS[x].day === w; })[0] : null;
+    return DIAS_SEM[w] + (k ? ': treino ' + k + ' (' + TREINOS[k].name + ')' : '');
+  }
+  // Ficha inicial para quem ainda não montou a sua (3 treinos de corpo todo; cargas para ajustar).
+  var FICHA_INICIAL = {
+    A: { name: 'Corpo todo A', day: 1, ex: [
+      { id: 'leg_press', name: 'Leg press 45°', sets: 3, reps: '10 a 12', r: 12, kg: 20, unit: 'por lado', tip: 'Comece leve e ajuste a carga.' },
+      { id: 'supino_deitado', name: 'Supino máquina deitado', sets: 3, reps: '10 a 12', r: 12, kg: 20 },
+      { id: 'pulley', name: 'Pulley', sets: 3, reps: '10 a 12', r: 12, kg: 25 },
+      { id: 'elevacao_lateral', name: 'Elevação lateral', sets: 3, reps: '12', r: 12, kg: 4, unit: 'por halter', step: 2 },
+      { id: 'rosca_w', name: 'Rosca direta W', sets: 3, reps: '12', r: 12, kg: 10 },
+      { id: 'triceps_corda', name: 'Tríceps corda', sets: 3, reps: '12', r: 12, kg: 15 }] },
+    B: { name: 'Corpo todo B', day: 3, ex: [
+      { id: 'flexora', name: 'Flexora', sets: 3, reps: '10 a 12', r: 12, kg: 20 },
+      { id: 'extensora', name: 'Extensora', sets: 3, reps: '10 a 12', r: 12, kg: 20 },
+      { id: 'supino_inclinado', name: 'Supino inclinado com halteres', sets: 3, reps: '10 a 12', r: 12, kg: 8, unit: 'por halter', step: 2 },
+      { id: 'remada_baixa', name: 'Remada baixa', sets: 3, reps: '10 a 12', r: 12, kg: 25, tip: 'Mantenha o tronco parado.' },
+      { id: 'desenvolvimento', name: 'Desenvolvimento sentado', sets: 3, reps: '10', r: 10, kg: 6, unit: 'por halter', step: 2 },
+      { id: 'panturrilha', name: 'Panturrilha', sets: 3, reps: '15', r: 15, kg: 30 }] },
+    C: { name: 'Corpo todo C', day: 5, ex: [
+      { id: 'leg_press', name: 'Leg press 45°', sets: 3, reps: '12', r: 12, kg: 20, unit: 'por lado' },
+      { id: 'abdutora', name: 'Abdutora', sets: 3, reps: '15', r: 15, kg: 30 },
+      { id: 'voador', name: 'Voador', sets: 3, reps: '12', r: 12, kg: 20 },
+      { id: 'remada_maquina', name: 'Remada na máquina (pegada neutra)', sets: 3, reps: '12', r: 12, kg: 15 },
+      { id: 'rosca_martelo', name: 'Rosca martelo', sets: 3, reps: '12', r: 12, kg: 6, unit: 'por halter', step: 2 },
+      { id: 'triceps_testa', name: 'Tríceps testa na polia em pé', sets: 3, reps: '12', r: 12, kg: 15 }] }
+  };
   var fichaAplicada = null;
+  /* Configurações do perfil e assistente de primeiro acesso */
+  var cfgAberto = false;
+  function idadeDe(nasc) { var h = Store.day(); return parseInt(h.slice(0, 4), 10) - parseInt(nasc.slice(0, 4), 10) - (h.slice(5) < nasc.slice(5) ? 1 : 0); }
+  function metasSugeridas(c) {
+    var peso = Number(c.peso) || PERFIL.pesoBase, alt = Number(c.altura) || 170, id = c.nasc ? idadeDe(c.nasc) : 35, f = c.sexo === 'f';
+    var tmb = 10 * peso + 6.25 * alt - 5 * id + (f ? -161 : 5);
+    var n = (c.modalidades || []).filter(function (m) { return m !== 'outros'; }).length;
+    var tdee = tmb * Math.min(1.55, 1.25 + 0.075 * n);
+    var aj = c.objetivo === 'emagrecer' ? -Math.min(500, tdee * .2) : c.objetivo === 'massa' ? 250 : 0;
+    var piso = f ? 1200 : 1500, k = Math.max(piso, Math.round((tdee + aj) / 50) * 50);
+    var base = Math.min(peso, Number(c.pesoMeta) || peso);
+    return { kcal: { util: k, fds: k }, prot: { min: Math.round(base * 1.6 / 5) * 5, max: Math.round(base * 2.0 / 5) * 5 }, piso: piso, tdee: Math.round(tdee) };
+  }
+  function abreConfig(wizard) {
+    if (cfgAberto) return; cfgAberto = true;
+    var c0 = Store.get('perfil', 'config') || {}, c = JSON.parse(JSON.stringify(Object.assign({}, wizard ? {} : PERFIL, c0)));
+    if (!c.modalidades) c.modalidades = wizard ? [] : PERFIL.modalidades.slice();
+    if (c.modalidades.indexOf('cardio') >= 0) c.modalidades = c.modalidades.filter(function (m) { return m !== 'cardio'; }).concat(['corrida', 'bike']);
+    c.peso = c.peso || (wizard ? '' : Math.round(pesoAte(Store.day()) * 10) / 10);
+    c.sexo = c.sexo || 'm'; c.objetivo = c.objetivo || (wizard ? 'emagrecer' : 'emagrecer');
+    var ov = h('div', { class: 'cfg-ov', role: 'dialog', 'aria-label': wizard ? 'Primeiro acesso' : 'Configurações' });
+    var box = h('div', { class: 'cfg-box' }); ov.appendChild(box);
+    document.body.appendChild(ov); document.body.style.overflow = 'hidden';
+    var passo = 0, PASSOS = ['Sobre você', 'O que você pratica', 'Suas metas', 'Conexões'];
+    function fecha() { ov.remove(); document.body.style.overflow = ''; cfgAberto = false; }
+    function campo(id, rot, el) { el.id = id; return h('div', { class: 'cfg-campo' }, h('label', { for: id, text: rot }), el); }
+    function inp(tipo, val, extra) { var e = h('input', Object.assign({ type: tipo }, extra || {})); e.value = val == null ? '' : val; return e; }
+    function sel(ops, val) { var e = h('select', {}); ops.forEach(function (o) { var op = h('option', { value: o[0], text: o[1] }); if (o[0] === val) op.selected = true; e.appendChild(op); }); return e; }
+    function chk(rot, on, fn) { var e = h('input', { type: 'checkbox' }); e.checked = !!on; e.addEventListener('change', function () { fn(e.checked); }); return h('label', { class: 'cfg-chk' }, e, h('span', { text: rot })); }
+    function secSobre() {
+      var nm = inp('text', c.nome, { autocomplete: 'name' }), sx = sel([['m', 'Masculino'], ['f', 'Feminino']], c.sexo || 'm'), na = inp('date', c.nasc || ''), al = inp('number', c.altura || '', { inputmode: 'numeric', min: '120', max: '230' }),
+        pe = inp('number', c.peso || '', { inputmode: 'decimal', step: '0.1' }), pm = inp('number', c.pesoMeta || '', { inputmode: 'decimal', step: '0.1' }), ci = inp('text', c.cidade || '', { placeholder: 'Ex.: Itaúna-MG' }),
+        ob = sel([['emagrecer', 'Emagrecer'], ['massa', 'Ganhar massa'], ['manter', 'Manter o peso'], ['prova', 'Preparar uma prova']], c.objetivo || 'emagrecer');
+      var liga = function (e, k, n) { e.addEventListener('input', function () { c[k] = n ? (e.value === '' ? '' : Number(e.value)) : e.value; }); e.addEventListener('change', function () { c[k] = n ? (e.value === '' ? '' : Number(e.value)) : e.value; }); };
+      liga(nm, 'nome'); liga(sx, 'sexo'); liga(na, 'nasc'); liga(al, 'altura', 1); liga(pe, 'peso', 1); liga(pm, 'pesoMeta', 1); liga(ci, 'cidade'); liga(ob, 'objetivo');
+      return h('section', { class: 'cfg-sec' }, h('h2', { text: 'Sobre você' }),
+        campo('cf-nome', 'Nome', nm), h('div', { class: 'cfg-2' }, campo('cf-sexo', 'Sexo', sx), campo('cf-nasc', 'Nascimento', na)),
+        h('div', { class: 'cfg-2' }, campo('cf-alt', 'Altura (cm)', al), campo('cf-peso', 'Peso atual (kg)', pe)),
+        h('div', { class: 'cfg-2' }, campo('cf-meta', 'Peso desejado (kg)', pm), campo('cf-obj', 'Objetivo', ob)), campo('cf-cid', 'Cidade', ci));
+    }
+    function secPratica() {
+      var g = h('div', { class: 'cfg-chks' });
+      MODALIDADES.forEach(function (m) { g.appendChild(chk(m[1], c.modalidades.indexOf(m[0]) >= 0, function (on) { c.modalidades = c.modalidades.filter(function (x) { return x !== m[0]; }); if (on) c.modalidades.push(m[0]); })); });
+      var oc = c.ocultar || [], g2 = h('div', { class: 'cfg-chks' });
+      [['receitas', 'Receitas'], ['agua', 'Água']].forEach(function (t) { g2.appendChild(chk(t[1], oc.indexOf(t[0]) < 0, function (on) { c.ocultar = (c.ocultar || []).filter(function (x) { return x !== t[0]; }); if (!on) c.ocultar.push(t[0]); })); });
+      return h('section', { class: 'cfg-sec' }, h('h2', { text: 'O que você pratica' }), h('p', { class: 'tip', text: 'Só o que estiver marcado aparece no app. O treinador de corrida aparece para quem marca Corrida.' }), g,
+        h('h3', { text: 'Também mostrar' }), g2);
+    }
+    function secMetas() {
+      c.kcal = c.kcal || {}; c.prot = c.prot || {};
+      var ku = inp('number', c.kcal.util || '', { inputmode: 'numeric', step: '50' }), kf = inp('number', c.kcal.fds || '', { inputmode: 'numeric', step: '50' }),
+        p1 = inp('number', c.prot.min || '', { inputmode: 'numeric' }), p2 = inp('number', c.prot.max || '', { inputmode: 'numeric' }), info = h('p', { class: 'tip' });
+      function liga(e, o, k) { e.addEventListener('input', function () { c[o][k] = Number(e.value) || ''; }); }
+      liga(ku, 'kcal', 'util'); liga(kf, 'kcal', 'fds'); liga(p1, 'prot', 'min'); liga(p2, 'prot', 'max');
+      function calc() {
+        var m = metasSugeridas(c); c.kcal = m.kcal; c.prot = m.prot;
+        ku.value = m.kcal.util; kf.value = m.kcal.fds; p1.value = m.prot.min; p2.value = m.prot.max;
+        info.textContent = 'Gasto estimado: ' + nInt(m.tdee) + ' kcal por dia. A meta nunca fica abaixo de ' + nInt(m.piso) + ' kcal.';
+      }
+      var bt = h('button', { type: 'button', class: 'howbtn', id: 'cf-calc', text: 'Calcular pelo meu perfil' }); bt.addEventListener('click', calc);
+      if (wizard && !c.kcal.util) calc();
+      return h('section', { class: 'cfg-sec' }, h('h2', { text: 'Suas metas' }), bt, info,
+        h('div', { class: 'cfg-2' }, campo('cf-ku', 'Calorias nos dias úteis', ku), campo('cf-kf', 'Calorias no fim de semana', kf)),
+        h('div', { class: 'cfg-2' }, campo('cf-p1', 'Proteína mínima (g)', p1), campo('cf-p2', 'Proteína máxima (g)', p2)),
+        h('p', { class: 'tip', text: 'Gordura, carboidrato e água são calculados a partir daqui e do seu peso. Estas metas são uma estimativa: para uma dieta sob medida, procure um nutricionista.' }));
+    }
+    function secCon() {
+      var st = h('button', { type: 'button', class: 'howbtn', text: 'Conectar Strava' });
+      st.addEventListener('click', function () { var b = document.getElementById('pl-con'); if (b) b.click(); });
+      var hc = h('button', { type: 'button', class: 'howbtn', text: 'Health Connect (balança e relógio)' });
+      hc.addEventListener('click', function () { var b = document.getElementById('pl-hc'); if (b) { fecha(); b.click(); } });
+      return h('section', { class: 'cfg-sec' }, h('h2', { text: 'Conexões' }),
+        h('p', { class: 'tip', text: 'Tudo aqui é opcional e pode ser feito depois, pelo menu Conta.' }),
+        h('div', { class: 'cfg-con' }, h('b', { text: 'Strava' }), h('span', { class: 'tip', text: 'Traz corridas, pedais e caminhadas.' }), st),
+        h('div', { class: 'cfg-con' }, h('b', { text: 'Health Connect (Android)' }), h('span', { class: 'tip', text: 'Traz peso, composição corporal, sono e frequência cardíaca do relógio e da balança.' }), hc),
+        h('div', { class: 'cfg-con' }, h('b', { text: 'Chave de IA' }), h('span', { class: 'tip', text: 'Para calcular refeições por texto e foto e ter as análises da IA. Chega na próxima atualização; até lá o app funciona com o cálculo próprio.' })));
+    }
+    var SEC = [secSobre, secPratica, secMetas, secCon];
+    function salvar() {
+      if (!c.nome || !c.nasc || !c.altura || !c.peso) { passo = 0; desenha(); toastCfg('Preencha nome, nascimento, altura e peso.'); return false; }
+      if (!c.kcal || !c.kcal.util) { var m = metasSugeridas(c); c.kcal = m.kcal; c.prot = m.prot; }
+      var piso = c.sexo === 'f' ? 1200 : 1500;
+      ['util', 'fds'].forEach(function (k) { c.kcal[k] = Math.max(piso, Number(c.kcal[k]) || piso); });
+      if (!c.kcal.fds) c.kcal.fds = c.kcal.util;
+      var novo = Object.assign({}, c0, c);
+      novo.legado = !!c0.legado;
+      novo.pesoBase = c0.pesoBase || Number(c.peso);
+      if (!novo.legado) {
+        var pr = (c.modalidades || []).map(function (m) { var x = MODALIDADES.filter(function (y) { return y[0] === m; })[0]; return x ? x[1].toLowerCase() : m; }).join(', ');
+        novo.contexto_treino = 'Pratica: ' + (pr || 'nada registrado') + '. Objetivo: ' + ({ emagrecer: 'emagrecer', massa: 'ganhar massa', manter: 'manter o peso', prova: 'preparar uma prova' })[c.objetivo || 'emagrecer'] + '.';
+        novo.contexto_corrida = (c.sexo === 'f' ? 'Mulher' : 'Homem') + ' de ' + idadeDe(c.nasc) + ' anos, ' + c.altura + ' cm e ' + c.peso + ' kg. ' + novo.contexto_treino;
+      }
+      delete novo.peso;
+      Store.set('perfil', 'config', novo);
+      if (!Store.all('peso') || !Object.keys(Store.all('peso')).length) Store.set('peso', Store.day(), { data: Store.day(), kg: Number(c.peso) });
+      if (!novo.legado && (c.modalidades || []).indexOf('academia') >= 0 && !Store.get('perfil', 'ficha_academia')) Store.set('perfil', 'ficha_academia', { treinos: FICHA_INICIAL, origem: 'inicial' });
+      aplicaPerfil(); try { renderFood(); } catch (e) {}
+      fecha(); salvoOk(wizard ? 'Tudo pronto. Bom treino!' : 'Configurações salvas');
+      return true;
+    }
+    function toastCfg(t) { var p = box.querySelector('.cfg-aviso'); if (p) p.textContent = t; }
+    function desenha() {
+      box.textContent = '';
+      var top = h('div', { class: 'cfg-top' }, h('h1', { text: wizard ? 'Bem-vindo ao Peleja' : 'Configurações' }));
+      if (!wizard) { var x = h('button', { type: 'button', class: 'cfg-x', 'aria-label': 'Fechar', text: '✕' }); x.addEventListener('click', fecha); top.appendChild(x); }
+      box.appendChild(top);
+      if (wizard) {
+        box.appendChild(h('p', { class: 'tip', text: 'Passo ' + (passo + 1) + ' de 4 · ' + PASSOS[passo] }));
+        var bar = h('div', { class: 'track' }), bi = h('i', {}); bi.style.width = ((passo + 1) / 4 * 100) + '%'; bar.appendChild(bi); box.appendChild(bar);
+        box.appendChild(SEC[passo]());
+      } else SEC.forEach(function (f) { box.appendChild(f()); });
+      box.appendChild(h('p', { class: 'cfg-aviso', role: 'status' }));
+      var ac = h('div', { class: 'cfg-acoes' });
+      if (wizard && passo > 0) { var vt = h('button', { type: 'button', class: 'howbtn', text: 'Voltar' }); vt.addEventListener('click', function () { passo--; desenha(); }); ac.appendChild(vt); }
+      var ok = h('button', { type: 'button', class: 'go', id: 'cf-ok', text: wizard ? (passo < 3 ? 'Continuar' : 'Começar') : 'Salvar' });
+      ok.addEventListener('click', function () {
+        if (wizard && passo === 0 && (!c.nome || !c.nasc || !c.altura || !c.peso)) { toastCfg('Preencha nome, nascimento, altura e peso para continuar.'); return; }
+        if (wizard && passo < 3) { passo++; desenha(); box.scrollTop = 0; return; }
+        salvar();
+      });
+      ac.appendChild(ok); box.appendChild(ac);
+    }
+    desenha();
+  }
+  window.abreConfig = function () { abreConfig(false); };
+
   function pessoaTxt() { return PERFIL.sexo === 'f' ? 'uma mulher' : 'um homem'; }
   function ddmm(d) { return d.slice(8, 10) + '/' + d.slice(5, 7); }
   function sinal(v, f) { return (v > 0 ? '+' : v < 0 ? '−' : '') + f(Math.abs(v)); }
@@ -7673,7 +7875,7 @@ window.MOVES = (function () {
   // Troca de tema: redesenha o que usa cores lidas na hora (gráficos e mapa).
   window.addEventListener('dt-tema', function () { gAnimou = {}; renderHist(); renderDesempenho(); renderSaude(); });
 
-  $('hoje').textContent = DIA[new Date().getDay()];
+  $('hoje').textContent = diaTxt(Store.day());
   renderWeek();
   buildGymTop(); buildCardio(); buildFood(); buildPeso(); buildLombarClose(); buildLombarMedia(); show();
   pickDefault(); renderGym(); renderCardio(); renderHist(); renderFood();
@@ -7698,6 +7900,8 @@ window.MOVES = (function () {
   var stravaAuto = false;
   Store.watch(function () {
     aplicaPerfil();
+    // Primeiro acesso: perfil novo, sem configuração e sem nenhum registro ainda.
+    if (Store.loaded('perfil') && Store.loaded('refeicoes') && !Store.get('perfil', 'config') && !Object.keys(Store.all('refeicoes') || {}).length && !Object.keys(Store.all('treinos') || {}).length) abreConfig(true);
     aliSemente(); medBadge();
     if (!stravaAuto && Object.keys(Store.all('strava')).length) { stravaAuto = true; syncStrava(true); }
     if (firstData && !$('gym').contains(document.activeElement)) { firstData = false; pickDefault(); }
