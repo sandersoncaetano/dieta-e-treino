@@ -12,6 +12,7 @@ function tipoDe(p) {
   if (p.includes('Analise a semana')) return 'semana';
   if (p.includes('Feche a semana')) return 'fechamento';
   if (p.includes('estimando uma refeição')) return 'refeicao';
+  if (p.includes('montando uma ficha de academia')) return 'ficha';
   return 'outro';
 }
 
@@ -27,6 +28,7 @@ const POR_TIPO = {
   semana: { leve: true, max: 500 },
   fechamento: { leve: true, max: 500 },
   treinador: { leve: false, max: 6000 },
+  ficha: { leve: false, max: 8000 },
   outro: { leve: false, max: 2000 }
 };
 function escolhe(tipo, temFoto) {
@@ -81,7 +83,9 @@ export default rota(async (req, res) => {
   if (imagens.length > 4) return responde(res, 400, { erro: 'Imagens demais' });
 
   const conteudo = [
-    ...imagens.map((i) => ({ type: 'image', source: { type: 'base64', media_type: i.tipo || 'image/jpeg', data: i.base64 } })),
+    ...imagens.map((i) => i.tipo === 'application/pdf'
+      ? { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: i.base64 } }
+      : { type: 'image', source: { type: 'base64', media_type: i.tipo || 'image/jpeg', data: i.base64 } }),
     { type: 'text', text: prompt + '\n\nEntregue a resposta chamando a ferramenta responder com o objeto JSON pedido, sem escrever nada antes nem fora dela. Dentro dos textos, use aspas simples em vez de aspas duplas.' }
   ];
   const tipo = tipoDe(String(prompt)), esc = escolhe(tipo, imagens.length > 0);

@@ -554,7 +554,7 @@
           '<p style="margin:6px 0 0">Economia estimada: <strong>' + dinheiro(eco) + '</strong>' + (n7 && n7 !== locais.length ? ' (' + dinheiro(eco7) + ' nos últimos 7 dias)' : '') + '.</p>' +
           '<p style="margin:4px 0 0;' + sub + '">Calculada pelo custo médio que cada tipo tinha quando ia para a IA.</p></div>';
       }
-      var nomes = { refeicao: 'Refeições', dia: 'Fechar o dia', receita: 'Receitas', atividade: 'Análise de atividades', semana: 'Análise da pesagem', fechamento: 'Fechamento da semana', treinador: 'Treinador de corrida', outro: 'Outros' };
+      var nomes = { refeicao: 'Refeições', dia: 'Fechar o dia', receita: 'Receitas', atividade: 'Análise de atividades', semana: 'Análise da pesagem', fechamento: 'Fechamento da semana', treinador: 'Treinador de corrida', ficha: 'Ficha da academia', outro: 'Outros' };
       var tipos = {};
       rows.forEach(function (x) { (tipos[x.tipo] = tipos[x.tipo] || []).push(x); });
       h += '<h3 style="margin:16px 0 2px;font-size:1.1rem">Por tipo, desde o início</h3>';

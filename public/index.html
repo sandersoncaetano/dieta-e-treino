@@ -787,6 +787,8 @@ input, textarea { padding: 10px 12px; }
 @keyframes flipx { 0% { opacity: 0; } 50% { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .flip img + img { animation-duration: 4s; } }
 #fi-rm { justify-self: start; max-width: none; text-align: left; }
+.fi-busca textarea { width: 100%; box-sizing: border-box; font: inherit; }
+#fi-ia { width: 100%; }
 .fi-passos { margin: 0; padding-left: 20px; display: grid; gap: 6px; }
 .toast { bottom: calc(84px + env(safe-area-inset-bottom, 0px)); border-radius: 22px; }
 </style>
@@ -3186,6 +3188,15 @@ window.MOVES = (function () {
         row.appendChild(nv);
       }
       box.appendChild(row);
+      var iab = h('button', { type: 'button', class: 'howbtn', id: 'fi-ia', text: '✨ Importar ou gerar ficha com IA' });
+      iab.addEventListener('click', function () { fichaIA(function (novo, modo) {
+        if (modo === 'trocar') { Object.keys(T).forEach(function (k) { delete T[k]; }); }
+        var livres = 'ABCDEFG'.split('').filter(function (l) { return !T[l]; });
+        novo.forEach(function (t, i) { if (livres[i]) T[livres[i]] = t; });
+        letra = modo === 'trocar' ? 'A' : livres[0]; mudou = true; desenha();
+        aviso('Ficha montada pela IA. Confira cada treino e toque em Salvar ficha.');
+      }, letras().length); });
+      box.appendChild(iab);
       if (letra && T[letra]) box.appendChild(secTreino(T[letra]));
       else box.appendChild(h('p', { class: 'tip', text: 'Toque em + para criar o primeiro treino.' }));
       box.appendChild(h('p', { class: 'cfg-aviso', role: 'status' }));
@@ -3310,6 +3321,130 @@ window.MOVES = (function () {
     desenha();
   }
   window.abreFicha = abreFicha;
+
+  /* Ficha pela IA: importar (foto, PDF ou texto) ou gerar pelo objetivo. A IA devolve nomes; o app casa com a base. */
+  function casaEx(nome, en, base) {
+    var n = normTxt(nome), e = normTxt(en || ''), app = exDoApp();
+    var a = app.filter(function (x) { return x.k === n; })[0];
+    if (a) return a;
+    if (!base) return null;
+    var c = base.filter(function (x) { return normTxt(x.n) === n || (e && normTxt(x.en) === e); })[0];
+    if (c) return c;
+    function tk(t) { return t.split(' ').filter(function (w) { return w.length > 2 && ['com', 'the', 'and', 'with', 'para', 'nos', 'nas'].indexOf(w) < 0; }); }
+    function jac(a, b) { var A = tk(a), B = tk(b); if (!A.length || !B.length) return 0; var i = A.filter(function (w) { return B.indexOf(w) >= 0; }).length; return i / (A.length + B.length - i); }
+    var best = null, bs = 0;
+    base.forEach(function (x) { var sc = Math.max(e ? jac(e, normTxt(x.en)) : 0, jac(n, normTxt(x.n))); if (sc > bs) { bs = sc; best = x; } });
+    return bs >= 0.6 ? best : null;
+  }
+  function fichaPrompt(o) {
+    var app = exDoApp().map(function (x) { return x.n; }).join('; ');
+    var formato = 'Responda com {"treinos":[{"nome":"nome curto do treino","dia":número do dia da semana (0 domingo a 6 sábado) ou null,"exercicios":[{"nome":"nome em português, como se fala em academia no Brasil","en":"nome em inglês","series":número,"reps":"texto, ex.: 10 a 12","carga_kg":número ou null,"unidade":"por halter", "por lado" ou "","obs":"dica curta ou vazio"}]}],"observacao":"uma ou duas frases para a pessoa"}.';
+    var base = 'Você está montando uma ficha de academia para ' + pessoaTxt() + ' de ' + (PERFIL.nasc ? idadeDe(PERFIL.nasc) + ' anos' : 'idade não informada') + (PERFIL.contexto_treino ? '. Contexto: ' + PERFIL.contexto_treino : '') + '.\n' +
+      'Quando o exercício for um destes do app, use exatamente este nome: ' + app + '.\n';
+    if (o.modo === 'importar') return base + 'Transcreva a ficha que a pessoa enviou (nas imagens, no PDF ou no texto abaixo), sem inventar exercícios. Mantenha a ordem, as séries, as repetições e as cargas que estiverem escritas. Se a ficha não disser o dia, use null. Se não der para ler algo, diga na observação.\n' +
+      (o.texto ? 'Texto enviado:\n' + o.texto.slice(0, 8000) + '\n' : '') + formato;
+    return base + 'Crie uma ficha nova com ' + o.dias + ' treinos por semana, ' + o.tempo + ' minutos cada, para quem é ' + o.nivel + ', com o objetivo de ' + o.obj + '. Local: ' + o.local + '.' +
+      (o.rest ? ' Cuidados e limitações: ' + o.rest + '.' : '') + ' Distribua os dias com descanso entre treinos dos mesmos músculos. Use exercícios comuns e seguros, de 5 a 8 por treino, e carga_kg null (a pessoa ajusta no primeiro treino). ' + formato;
+  }
+  function fichaDaIA(r, base) {
+    var ts = r && (r.treinos || r.ficha); if (typeof ts === 'string') { try { ts = JSON.parse(ts); } catch (e) { ts = null; } }
+    if (!Array.isArray(ts) || !ts.length) throw new Error('vazio');
+    var stats = { foto: 0, ani: 0, prop: 0 };
+    var out = ts.slice(0, 7).map(function (t, i) {
+      var ids = {};
+      var ex = (t.exercicios || t.ex || []).slice(0, 15).map(function (x) {
+        var nm = String(x.nome || '').trim().slice(0, 60); if (!nm) return null;
+        var m = casaEx(nm, x.en, base), e;
+        if (m && m.app) { e = { id: m.id, name: m.n }; if (m.unit) e.unit = m.unit; if (m.step) e.step = m.step; stats.ani++; }
+        else if (m) { e = { id: m.id, name: m.n, cat: m.id, img: m.img }; stats.foto++; }
+        else { e = { id: 'p_' + normTxt(nm).replace(/ /g, '_').slice(0, 40), name: nm.charAt(0).toUpperCase() + nm.slice(1), proprio: true }; stats.prop++; }
+        if (ids[e.id]) return null; ids[e.id] = 1;
+        e.sets = Math.max(1, Math.min(10, Math.round(Number(x.series) || 3)));
+        e.reps = String(x.reps || '10 a 12').slice(0, 20); e.r = repsAlvo(e.reps);
+        e.kg = x.carga_kg == null || x.carga_kg === '' || isNaN(Number(x.carga_kg)) ? null : Number(x.carga_kg);
+        if (x.unidade === 'por halter' || x.unidade === 'por lado') e.unit = x.unidade;
+        if (e.unit === 'por halter' && !e.step) e.step = 2;
+        if (x.obs) e.tip = String(x.obs).slice(0, 200);
+        return e;
+      }).filter(Boolean);
+      var d = t.dia === null || t.dia === undefined || t.dia === '' ? null : Number(t.dia);
+      return { name: String(t.nome || 'Treino ' + (i + 1)).slice(0, 60), day: d >= 0 && d <= 6 ? d : null, ex: ex };
+    }).filter(function (t) { return t.ex.length; });
+    if (!out.length) throw new Error('vazio');
+    return { treinos: out, stats: stats, obs: String(r.observacao || '') };
+  }
+  function fichaIA(aplica, temTreinos) {
+    var ov = h('div', { class: 'cfg-ov fi-busca', role: 'dialog', 'aria-label': 'Ficha com IA' }), bb = h('div', { class: 'cfg-box' });
+    ov.appendChild(bb); document.body.appendChild(ov);
+    var modo = 'importar', arqs = [], o = { dias: 3, tempo: 60, nivel: 'iniciante', obj: 'emagrecer', local: 'academia completa', rest: '' };
+    function fecha() { ov.remove(); }
+    function sel(id, ops, val, fn) { var e = h('select', { id: id }); ops.forEach(function (x) { var op = h('option', { value: x[0], text: x[1] }); if (String(x[0]) === String(val)) op.selected = true; e.appendChild(op); }); e.addEventListener('change', function () { fn(e.value); }); return e; }
+    function campo(id, rot, el) { return h('div', { class: 'cfg-campo' }, h('label', { for: id, text: rot }), el); }
+    function desenha() {
+      bb.textContent = '';
+      var x = h('button', { type: 'button', class: 'cfg-x', 'aria-label': 'Voltar', text: '✕' }); x.addEventListener('click', fecha);
+      bb.appendChild(h('div', { class: 'cfg-top' }, h('h1', { text: 'Ficha com IA' }), x));
+      var seg = h('div', { class: 'durs', role: 'group' });
+      [['importar', 'Importar a minha'], ['gerar', 'Gerar uma nova']].forEach(function (m) {
+        var b = h('button', { type: 'button', class: 'dur', id: 'fia-' + m[0], text: m[1], 'aria-pressed': modo === m[0] ? 'true' : 'false' });
+        b.addEventListener('click', function () { modo = m[0]; desenha(); }); seg.appendChild(b);
+      });
+      bb.appendChild(seg);
+      var sec = h('section', { class: 'cfg-sec' });
+      if (modo === 'importar') {
+        sec.appendChild(h('p', { class: 'tip', text: 'Mande fotos ou PDF da ficha que você já tem (até 4 arquivos), ou cole o texto. A IA transcreve e o app liga cada exercício à base com fotos.' }));
+        var fi = h('input', { type: 'file', id: 'fia-arq', accept: 'image/*,application/pdf', multiple: '', hidden: '' });
+        var pick = h('button', { type: 'button', class: 'howbtn', text: arqs.length ? 'Trocar arquivos' : '📎 Escolher fotos ou PDF' });
+        pick.addEventListener('click', function () { fi.click(); });
+        fi.addEventListener('change', function () { arqs = Array.prototype.slice.call(fi.files || [], 0, 4); desenha(); });
+        sec.appendChild(h('div', { class: 'photo-row' }, pick, fi));
+        if (arqs.length) sec.appendChild(h('p', { class: 'tip', text: arqs.map(function (f) { return f.name; }).join(', ') }));
+        var tx = h('textarea', { id: 'fia-texto', rows: '6', placeholder: 'Ou cole aqui. Ex.:\nTreino A – Peito\nSupino reto 4x10 30kg\nCrucifixo 3x12' }); tx.value = o.texto || '';
+        tx.addEventListener('input', function () { o.texto = tx.value; });
+        sec.appendChild(campo('fia-texto', 'Texto da ficha', tx));
+      } else {
+        sec.appendChild(h('div', { class: 'cfg-2' },
+          campo('fia-obj', 'Objetivo', sel('fia-obj', [['emagrecer', 'Emagrecer'], ['ganhar massa muscular', 'Ganhar massa'], ['ganhar força', 'Ganhar força'], ['condicionamento e saúde', 'Saúde em geral']], o.obj, function (v) { o.obj = v; })),
+          campo('fia-niv', 'Experiência', sel('fia-niv', [['iniciante', 'Iniciante'], ['intermediário', 'Intermediário'], ['avançado', 'Avançado']], o.nivel, function (v) { o.nivel = v; }))));
+        sec.appendChild(h('div', { class: 'cfg-2' },
+          campo('fia-dias', 'Treinos por semana', sel('fia-dias', [[2, '2'], [3, '3'], [4, '4'], [5, '5'], [6, '6']], o.dias, function (v) { o.dias = Number(v); })),
+          campo('fia-tempo', 'Tempo por treino', sel('fia-tempo', [[30, '30 min'], [45, '45 min'], [60, '1 hora'], [75, '1h15'], [90, '1h30']], o.tempo, function (v) { o.tempo = Number(v); }))));
+        sec.appendChild(campo('fia-local', 'Onde', sel('fia-local', [['academia completa', 'Academia completa'], ['academia pequena, com poucas máquinas', 'Academia pequena'], ['em casa, com halteres e elástico', 'Em casa (halteres e elástico)'], ['em casa, só com o peso do corpo', 'Em casa (sem equipamento)']], o.local, function (v) { o.local = v; })));
+        var rs = h('textarea', { id: 'fia-rest', rows: '3', placeholder: 'Ex.: dor no joelho, hérnia, ombro operado' }); rs.value = o.rest; rs.addEventListener('input', function () { o.rest = rs.value; });
+        sec.appendChild(campo('fia-rest', 'Dores ou limitações (opcional)', rs));
+        sec.appendChild(h('p', { class: 'tip', text: 'É uma sugestão para começar. Se tiver dor ou alguma condição de saúde, mostre a ficha a um profissional de educação física.' }));
+      }
+      bb.appendChild(sec);
+      var msg = h('p', { class: 'cfg-aviso', role: 'status' }); bb.appendChild(msg);
+      var ac = h('div', { class: 'cfg-acoes' });
+      function vai(m) {
+        if (modo === 'importar' && !arqs.length && !String(o.texto || '').trim()) { msg.textContent = 'Escolha um arquivo ou cole o texto da ficha.'; return; }
+        ac.querySelectorAll('button').forEach(function (b) { b.disabled = true; });
+        msg.textContent = 'A IA está montando a ficha. Leva uns 20 a 40 segundos…';
+        Promise.all([Store.sample(), catalogo().catch(function () { return null; })]).then(function (r) {
+          var sample = r[0]; if (!sample) throw new Error('indisponivel');
+          var opts = { modelTier: 'default', cache: false };
+          if (arqs.some(function (f) { return f.type === 'application/pdf' && f.size > 3e6; })) throw new Error('pdf');
+          return Promise.all(modo === 'importar' ? arqs.map(function (f) { return f.type === 'application/pdf' ? f : shrink(f, 1600).then(toBlob).catch(function () { return f; }); }) : []).then(function (bs) {
+            if (bs.length) opts.images = bs;
+            return sample.json(fichaPrompt(Object.assign({ modo: modo }, o)), opts);
+          }).then(function (res) { return fichaDaIA(res, r[1] && r[1].ex); });
+        }).then(function (f) {
+          fecha(); aplica(f.treinos, m);
+          var p = document.querySelector('.cfg-ov .cfg-aviso');
+          if (p) p.textContent = (f.obs ? f.obs + ' ' : '') + 'Com fotos: ' + f.stats.foto + ', com animação: ' + f.stats.ani + ', sem imagem: ' + f.stats.prop + '. Confira cada treino e toque em Salvar ficha.';
+        }).catch(function (e) {
+          ac.querySelectorAll('button').forEach(function (b) { b.disabled = false; });
+          msg.textContent = e && e.message === 'pdf' ? 'O PDF passa de 3 MB. Mande fotos das páginas no lugar.' : e && e.message === 'indisponivel' ? 'A IA não está disponível agora.' : e && e.message === 'vazio' ? 'A IA não encontrou exercícios. Tente uma foto mais nítida ou cole o texto.' : 'Não consegui agora. Tente de novo.';
+        });
+      }
+      var b1 = h('button', { type: 'button', class: 'go', id: 'fia-trocar', text: temTreinos ? 'Substituir minha ficha' : 'Montar ficha' }); b1.addEventListener('click', function () { vai('trocar'); }); ac.appendChild(b1);
+      if (temTreinos && temTreinos < 7) { var b2 = h('button', { type: 'button', class: 'howbtn', id: 'fia-somar', text: 'Somar aos treinos' }); b2.addEventListener('click', function () { vai('somar'); }); ac.appendChild(b2); }
+      bb.appendChild(ac);
+      if (temTreinos) bb.appendChild(h('p', { class: 'tip', text: 'Nada é gravado antes de você conferir e tocar em Salvar ficha.' }));
+    }
+    desenha();
+  }
 
   function pessoaTxt() { return PERFIL.sexo === 'f' ? 'uma mulher' : 'um homem'; }
   function ddmm(d) { return d.slice(8, 10) + '/' + d.slice(5, 7); }
