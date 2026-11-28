@@ -1,5 +1,5 @@
 /*
-  Plataforma própria do Dieta e Treino.
+  Plataforma própria do Peleja (antigo Dieta e Treino).
   Substitui os serviços que o claude.ai fornecia ao artefato (window.claude.use):
     db     -> tabela "docs" no Supabase, com atualização em tempo real
     assets -> bucket "fotos" no Supabase Storage
@@ -54,7 +54,7 @@
       var box = document.createElement('div');
       box.setAttribute('style', css);
       box.innerHTML = '<form style="max-width:360px;width:100%;display:grid;gap:12px;background:var(--surface,#fff);padding:20px;border-radius:16px">' +
-        '<h1 style="margin:0;font-size:1.6rem">Dieta e Treino</h1>' +
+        '<h1 style="margin:0;font-size:1.6rem">Peleja</h1><p style="margin:-6px 0 4px;color:var(--muted,#555)">Dieta e treino, uma peleja por dia.</p>' +
         '<label for="pl-email">Seu e-mail</label>' +
         '<input id="pl-email" type="email" required autocomplete="email" style="font:inherit;padding:12px;border-radius:10px;border:2px solid var(--line,#c6d4e8)">' +
         '<label for="pl-senha">Senha (se tiver)</label>' +
@@ -106,7 +106,7 @@
     post({ acao: 'convite', codigo: codigo }).then(function (x) {
       if (!x.ok) { erro(x.j.erro || 'Convite inválido.'); return; }
       f.innerHTML = '<h1 style="margin:0;font-size:1.5rem">Você foi convidado</h1>' +
-        '<p style="margin:0">Crie seu acesso ao Dieta e Treino. Depois você entra sempre com este e-mail e esta senha.</p>' +
+        '<p style="margin:0">Crie seu acesso ao Peleja, o app de dieta e treino. Depois você entra sempre com este e-mail e esta senha.</p>' +
         '<label for="pa-nome">Seu nome</label><input id="pa-nome" required autocomplete="name" style="' + EST_IN + '">' +
         '<label for="pa-email">Seu e-mail</label><input id="pa-email" type="email" required autocomplete="email" style="' + EST_IN + '">' +
         '<label for="pa-senha">Crie uma senha (mínimo 8 caracteres)</label><input id="pa-senha" type="password" required minlength="8" autocomplete="new-password" style="' + EST_IN + '">' +
@@ -195,11 +195,11 @@
               '<div style="display:flex;gap:8px;flex-wrap:wrap">' + bts + '</div></div>';
           }).join('');
         function mostraLink(codigo, onde) {
-          var url = location.origin + '/?convite=' + codigo, txt = 'Te convidei para o Dieta e Treino. Abra este link e crie seu acesso: ' + url;
+          var url = location.origin + '/?convite=' + codigo, txt = 'Te convidei para o Peleja, um app de dieta e treino. Abra este link e crie seu acesso: ' + url;
           onde.innerHTML = '<p style="margin:6px 0;overflow-wrap:anywhere;font-size:.9rem"><code style="user-select:all">' + esc(url) + '</code></p>';
           var row = document.createElement('div'); row.setAttribute('style', 'display:flex;gap:8px;flex-wrap:wrap');
           var BT = 'font:inherit;font-weight:700;min-height:40px;padding:0 14px;border-radius:20px;border:0;';
-          if (navigator.share) { var sh = document.createElement('button'); sh.type = 'button'; sh.textContent = 'Compartilhar'; sh.setAttribute('style', BT + 'background:var(--accent,#1a5fd0);color:var(--on-accent,#fff)'); sh.addEventListener('click', function () { navigator.share({ title: 'Dieta e Treino', text: txt }).catch(function () {}); }); row.appendChild(sh); }
+          if (navigator.share) { var sh = document.createElement('button'); sh.type = 'button'; sh.textContent = 'Compartilhar'; sh.setAttribute('style', BT + 'background:var(--accent,#1a5fd0);color:var(--on-accent,#fff)'); sh.addEventListener('click', function () { navigator.share({ title: 'Peleja', text: txt }).catch(function () {}); }); row.appendChild(sh); }
           var wa = document.createElement('a'); wa.href = 'https://wa.me/?text=' + encodeURIComponent(txt); wa.target = '_blank'; wa.rel = 'noopener'; wa.textContent = 'WhatsApp'; wa.setAttribute('style', BT + 'display:inline-grid;place-items:center;text-decoration:none;background:var(--mat,#eee);color:inherit'); row.appendChild(wa);
           var cp = document.createElement('button'); cp.type = 'button'; cp.textContent = 'Copiar'; cp.setAttribute('style', BT + 'background:var(--mat,#eee);color:inherit');
           cp.addEventListener('click', function () { (navigator.clipboard ? navigator.clipboard.writeText(txt) : Promise.reject()).then(function () { cp.textContent = 'Copiado'; }, function () { cp.textContent = 'Selecione e copie'; }); });
